@@ -519,6 +519,11 @@ html.tmodal-open { overflow: hidden; }
   position: relative; aspect-ratio: 16 / 10; overflow: hidden;
   background: var(--bg-2); /* warm sand while the photo loads */
 }
+/* Single-column mobile: taller frame so portrait photography breathes
+   instead of being reduced to a tight eye-band crop */
+@media (max-width: 680px) {
+  .post-art { aspect-ratio: 4 / 3; }
+}
 .post-art img {
   position: absolute; inset: 0; width: 100%; height: 100%;
   object-fit: cover;
@@ -557,6 +562,9 @@ html.tmodal-open { overflow: hidden; }
 }
 .article-back:hover { text-decoration: underline; text-underline-offset: 4px; }
 .article-art { aspect-ratio: 21 / 9; border-radius: 12px; }
+@media (max-width: 680px) {
+  .article-art { aspect-ratio: 16 / 10; }
+}
 .article-meta { margin-top: 32px; }
 .article-title {
   margin-top: 14px;
