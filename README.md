@@ -23,7 +23,7 @@ assets/logo-white.png Brand wordmark (transparent, for dark backgrounds)
 3. Save — the site goes live at `https://sambawy01.github.io/Holistic-Beauty-Website-/`
 
 ## To-do before launch
-- [ ] Replace placeholder WhatsApp number (`wa.me/200000000000`) in all three links (nav, hero, reserve)
+- [x] WhatsApp number connected (+7 938 888 34 31)
 - [ ] Replace placeholder email (`hello@victoriavasilyeva.com`)
 - [ ] Confirm the real testimonial text and client name
 - [ ] Confirm "10+ years" experience figure

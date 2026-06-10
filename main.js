@@ -66,29 +66,23 @@
     });
   });
 
-  // ---- Treatment hover photo (desktop pointer only) ----
-  const tPhoto = document.getElementById("tPhoto");
-  if (tPhoto && window.matchMedia("(hover: hover) and (min-width: 900px)").matches) {
-    const img = tPhoto.querySelector("img");
-    document.querySelectorAll(".t-row").forEach((row) => {
-      row.addEventListener("mouseenter", () => {
-        img.src = row.dataset.photo;
-        tPhoto.style.opacity = "1";
-        tPhoto.style.clipPath = "inset(0 0 0% 0)";
-      });
-      row.addEventListener("mouseleave", () => {
-        tPhoto.style.opacity = "0";
-        tPhoto.style.clipPath = "inset(0 0 100% 0)";
-      });
-      row.addEventListener("mousemove", (e) => {
-        tPhoto.style.left = Math.min(e.clientX + 28, window.innerWidth - 260) + "px";
-        tPhoto.style.top = Math.max(16, Math.min(e.clientY - 140, window.innerHeight - 304)) + "px";
-      });
-    });
+  // ---- Setting photo rotation ----
+  const slides = gsap.utils.toArray(".setting-slide");
+  if (slides.length > 1) {
+    let cur = 0, rotTimer = null;
+    const rotate = () => {
+      slides[cur].classList.remove("is-active");
+      cur = (cur + 1) % slides.length;
+      slides[cur].classList.add("is-active");
+    };
+    new IntersectionObserver(([e]) => {
+      if (e.isIntersecting && !rotTimer) rotTimer = setInterval(rotate, 5000);
+      else if (!e.isIntersecting && rotTimer) { clearInterval(rotTimer); rotTimer = null; }
+    }, { threshold: 0.15 }).observe(document.querySelector(".setting"));
   }
 
   // ---- Setting parallax  ----
-  gsap.fromTo(".setting-media img",
+  gsap.fromTo(".setting-media",
     { yPercent: -10 }, {
       yPercent: 10, ease: "none",
       scrollTrigger: { trigger: ".setting", start: "top bottom", end: "bottom top", scrub: true },
