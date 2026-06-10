@@ -20,7 +20,7 @@ assets/logo-white.png Brand wordmark (transparent, for dark backgrounds)
 ## Deploy with GitHub Pages
 1. Go to repo **Settings → Pages**
 2. Source: **Deploy from a branch** → branch `main`, folder `/ (root)`
-3. Save — the site goes live at `https://sambawy01.github.io/Holistic-Beauty-Website-/`
+3. Save — the site goes live at `https://victoriaholisticbeauty.com/`
 
 ## To-do before launch
 - [x] WhatsApp number connected (+7 938 888 34 31)
