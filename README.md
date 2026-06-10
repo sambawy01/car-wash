@@ -11,6 +11,9 @@ Official website for Victoria Vasilyeva's holistic beauty studio in El Gouna, Eg
 ## Structure
 ```
 index.html            Main one-page site (services, prices, contact)
+styles.css            Desert Lagoon design system
+main.js               GSAP/Lenis motion choreography (reduced-motion safe)
+assets/img/           Local WebP photography
 assets/logo-white.png Brand wordmark (transparent, for dark backgrounds)
 ```
 
@@ -20,7 +23,7 @@ assets/logo-white.png Brand wordmark (transparent, for dark backgrounds)
 3. Save — the site goes live at `https://sambawy01.github.io/Holistic-Beauty-Website-/`
 
 ## To-do before launch
-- [ ] Replace placeholder WhatsApp number (`wa.me/200000000000`) in both links
+- [ ] Replace placeholder WhatsApp number (`wa.me/200000000000`) in all three links (nav, hero, reserve)
 - [ ] Replace placeholder email (`hello@victoriavasilyeva.com`)
 - [ ] Confirm the real testimonial text and client name
 - [ ] Confirm "10+ years" experience figure
