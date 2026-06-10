@@ -32,6 +32,26 @@ interface BookingFormProps {
   onBack: () => void;
 }
 
+
+const FORM_STRINGS = {
+  en: {
+    back: "Back",
+    confirm: "Confirm",
+    confirming: "Confirming...",
+    privacyPre: "By sending, you agree to our",
+    privacyLink: "Privacy policy",
+    privacyPost: "and the processing of your data.",
+  },
+  ru: {
+    back: "Назад",
+    confirm: "Подтвердить",
+    confirming: "Подтверждаем...",
+    privacyPre: "Отправляя форму, вы соглашаетесь с",
+    privacyLink: "политикой конфиденциальности",
+    privacyPost: "и обработкой ваших данных.",
+  },
+} as const;
+
 export const BookingForm: React.FC<BookingFormProps> = ({
   selectedSlot,
   eventTypeId,
@@ -45,6 +65,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [guests, setGuests] = useState<string[]>([]);
 
+  const ft = FORM_STRINGS[lang] ?? FORM_STRINGS.en;
   const form = useForm<BookingFormData>({
     resolver: zodResolver(createBookingSchema(lang)),
     defaultValues: {
@@ -161,25 +182,25 @@ export const BookingForm: React.FC<BookingFormProps> = ({
               onClick={onBack}
               className="flex-1 cursor-pointer h-12"
               >
-              Back
+              {ft.back}
             </Button>
             <Button
               disabled={loading}
               size='lg'
               className="flex-1 cursor-pointer h-12">
-              {loading ? "Confirming..." : "Confirm"}
+              {loading ? ft.confirming : ft.confirm}
             </Button>
           </div>
 
           {/* Privacy Policy Text */}
           <p className="text-center text-sm text-muted-foreground">
-            By sending, you agree to our{" "}
+            {ft.privacyPre}{" "}
             <Link
-              href="/privacy-policy"
+              href={lang === "ru" ? "/privacy-policy?lang=ru" : "/privacy-policy"}
               className="font-medium text-foreground underline hover:text-primary transition-colors">
-              Privacy policy
+              {ft.privacyLink}
             </Link>{" "}
-            and the processing of your data.
+            {ft.privacyPost}
           </p>
         </form>
       </Form>
