@@ -96,7 +96,7 @@ export const BRAND = {
     "Victoria provides services to female clients only — politely inform male inquirers.",
   whatsappNumber: "+7 938 888 34 31",
   whatsappLink: "https://wa.me/79388883431",
-  bookingLink: "https://vv-holistic.vercel.app/book",
+  bookingLink: "https://book.victoriaholisticbeauty.com/book",
   contactEmail: "victoria@victoriaholisticbeauty.com",
 };
 

@@ -6,13 +6,13 @@
   const CHAT_ENDPOINT =
     (location.hostname === "localhost" || location.hostname === "127.0.0.1")
       ? "http://localhost:3000/api/chat"
-      : "https://vv-holistic.vercel.app/api/chat";
+      : "https://book.victoriaholisticbeauty.com/api/chat";
 
   const RU = document.documentElement.lang === "ru";
   const CONTACT_EMAIL = "victoria@victoriaholisticbeauty.com";
   const BOOK_URL = RU
-    ? "https://vv-holistic.vercel.app/book?lang=ru"
-    : "https://vv-holistic.vercel.app/book";
+    ? "https://book.victoriaholisticbeauty.com/book?lang=ru"
+    : "https://book.victoriaholisticbeauty.com/book";
 
   const T = RU
     ? {

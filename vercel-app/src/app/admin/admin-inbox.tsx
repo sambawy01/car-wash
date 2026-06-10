@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CalBooking } from "@/lib/admin/cal";
 import { SERVICES } from "@/lib/services";
 
-const PUBLIC_BOOKING_BASE = "https://vv-holistic.vercel.app/book";
+const PUBLIC_BOOKING_BASE = "https://book.victoriaholisticbeauty.com/book";
 const CAIRO_TZ = "Africa/Cairo";
 
 /* ---------- helpers ---------- */

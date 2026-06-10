@@ -19,7 +19,7 @@ export default function Home() {
           Book an appointment
         </Link>
         <a
-          href="https://sambawy01.github.io/Holistic-Beauty-Website-/"
+          href="https://victoriaholisticbeauty.com/"
           className="rounded-full border border-[#A9745A]/50 px-8 py-3 text-[#3A332C] transition-colors hover:border-[#A9745A]"
         >
           Back to main site

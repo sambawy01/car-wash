@@ -8,8 +8,8 @@ export const metadata = {
 };
 
 const WHATSAPP_LINK = "https://wa.me/79388883431";
-const MAIN_SITE_EN = "https://sambawy01.github.io/Holistic-Beauty-Website-/";
-const MAIN_SITE_RU = "https://sambawy01.github.io/Holistic-Beauty-Website-/ru.html";
+const MAIN_SITE_EN = "https://victoriaholisticbeauty.com/";
+const MAIN_SITE_RU = "https://victoriaholisticbeauty.com/ru.html";
 
 type Lang = "en" | "ru";
 

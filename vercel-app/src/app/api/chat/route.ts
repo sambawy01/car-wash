@@ -9,12 +9,16 @@ const UPSTREAM_TIMEOUT_MS = 30_000;
 
 // --- CORS ---------------------------------------------------------------
 
-const GITHUB_PAGES_ORIGIN = "https://sambawy01.github.io";
+const ALLOWED_ORIGINS = new Set([
+  "https://victoriaholisticbeauty.com",
+  "https://www.victoriaholisticbeauty.com",
+  "https://sambawy01.github.io", // legacy URL, redirects to the domain
+]);
 const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 function isAllowedOrigin(origin: string | null): boolean {
   if (!origin) return true; // same-origin / curl without Origin header
-  return origin === GITHUB_PAGES_ORIGIN || LOCAL_ORIGIN_RE.test(origin);
+  return ALLOWED_ORIGINS.has(origin) || LOCAL_ORIGIN_RE.test(origin);
 }
 
 function corsHeaders(origin: string | null): Record<string, string> {
