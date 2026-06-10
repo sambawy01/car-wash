@@ -27,16 +27,10 @@
   gsap.ticker.lagSmoothing(0);
 
   // ---- Hero load sequence ----
-  const name = document.getElementById("heroName");
-  name.setAttribute("aria-label", name.textContent);
-  name.innerHTML = `<span aria-hidden="true">` + name.textContent
-    .split("")
-    .map((c) => (c.trim() === "" ? " " : `<span class="ch">${c}</span>`))
-    .join("") + `</span>`;
-  gsap.set(name, { opacity: 1 });
+  gsap.set("#heroName", { opacity: 1 });
   gsap.timeline()
-    .from(".hero-name .ch", { yPercent: 60, opacity: 0, duration: 0.9, stagger: 0.035, ease: "power3.out" }, 0.15)
-    .to(".hero .reveal-soft", { opacity: 1, y: 0, duration: 0.8, stagger: 0.12, ease: "power2.out" }, "-=0.45");
+    .from(".hero-logo", { y: 28, opacity: 0, scale: 0.985, duration: 1.5, ease: "power3.out" }, 0.2)
+    .to(".hero .reveal-soft", { opacity: 1, y: 0, duration: 0.8, stagger: 0.12, ease: "power2.out" }, "-=0.7");
 
   // ---- Hero parallax scroll-out ----
   gsap.to(".hero-media", {
