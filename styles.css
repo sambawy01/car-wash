@@ -5,7 +5,7 @@
   --teal: #16494E;
   --teal-dark: #0D2E31;
   --bronze: #B08D57;
-  --bronze-text: #8A6B3C;
+  --bronze-text: #7A5E33;
   --ink: #2B2620;
   --serif: "Fraunces", "Cormorant Garamond", Georgia, serif;
   --sans: "Jost", "Inter", system-ui, sans-serif;
@@ -136,9 +136,9 @@ h2 {
 }
 .t-name { font-family: var(--serif); font-size: clamp(18px, 2.4vw, 24px); }
 /* Amendment 4: targets .t-name .t-sub (HTML uses <span class="t-sub">) */
-.t-name .t-sub { font-family: var(--sans); font-size: 13px; color: rgba(43,38,32,0.62); margin-left: 10px; letter-spacing: 0.04em; }
+.t-name .t-sub { font-family: var(--sans); font-size: 13px; color: rgba(43,38,32,0.72); margin-left: 10px; letter-spacing: 0.04em; }
 .t-price { flex: none; color: var(--bronze-text); font-size: 15px; letter-spacing: 0.05em; }
-.t-price small { color: rgba(43,38,32,0.62); font-size: 12px; }
+.t-price small { color: rgba(43,38,32,0.72); font-size: 12px; }
 .t-photo {
   position: fixed; z-index: 30; width: 230px; aspect-ratio: 4/5; pointer-events: none;
   opacity: 0; clip-path: inset(0 0 100% 0); transition: clip-path 0.55s var(--ease), opacity 0.3s;
@@ -181,7 +181,7 @@ h2 {
 .footer {
   margin-top: clamp(70px, 10vh, 120px); padding: 22px 28px;
   display: flex; justify-content: space-between;
-  font-size: 11px; color: rgba(237,227,211,0.55);
+  font-size: 11px; color: rgba(237,227,211,0.64);
   border-top: 1px solid rgba(237,227,211,0.12);
 }
 
