@@ -3,10 +3,10 @@
 Official website for Victoria Vasilyeva's holistic beauty studio in El Gouna, Egypt.
 
 ## Stack
-- Static HTML — no build step required
-- Tailwind CSS (CDN)
-- Lucide icons (CDN)
-- Inter font (Google Fonts)
+- Static HTML + hand-written CSS — no build step
+- GSAP ScrollTrigger + Lenis smooth scroll (CDN)
+- Fraunces & Jost (Google Fonts)
+- Local WebP photography (assets/img/)
 
 ## Structure
 ```
