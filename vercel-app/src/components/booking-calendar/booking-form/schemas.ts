@@ -12,6 +12,14 @@ export const createBookingSchema = (lang: BookingLang = 'en') =>
       .string()
       .min(1, lang === 'ru' ? 'Укажите эл. почту' : 'Email is required')
       .email(lang === 'ru' ? 'Неверный адрес эл. почты' : 'Invalid email address'),
+    phone: z
+      .string()
+      .regex(
+        /^\+?[0-9\s\-()]{8,17}$/,
+        lang === 'ru'
+          ? 'Укажите номер телефона с кодом страны'
+          : 'Enter a valid phone number with country code'
+      ),
     notes: z.string().optional().or(z.literal('')),
     guests: z
       .array(z.string().email('Please enter valid email addresses'))

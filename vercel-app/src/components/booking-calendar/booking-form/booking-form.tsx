@@ -50,6 +50,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
     defaultValues: {
       name: "",
       email: "",
+      phone: "",
       notes: "",
       guests: [],
       referralSource: undefined,
@@ -63,6 +64,9 @@ export const BookingForm: React.FC<BookingFormProps> = ({
     try {
       const endTime = calculateEndTime(selectedSlot, eventLength);
 
+      // Normalize phone: strip spaces, dashes and parentheses (keep leading +)
+      const normalizedPhone = data.phone.replace(/[\s\-()]/g, "");
+
       const bookingData: CalcomBookingRequest = {
         eventTypeId,
         start: selectedSlot,
@@ -71,6 +75,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
         attendee: {
           name: data.name,
           email: data.email,
+          phoneNumber: normalizedPhone,
           timeZone: userTimezone,
         },
         metadata: {

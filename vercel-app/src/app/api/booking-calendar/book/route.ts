@@ -6,6 +6,8 @@ interface BookingRequestV2 {
   attendee: {
     name: string;
     email: string;
+    /** Verified: lands on attendees[].phoneNumber and is auto-mirrored to bookingFieldsResponses.attendeePhoneNumber */
+    phoneNumber?: string;
     timeZone: string;
     language?: string;
   };
@@ -68,9 +70,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure notes is always a string
-    const notes = String(
+    let notes = String(
       bookingData.metadata?.notes || "No additional notes provided"
     );
+
+    // Sanitize phone: strip spaces/dashes/parens, then require E.164-ish shape.
+    // If it doesn't pass Cal-safe validation, surface it via notes instead so
+    // Victoria still sees it and the booking never fails because of the phone.
+    let phoneNumber: string | undefined;
+    if (typeof bookingData.attendee.phoneNumber === "string") {
+      const normalized = bookingData.attendee.phoneNumber
+        .replace(/[\s\-()]/g, "")
+        .slice(0, 32);
+      if (/^\+?[0-9]{8,17}$/.test(normalized)) {
+        phoneNumber = normalized;
+      } else if (normalized.length > 0) {
+        notes = `Phone: ${normalized}\n${notes}`;
+      }
+    }
 
     // Format the booking data for Cal.com v2 API
     const calcomBookingData: BookingRequestV2 = {
@@ -78,6 +95,7 @@ export async function POST(request: NextRequest) {
       attendee: {
         name: bookingData.attendee.name,
         email: bookingData.attendee.email,
+        ...(phoneNumber && { phoneNumber }),
         timeZone: bookingData.attendee.timeZone,
         language: "en",
       },

@@ -19,12 +19,14 @@ const CONTACT_STRINGS = {
     label: "Contact Information",
     name: "Full name",
     email: "Email",
+    phone: "Mobile number (WhatsApp)",
     notes: "Anything Victoria should know before your session? (optional)",
   },
   ru: {
     label: "Контактные данные",
     name: "Имя и фамилия",
     email: "Эл. почта",
+    phone: "Мобильный номер (WhatsApp)",
     notes: "Что Виктории стоит знать перед сеансом? (необязательно)",
   },
 } as const;
@@ -37,26 +39,26 @@ export const ContactSection = <T extends FieldValues>({ control, lang = "en" }: 
         {t.label}
       </Label>
       
-      <div className="flex flex-col gap-4 sm:flex-row">
-        {/* Name Field */}
-        <FormField
-          control={control}
-          name={'name' as Path<T>}
-          render={({ field }) => (
-            <FormItem className="w-full">
-              <FormControl>
-                <Input
-                  type="text"
-                  placeholder={t.name}
-                  {...field}
-                  className="h-12 bg-muted text-foreground border-border focus-visible:border-primary focus-visible:ring-primary/50"
-                />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+      {/* Name Field */}
+      <FormField
+        control={control}
+        name={'name' as Path<T>}
+        render={({ field }) => (
+          <FormItem className="w-full">
+            <FormControl>
+              <Input
+                type="text"
+                placeholder={t.name}
+                {...field}
+                className="h-12 bg-muted text-foreground border-border focus-visible:border-primary focus-visible:ring-primary/50"
+              />
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
 
+      <div className="flex flex-col gap-4 sm:flex-row">
         {/* Email Field */}
         <FormField
           control={control}
@@ -67,6 +69,27 @@ export const ContactSection = <T extends FieldValues>({ control, lang = "en" }: 
                 <Input
                   type="email"
                   placeholder={t.email}
+                  {...field}
+                  className="h-12 bg-muted text-foreground border-border focus-visible:border-primary focus-visible:ring-primary/50"
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Phone Field */}
+        <FormField
+          control={control}
+          name={'phone' as Path<T>}
+          render={({ field }) => (
+            <FormItem className="w-full">
+              <FormControl>
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  placeholder={t.phone}
                   {...field}
                   className="h-12 bg-muted text-foreground border-border focus-visible:border-primary focus-visible:ring-primary/50"
                 />

@@ -6,6 +6,7 @@ export interface TimeSlot {
 export interface BookingFormData {
   name: string;
   email: string;
+  phone: string;
   notes: string;
   guests?: string[];
   referralSource?: 'google' | 'twitter' | 'instagram' | 'facebook';
@@ -26,6 +27,8 @@ export interface CalcomBookingRequest {
   attendee: {
     name: string;
     email: string;
+    /** E.164-ish, normalized client-side (no spaces/dashes/parens) */
+    phoneNumber?: string;
     timeZone: string;
   };
   metadata?: {
