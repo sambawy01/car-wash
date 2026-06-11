@@ -24,10 +24,10 @@ export const SERVICES: Service[] = [
     ru: { title: "Массаж лица" },
     durations: [60, 90],
     priceLine: {
-      en: "E£1,900–2,800 · 2 600–3 900 ₽",
-      ru: "E£1,900–2,800 · 2 600–3 900 ₽",
+      en: "E£2,300–3,350 · 3 100–4 700 ₽",
+      ru: "E£2,300–3,350 · 3 100–4 700 ₽",
     },
-    price: { egp: 2800, rub: 3900 },
+    price: { egp: 3350, rub: 4700 },
   },
   {
     slug: "body-massage",
@@ -36,10 +36,10 @@ export const SERVICES: Service[] = [
     ru: { title: "Медицинский массаж тела" },
     durations: [40, 60],
     priceLine: {
-      en: "E£2,100–2,800 · 2 900–3 900 ₽",
-      ru: "E£2,100–2,800 · 2 900–3 900 ₽",
+      en: "E£2,500–3,350 · 3 500–4 700 ₽",
+      ru: "E£2,500–3,350 · 3 500–4 700 ₽",
     },
-    price: { egp: 2800, rub: 3900 },
+    price: { egp: 3350, rub: 4700 },
   },
   {
     slug: "microcurrent-rf",
@@ -47,8 +47,8 @@ export const SERVICES: Service[] = [
     en: { title: "Microcurrent / RF Therapy" },
     ru: { title: "Микротоки · RF-терапия" },
     durations: [20],
-    priceLine: { en: "E£900 · 1 300 ₽", ru: "E£900 · 1 300 ₽" },
-    price: { egp: 900, rub: 1300 },
+    priceLine: { en: "E£1,100 · 1 600 ₽", ru: "E£1,100 · 1 600 ₽" },
+    price: { egp: 1100, rub: 1600 },
   },
   {
     slug: "hydrofacial",
@@ -56,8 +56,8 @@ export const SERVICES: Service[] = [
     en: { title: "HydroFacial + Ultrasonic Cleaning" },
     ru: { title: "HydroFacial + ультразвуковая чистка" },
     durations: [60, 90],
-    priceLine: { en: "E£3,100 · 4 300 ₽", ru: "E£3,100 · 4 300 ₽" },
-    price: { egp: 3100, rub: 4300 },
+    priceLine: { en: "E£3,700 · 5 200 ₽", ru: "E£3,700 · 5 200 ₽" },
+    price: { egp: 3700, rub: 5200 },
   },
   {
     slug: "clear-skin-holy-land",
@@ -65,8 +65,8 @@ export const SERVICES: Service[] = [
     en: { title: "Clear Skin with HOLY LAND" },
     ru: { title: "Чистая кожа с HOLY LAND" },
     durations: [60],
-    priceLine: { en: "E£1,500 · 2 100 ₽", ru: "E£1,500 · 2 100 ₽" },
-    price: { egp: 1500, rub: 2100 },
+    priceLine: { en: "E£1,800 · 2 500 ₽", ru: "E£1,800 · 2 500 ₽" },
+    price: { egp: 1800, rub: 2500 },
   },
   {
     slug: "carboxytherapy",
@@ -74,8 +74,8 @@ export const SERVICES: Service[] = [
     en: { title: "Non-Invasive Carboxytherapy" },
     ru: { title: "Неинвазивная карбокситерапия" },
     durations: [30],
-    priceLine: { en: "E£1,100 · 1 500 ₽", ru: "E£1,100 · 1 500 ₽" },
-    price: { egp: 1100, rub: 1500 },
+    priceLine: { en: "E£1,300 · 1 800 ₽", ru: "E£1,300 · 1 800 ₽" },
+    price: { egp: 1300, rub: 1800 },
   },
   {
     slug: "mandelic-peel",
@@ -83,8 +83,8 @@ export const SERVICES: Service[] = [
     en: { title: "Mandelic Onmacabim Peel" },
     ru: { title: "Миндальный пилинг Onmacabim" },
     durations: [20],
-    priceLine: { en: "E£1,400 · 1 900 ₽", ru: "E£1,400 · 1 900 ₽" },
-    price: { egp: 1400, rub: 1900 },
+    priceLine: { en: "E£1,700 · 2 300 ₽", ru: "E£1,700 · 2 300 ₽" },
+    price: { egp: 1700, rub: 2300 },
   },
   {
     slug: "alginate-mask",
@@ -92,8 +92,8 @@ export const SERVICES: Service[] = [
     en: { title: "Alginate Mask" },
     ru: { title: "Альгинатная маска" },
     durations: [30],
-    priceLine: { en: "E£900 · 1 300 ₽", ru: "E£900 · 1 300 ₽" },
-    price: { egp: 900, rub: 1300 },
+    priceLine: { en: "E£1,100 · 1 600 ₽", ru: "E£1,100 · 1 600 ₽" },
+    price: { egp: 1100, rub: 1600 },
   },
   {
     slug: "dermapen-face-neck-decollete",
@@ -101,8 +101,8 @@ export const SERVICES: Service[] = [
     en: { title: "Derma Pen — Full Face + Neck + Décolletage" },
     ru: { title: "Дермапен — лицо + шея + декольте" },
     durations: [90],
-    priceLine: { en: "E£3,800 · 5 300 ₽", ru: "E£3,800 · 5 300 ₽" },
-    price: { egp: 3800, rub: 5300 },
+    priceLine: { en: "E£4,550 · 6 400 ₽", ru: "E£4,550 · 6 400 ₽" },
+    price: { egp: 4550, rub: 6400 },
   },
   {
     slug: "dermapen-face-neck",
@@ -110,8 +110,8 @@ export const SERVICES: Service[] = [
     en: { title: "Derma Pen — Full Face + Neck" },
     ru: { title: "Дермапен — лицо + шея" },
     durations: [60],
-    priceLine: { en: "E£2,800 · 3 900 ₽", ru: "E£2,800 · 3 900 ₽" },
-    price: { egp: 2800, rub: 3900 },
+    priceLine: { en: "E£3,350 · 4 700 ₽", ru: "E£3,350 · 4 700 ₽" },
+    price: { egp: 3350, rub: 4700 },
   },
   {
     slug: "dermapen-single-area",
@@ -119,8 +119,8 @@ export const SERVICES: Service[] = [
     en: { title: "Derma Pen — Single Area" },
     ru: { title: "Дермапен — одна зона" },
     durations: [30],
-    priceLine: { en: "E£2,100 · 2 900 ₽", ru: "E£2,100 · 2 900 ₽" },
-    price: { egp: 2100, rub: 2900 },
+    priceLine: { en: "E£2,500 · 3 500 ₽", ru: "E£2,500 · 3 500 ₽" },
+    price: { egp: 2500, rub: 3500 },
   },
 ];
 

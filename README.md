@@ -31,4 +31,4 @@ assets/logo-white.png Brand wordmark (transparent, for dark backgrounds)
 > Note: WhatsApp is consultation-only (offered via Vassili, the AI assistant); booking goes through `/book`.
 
 ## Prices
-Current prices reflect the June 2026 update (+25%, rounded to nearest hundred).
+Prices updated 2026-06-11 (+20%).

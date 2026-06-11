@@ -34,67 +34,67 @@ export const SERVICES: Service[] = [
     nameEn: "Facial Massage (Plastic / Myofascial / Buccal)",
     nameRu: "Массаж лица (пластический/миофасциальный/буккальный)",
     prices: [
-      { variantEn: "60 min", variantRu: "60 мин", priceEgp: "E£1,900", priceRub: "2 600₽" },
-      { variantEn: "90 min", variantRu: "90 мин", priceEgp: "E£2,800", priceRub: "3 900₽" },
+      { variantEn: "60 min", variantRu: "60 мин", priceEgp: "E£2,300", priceRub: "3 100₽" },
+      { variantEn: "90 min", variantRu: "90 мин", priceEgp: "E£3,350", priceRub: "4 700₽" },
     ],
   },
   {
     nameEn: "Medical Body Massage",
     nameRu: "Медицинский массаж тела",
     prices: [
-      { variantEn: "40 min", variantRu: "40 мин", priceEgp: "E£2,100", priceRub: "2 900₽" },
-      { variantEn: "60 min", variantRu: "60 мин", priceEgp: "E£2,800", priceRub: "3 900₽" },
+      { variantEn: "40 min", variantRu: "40 мин", priceEgp: "E£2,500", priceRub: "3 500₽" },
+      { variantEn: "60 min", variantRu: "60 мин", priceEgp: "E£3,350", priceRub: "4 700₽" },
     ],
   },
   {
     nameEn: "Microcurrent / RF Therapy",
     nameRu: "Микротоки / RF-терапия",
     prices: [
-      { variantEn: "20 min", variantRu: "20 мин", priceEgp: "E£900", priceRub: "1 300₽" },
+      { variantEn: "20 min", variantRu: "20 мин", priceEgp: "E£1,100", priceRub: "1 600₽" },
     ],
   },
   {
     nameEn: "HydroFacial + Ultrasonic Cleaning (Onmacabim)",
     nameRu: "HydroFacial + ультразвуковая чистка",
     prices: [
-      { variantEn: "60–90 min", variantRu: "60–90 мин", priceEgp: "E£3,100", priceRub: "4 300₽" },
+      { variantEn: "60–90 min", variantRu: "60–90 мин", priceEgp: "E£3,700", priceRub: "5 200₽" },
     ],
   },
   {
     nameEn: "Clear Skin with HOLY LAND (Fruit Peel & Hydro Mask)",
     nameRu: "Чистая кожа с HOLY LAND",
     prices: [
-      { variantEn: "", variantRu: "", priceEgp: "E£1,500", priceRub: "2 100₽" },
+      { variantEn: "", variantRu: "", priceEgp: "E£1,800", priceRub: "2 500₽" },
     ],
   },
   {
     nameEn: "Non-Invasive Carboxytherapy",
     nameRu: "Неинвазивная карбокситерапия",
     prices: [
-      { variantEn: "30 min", variantRu: "30 мин", priceEgp: "E£1,100", priceRub: "1 500₽" },
+      { variantEn: "30 min", variantRu: "30 мин", priceEgp: "E£1,300", priceRub: "1 800₽" },
     ],
   },
   {
     nameEn: "Mandelic Onmacabim Peel (All-Season Lifting)",
     nameRu: "Миндальный пилинг Onmacabim",
     prices: [
-      { variantEn: "20 min", variantRu: "20 мин", priceEgp: "E£1,400", priceRub: "1 900₽" },
+      { variantEn: "20 min", variantRu: "20 мин", priceEgp: "E£1,700", priceRub: "2 300₽" },
     ],
   },
   {
     nameEn: "Alginate Mask",
     nameRu: "Альгинатная маска",
     prices: [
-      { variantEn: "", variantRu: "", priceEgp: "E£900", priceRub: "1 300₽" },
+      { variantEn: "", variantRu: "", priceEgp: "E£1,100", priceRub: "1 600₽" },
     ],
   },
   {
     nameEn: "Derma Pen Microneedling",
     nameRu: "Дермапен·микронидлинг",
     prices: [
-      { variantEn: "Full Face+Neck+Décolletage", variantRu: "Лицо+шея+декольте", priceEgp: "E£3,800", priceRub: "5 300₽" },
-      { variantEn: "Full Face+Neck", variantRu: "Лицо+шея", priceEgp: "E£2,800", priceRub: "3 900₽" },
-      { variantEn: "Single Area", variantRu: "Одна зона", priceEgp: "E£2,100", priceRub: "2 900₽" },
+      { variantEn: "Full Face+Neck+Décolletage", variantRu: "Лицо+шея+декольте", priceEgp: "E£4,550", priceRub: "6 400₽" },
+      { variantEn: "Full Face+Neck", variantRu: "Лицо+шея", priceEgp: "E£3,350", priceRub: "4 700₽" },
+      { variantEn: "Single Area", variantRu: "Одна зона", priceEgp: "E£2,500", priceRub: "3 500₽" },
     ],
   },
 ];
