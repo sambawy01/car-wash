@@ -108,9 +108,7 @@ h2 {
 @media (max-width: 480px) {
   .nav-links a:nth-child(2) { display: none; } /* hide About: keeps Journal + RU + Reserve and room for the logo */
 }
-@media (max-width: 400px) {
-  .nav-links a:nth-child(1):lang(ru) { display: none; } /* RU labels are longer — free room for the logo */
-}
+
 
 /* ===== Logo recolor: white script → deep warm brown on light backgrounds ===== */
 .nav-logo, .reserve-logo { filter: var(--logo-ink); }
@@ -1222,11 +1220,12 @@ html.order-open .chat-card { display: none; }
   .pmodal-overlay, .pmodal { animation: none !important; }
 }
 
-/* Six links now (Treatments · About · Journal · Shop · lang · CTA): extend the
-   progressive hiding so Shop stays reachable on narrow phones. */
-@media (max-width: 480px) {
-  .nav-links a:nth-child(1):lang(ru) { display: none; } /* Процедуры — RU rows are longer */
-}
+/* Six links (Treatments · About · Journal · Shop · lang · CTA): progressive
+   hiding priority — Treatments is the core business link and NEVER hides.
+   Drop order: About (≤480, rule above) → Journal (≤430) → Shop (≤390). */
 @media (max-width: 430px) {
-  .nav-links a:nth-child(1) { display: none; } /* Treatments — Journal · Shop · lang · CTA remain */
+  .nav-links a:nth-child(3) { display: none; } /* Journal */
+}
+@media (max-width: 390px) {
+  .nav-links a:nth-child(4) { display: none; } /* Shop */
 }
