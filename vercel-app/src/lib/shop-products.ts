@@ -5,7 +5,14 @@
  * are computed HERE on the server from these prices. Client-supplied
  * prices/totals are never trusted.
  *
- * Prices are placeholder data in EGP and RUB (integer units, no cents).
+ * Prices are in EGP and RUB (integer units, no cents). Two products carry
+ * prices converted from onmacabim-prof.com USD list prices (rates of
+ * 2026-06-11, EGP rounded to nearest 50, RUB to nearest 100); the other
+ * four had no listed price and keep placeholder values pending the
+ * owner's confirmation.
+ *
+ * Slugs and prices MUST stay identical to the PRODUCTS array in /shop.js
+ * (static site) — drift breaks order submission.
  */
 
 export interface ShopProduct {
@@ -18,60 +25,46 @@ export interface ShopProduct {
 
 export const SHOP_PRODUCTS: readonly ShopProduct[] = [
   {
-    slug: "hydrating-serum",
-    nameEn: "Hydrating Serum — Onmacabim 30ml",
-    nameRu: "Увлажняющая сыворотка",
+    slug: "tohar-hamidbar-concentrate",
+    nameEn: "Tohar Hamidbar No.2 Herbal Concentrate — DM line 150ml",
+    nameRu: "Травяной концентрат Tohar Hamidbar №2 (линия DM, 150 мл)",
     priceEgp: 1450,
     priceRub: 2000,
   },
   {
-    slug: "fruit-peel-mask",
-    nameEn: "Fruit Peel Mask — HOLY LAND 50ml",
-    nameRu: "Фруктовая маска-пилинг",
-    priceEgp: 980,
-    priceRub: 1400,
+    slug: "nd-neck-decollete-cream",
+    nameEn: "N.D Cream for Neck & Décolleté — Vivant line 50ml",
+    nameRu: "Крем для шеи и декольте N.D (линия Vivant, 50 мл)",
+    priceEgp: 1250,
+    priceRub: 1750,
   },
   {
-    slug: "alginate-mask-kit",
-    nameEn: "Alginate Modeling Mask home kit",
-    nameRu: "Альгинатная маска (набор)",
-    priceEgp: 750,
-    priceRub: 1050,
+    slug: "vitamin-c-mask",
+    nameEn: "Nourishing Skin Mask Vitamin C — VC line 50ml",
+    nameRu: "Питательная маска с витамином C (линия VC, 50 мл)",
+    priceEgp: 2300,
+    priceRub: 3200,
   },
   {
-    slug: "mineral-sunscreen-spf50",
-    nameEn: "Mineral Sunscreen SPF 50",
-    nameRu: "Минеральный SPF 50",
-    priceEgp: 890,
-    priceRub: 1250,
-  },
-  {
-    slug: "mandelic-toner",
-    nameEn: "Mandelic Renewal Toner 100ml",
-    nameRu: "Миндальный тоник",
-    priceEgp: 820,
-    priceRub: 1150,
-  },
-  {
-    slug: "collagen-eye-patches",
-    nameEn: "Collagen Eye Patches 60pcs",
-    nameRu: "Коллагеновые патчи",
-    priceEgp: 640,
-    priceRub: 900,
-  },
-  {
-    slug: "gua-sha-tool",
-    nameEn: "Facial Sculpting Tool gua sha",
-    nameRu: "Скульптурирующий гуаша",
-    priceEgp: 560,
-    priceRub: 800,
-  },
-  {
-    slug: "recovery-night-cream",
-    nameEn: "Recovery Night Cream 50ml",
-    nameRu: "Восстанавливающий ночной крем",
-    priceEgp: 1120,
+    slug: "vitality-spf15-moisturizer",
+    nameEn: "Vitality Moisturizer SPF 15 — Oxygen line 50ml",
+    nameRu: "Увлажняющий крем Vitality SPF 15 (линия Oxygen, 50 мл)",
+    priceEgp: 1150,
     priceRub: 1600,
+  },
+  {
+    slug: "nomela-serum",
+    nameEn: "NoMela Facial Serum — Luna whitening series 50ml",
+    nameRu: "Сыворотка для лица NoMela (серия Luna, 50 мл)",
+    priceEgp: 1350,
+    priceRub: 1900,
+  },
+  {
+    slug: "moisturizer-normal-dry",
+    nameEn: "Moisturizer for Normal to Dry Skin — ST Cells line 50ml",
+    nameRu: "Увлажняющий крем для нормальной и сухой кожи (линия ST Cells, 50 мл)",
+    priceEgp: 4850,
+    priceRub: 6700,
   },
 ] as const;
 

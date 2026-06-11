@@ -8,108 +8,111 @@
 
   /* =====================================================================
      PRODUCT DATA — the single source of truth for the shop.
-     Swap names / prices here. `photo` points at a 900×900 JPEG in
-     assets/img/shop/ (license-safe Unsplash placeholders until the owner's
-     own shots arrive — swap the file, keep the path, nothing else changes).
+     Real Onmacabim retail products carried by the studio (onmacabim-prof.com).
+     Slugs and prices MUST stay identical to
+     vercel-app/src/lib/shop-products.ts — the server recomputes totals
+     from its own copy, so any drift breaks orders.
+     `photo` points at a 900×900 JPEG in assets/img/shop/.
      `alt` is the per-language image description. If `photo` is null the
      card falls back to the tinted-gradient-and-initial placeholder art.
+     `desc` is short marketing copy (not rendered on cards yet).
      Prices: `egp` in Egyptian pounds, `rub` in roubles.
      ===================================================================== */
   var PRODUCTS = [
     {
-      slug: "hydrating-serum",
-      name: { en: "Hydrating Serum", ru: "Увлажняющая сыворотка" },
-      sub: { en: "Onmacabim · 30 ml", ru: "Onmacabim · 30 мл" },
+      slug: "tohar-hamidbar-concentrate",
+      name: { en: "Tohar Hamidbar No.2 Herbal Concentrate", ru: "Травяной концентрат Tohar Hamidbar №2" },
+      sub: { en: "DM line · 150 ml", ru: "линия DM · 150 мл" },
       egp: 1450, rub: 2000,
-      initial: { en: "S", ru: "С" }, tintA: "#EFE0C8", tintB: "#DCC29B",
-      photo: "assets/img/shop/hydrating-serum.jpg",
+      initial: { en: "T", ru: "Т" }, tintA: "#F0DAD4", tintB: "#DBB0A4",
+      photo: "assets/img/shop/tohar-hamidbar-concentrate.jpg",
       alt: {
-        en: "Hydrating serum — white dropper bottle with a gold collar on marble",
-        ru: "Увлажняющая сыворотка — белый флакон с пипеткой и золотым ободком на мраморе"
+        en: "Onmacabim DM Tohar Hamidbar No.2 — white pump bottle with a green leaf motif",
+        ru: "Onmacabim DM Tohar Hamidbar №2 — белый флакон с помпой и зелёным листом"
+      },
+      desc: {
+        en: "Highly concentrated herbal formula for oily, porous and blemish-prone skin. Plant extracts and acids cleanse and tighten pores, mattify, and calm the skin with a strong antioxidant effect.",
+        ru: "Высококонцентрированное растительное средство для жирной, пористой и проблемной кожи. Экстракты растений и кислоты очищают и сужают поры, матируют и успокаивают кожу, обладая мощным антиоксидантным действием."
       }
     },
     {
-      slug: "fruit-peel-mask",
-      name: { en: "Fruit Peel Mask", ru: "Фруктовая маска-пилинг" },
-      sub: { en: "HOLY LAND · 50 ml", ru: "HOLY LAND · 50 мл" },
-      egp: 980, rub: 1400,
-      initial: { en: "P", ru: "П" }, tintA: "#F0DAC4", tintB: "#DBB592",
-      photo: "assets/img/shop/fruit-peel-mask.jpg",
+      slug: "nd-neck-decollete-cream",
+      name: { en: "N.D Cream for Neck & Décolleté", ru: "Крем для шеи и декольте N.D" },
+      sub: { en: "Vivant line · 50 ml", ru: "линия Vivant · 50 мл" },
+      egp: 1250, rub: 1750,
+      initial: { en: "N", ru: "Н" }, tintA: "#E3E4D4", tintB: "#C9CCB0",
+      photo: "assets/img/shop/nd-neck-decollete-cream.jpg",
       alt: {
-        en: "Fruit peel mask — amber gel jar with a gold lid on a beige backdrop",
-        ru: "Фруктовая маска-пилинг — янтарная баночка геля с золотой крышкой на бежевом фоне"
+        en: "Onmacabim Vivant N.D Cream — white jar beside its olive-green box",
+        ru: "Onmacabim Vivant N.D Cream — белая банка рядом с оливковой коробкой"
+      },
+      desc: {
+        en: "A complex care cream for the delicate neck and décolleté zone combining natural and biotechnological components. Enzymes and lipopeptides support cell renewal and collagen synthesis for a natural firming effect.",
+        ru: "Комплексный крем для деликатной зоны шеи и декольте, сочетающий природные и биотехнологичные компоненты. Энзимы и липопептиды поддерживают обновление клеток и синтез коллагена, создавая естественный эффект лифтинга."
       }
     },
     {
-      slug: "alginate-mask-kit",
-      name: { en: "Alginate Modeling Mask", ru: "Альгинатная маска (набор)" },
-      sub: { en: "home kit · 5 uses", ru: "набор · 5 применений" },
-      egp: 750, rub: 1050,
-      initial: { en: "A", ru: "А" }, tintA: "#E3E4D4", tintB: "#C9CCB0",
-      photo: "assets/img/shop/alginate-mask-kit.jpg",
+      slug: "vitamin-c-mask",
+      name: { en: "Nourishing Skin Mask Vitamin C", ru: "Питательная маска с витамином C" },
+      sub: { en: "VC line · 50 ml", ru: "линия VC · 50 мл" },
+      egp: 2300, rub: 3200,
+      initial: { en: "C", ru: "С" }, tintA: "#F4E6C4", tintB: "#E2CC98",
+      photo: "assets/img/shop/vitamin-c-mask.jpg",
       alt: {
-        en: "Alginate mask home kit — mixing bowl, mask brush, measuring spoons and powder",
-        ru: "Набор альгинатной маски — миска для смешивания, кисть, мерные ложки и пудра"
+        en: "Onmacabim Nourishing Skin Mask Vitamin C — white tube beside its box",
+        ru: "Onmacabim питательная маска с витамином C — белая туба рядом с коробкой"
+      },
+      desc: {
+        en: "Rich, antioxidant-packed nourishing mask with a brightening effect. Helps reduce hyperpigmentation and supports collagen production — well suited to dehydrated skin with signs of photoaging.",
+        ru: "Насыщенная питательная маска с антиоксидантами и осветляющим эффектом. Помогает уменьшить гиперпигментацию и поддерживает выработку коллагена — подходит обезвоженной коже с признаками фотостарения."
       }
     },
     {
-      slug: "mineral-sunscreen-spf50",
-      name: { en: "Mineral Sunscreen SPF 50", ru: "Минеральный SPF 50" },
-      sub: { en: "mineral filter · 50 ml", ru: "минеральный фильтр · 50 мл" },
-      egp: 890, rub: 1250,
-      initial: { en: "50", ru: "50" }, tintA: "#F4E6C4", tintB: "#E2CC98",
-      photo: "assets/img/shop/mineral-sunscreen-spf50.jpg",
+      slug: "vitality-spf15-moisturizer",
+      name: { en: "Vitality Moisturizer SPF 15", ru: "Увлажняющий крем Vitality SPF 15" },
+      sub: { en: "Oxygen line · 50 ml", ru: "линия Oxygen · 50 мл" },
+      egp: 1150, rub: 1600,
+      initial: { en: "V", ru: "В" }, tintA: "#DCE4EC", tintB: "#B7C6D6",
+      photo: "assets/img/shop/vitality-spf15-moisturizer.jpg",
       alt: {
-        en: "Mineral sunscreen SPF 50 — white pump bottle on warm stone with a pine sprig",
-        ru: "Минеральный санскрин SPF 50 — белый флакон с помпой на тёплом камне с веткой сосны"
+        en: "Onmacabim Oxygen Vitality Moisturizing Lotion SPF 15 — white pump bottle beside its box",
+        ru: "Onmacabim Oxygen Vitality увлажняющий лосьон SPF 15 — белый флакон с помпой рядом с коробкой"
+      },
+      desc: {
+        en: "A light, quickly absorbed cream-fluid with a delicate fresh scent. Restores the skin's natural moisture balance, improves elasticity and complexion, and protects against UV with SPF 15.",
+        ru: "Лёгкий, быстро впитывающийся крем-флюид с нежным свежим ароматом. Восстанавливает естественный баланс влаги, повышает упругость, улучшает цвет лица и защищает от ультрафиолета с SPF 15."
       }
     },
     {
-      slug: "mandelic-toner",
-      name: { en: "Mandelic Renewal Toner", ru: "Миндальный тоник" },
-      sub: { en: "100 ml", ru: "100 мл" },
-      egp: 820, rub: 1150,
-      initial: { en: "T", ru: "Т" }, tintA: "#EBE3D2", tintB: "#D3C4A6",
-      photo: "assets/img/shop/mandelic-toner.jpg",
+      slug: "nomela-serum",
+      name: { en: "NoMela Facial Serum", ru: "Сыворотка для лица NoMela" },
+      sub: { en: "Luna whitening series · 50 ml", ru: "осветляющая серия Luna · 50 мл" },
+      egp: 1350, rub: 1900,
+      initial: { en: "L", ru: "Л" }, tintA: "#EFE0C8", tintB: "#DCC29B",
+      photo: "assets/img/shop/nomela-serum.jpg",
       alt: {
-        en: "Mandelic renewal toner — amber glass bottle in soft palm-leaf light",
-        ru: "Миндальный тоник — флакон янтарного стекла в мягком свете с тенью пальмы"
+        en: "Onmacabim Luna NoMela facial serum — white dropper bottle with a gold collar beside its box",
+        ru: "Onmacabim Luna NoMela сыворотка для лица — белый флакон с пипеткой и золотым ободком рядом с коробкой"
+      },
+      desc: {
+        en: "A delicate brightening serum that balances skin tone and helps prevent new pigmentation. Moisturizing polysaccharides and lightening extracts reduce melanin synthesis. For all skin types, year-round.",
+        ru: "Деликатная осветляющая сыворотка выравнивает тон кожи и помогает предотвратить появление новой пигментации. Увлажняющие полисахариды и осветляющие экстракты снижают синтез меланина. Для всех типов кожи, круглый год."
       }
     },
     {
-      slug: "collagen-eye-patches",
-      name: { en: "Collagen Eye Patches", ru: "Коллагеновые патчи" },
-      sub: { en: "60 pcs", ru: "60 шт" },
-      egp: 640, rub: 900,
-      initial: { en: "C", ru: "К" }, tintA: "#E6DDD6", tintB: "#CDBBAE",
-      photo: "assets/img/shop/collagen-eye-patches.jpg",
+      slug: "moisturizer-normal-dry",
+      name: { en: "Moisturizer for Normal to Dry Skin", ru: "Увлажняющий крем для нормальной и сухой кожи" },
+      sub: { en: "ST Cells line · 50 ml", ru: "линия ST Cells · 50 мл" },
+      egp: 4850, rub: 6700,
+      initial: { en: "M", ru: "М" }, tintA: "#E0D8CE", tintB: "#BFB1A2",
+      photo: "assets/img/shop/moisturizer-normal-dry.jpg",
       alt: {
-        en: "Collagen eye patches worn under the eyes",
-        ru: "Коллагеновые патчи под глазами"
-      }
-    },
-    {
-      slug: "gua-sha-tool",
-      name: { en: "Facial Sculpting Tool", ru: "Скульптурирующий гуаша" },
-      sub: { en: "gua sha · stone", ru: "гуаша · камень" },
-      egp: 560, rub: 800,
-      initial: { en: "G", ru: "Г" }, tintA: "#E0D8CE", tintB: "#BFB1A2",
-      photo: "assets/img/shop/gua-sha-tool.jpg",
-      alt: {
-        en: "Black stone gua sha sculpting tool on marble",
-        ru: "Скульптурирующий гуаша из чёрного камня на мраморе"
-      }
-    },
-    {
-      slug: "recovery-night-cream",
-      name: { en: "Recovery Night Cream", ru: "Восстанавливающий ночной крем" },
-      sub: { en: "50 ml", ru: "50 мл" },
-      egp: 1120, rub: 1600,
-      initial: { en: "N", ru: "Н" }, tintA: "#DED4C9", tintB: "#BCA88F",
-      photo: "assets/img/shop/recovery-night-cream.jpg",
-      alt: {
-        en: "Recovery night cream — open frosted jar on a wooden slab",
-        ru: "Восстанавливающий ночной крем — открытая матовая банка на деревянном спиле"
+        en: "Onmacabim ST Cells moisturizer for normal to dry skin — white pump bottle beside its box",
+        ru: "Onmacabim ST Cells увлажняющий крем для нормальной и сухой кожи — белый флакон с помпой рядом с коробкой"
+      },
+      desc: {
+        en: "A stem-cell moisturizer that supports collagen production and hyaluronic acid renewal. Skin looks smoother, firmer and more rested, with better resistance to outside stressors.",
+        ru: "Увлажняющий крем с фитостволовыми клетками поддерживает выработку коллагена и обновление гиалуроновой кислоты. Кожа выглядит более гладкой, упругой и отдохнувшей, лучше противостоит внешним воздействиям."
       }
     }
   ];

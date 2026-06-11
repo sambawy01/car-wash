@@ -93,7 +93,14 @@ export const BRAND = {
     "Victoria Vasilyeva, holistic beauty studio, working in Egypt & Russia, 10+ years of experience, medical-grade techniques combined with mindful restorative care. " +
     "Victoria's credentials: physician by training — Pavlov First Saint Petersburg State Medical University (ПСПбГМУ им. акад. И. П. Павлова): degree in General Medicine / internal medicine physician (терапевт), 2013; surgical residency (ординатура, хирург), 2015; professional retraining in nursing for cosmetology (сестринское дело в косметологии), 2015–2016. " +
     "She is recognized for serving celebrities and stars from Egypt and the Middle East region (never name specific clients — confidentiality). " +
-    "Victoria provides services to female clients only — politely inform male inquirers.",
+    "Victoria provides services to female clients only — politely inform male inquirers. " +
+    "Studio shop products — Onmacabim professional cosmetics (cash on delivery, 24–72h delivery across Egypt): " +
+    "Tohar Hamidbar No.2 Herbal Concentrate, DM line 150ml — E£1,450 / 2 000₽; " +
+    "N.D Cream for Neck & Décolleté, Vivant line 50ml — E£1,250 / 1 750₽; " +
+    "Nourishing Skin Mask Vitamin C, VC line 50ml — E£2,300 / 3 200₽; " +
+    "Vitality Moisturizer SPF 15, Oxygen line 50ml — E£1,150 / 1 600₽; " +
+    "NoMela Facial Serum, Luna whitening series 50ml — E£1,350 / 1 900₽; " +
+    "Moisturizer for Normal to Dry Skin, ST Cells line 50ml — E£4,850 / 6 700₽.",
   whatsappNumber: "+7 938 888 34 31",
   whatsappLink: "https://wa.me/79388883431",
   bookingLink: "https://book.victoriaholisticbeauty.com/book",
