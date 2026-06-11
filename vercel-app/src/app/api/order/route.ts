@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { corsHeaders, isAllowedOrigin } from "@/lib/cors";
+import { saveOrder, type StoredOrder } from "@/lib/orders";
 import {
   PRODUCTS_BY_SLUG,
   formatEgp,
@@ -29,6 +30,11 @@ export const runtime = "nodejs";
  *   bounced inbox can't take down the other; `emailed` stays true when at
  *   least one recipient succeeded, with per-recipient counts in
  *   `ownerEmails: { sent, failed }`.
+ * - Every order is persisted to Vercel Blob (private store) at
+ *   `orders/<orderNumber>.json` so /admin can track its status
+ *   (ordered → shipped → delivered). A Blob failure must NEVER fail the
+ *   order — it is caught and logged, and the response reports
+ *   `stored: boolean`.
  */
 
 const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
@@ -617,6 +623,37 @@ export async function POST(request: NextRequest) {
 
   const orderNumber = generateOrderNumber();
 
+  // Persist to Vercel Blob FIRST so the admin inbox sees the order even if
+  // both mailers fail. A Blob failure must never fail the order either —
+  // Victoria still gets the notification email with all details.
+  let stored = false;
+  try {
+    const createdAt = new Date().toISOString();
+    const record: StoredOrder = {
+      orderNumber,
+      createdAt,
+      status: "ordered",
+      items: result.order.lines.map((l) => ({
+        slug: l.product.slug,
+        qty: l.qty,
+        names: { en: l.product.nameEn, ru: l.product.nameRu },
+        lineTotals: { egp: l.lineEgp, rub: l.lineRub },
+      })),
+      totals: { egp: result.order.totalEgp, rub: result.order.totalRub },
+      name: result.order.name,
+      phone: result.order.phone,
+      email: result.order.email,
+      address: result.order.address,
+      note: result.order.note,
+      lang: result.order.lang,
+      statusHistory: [{ status: "ordered", at: createdAt }],
+    };
+    await saveOrder(record);
+    stored = true;
+  } catch (error) {
+    console.error(`[order] Blob persistence failed for ${orderNumber}:`, error);
+  }
+
   // Mailer failures must never fail the order — respond 200 with emailed:false.
   // The buyer confirmation is fully independent of Victoria's notification:
   // each has its own try/catch, and both outcomes are reported separately.
@@ -630,6 +667,7 @@ export async function POST(request: NextRequest) {
     {
       received: true,
       orderNumber,
+      stored,
       emailed: emailResult.sent,
       ownerEmails: {
         sent: emailResult.sentCount,

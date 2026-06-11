@@ -12,7 +12,7 @@ const COPY = {
     body: [
       "We collect your name, email address and mobile number solely to manage your booking: to confirm, reschedule or cancel your appointment and to contact you about it.",
       "Bookings are processed through Cal.com, our scheduling provider, which stores your booking details on our behalf. We do not sell or share your information with anyone else.",
-      "Messages you send to Vasili, our AI assistant, are processed to generate a reply and are not used to identify you.",
+      "Messages you send to Vassili, our AI assistant, are processed to generate a reply and are not used to identify you.",
       "To ask about or delete your data, write to victoria@victoriaholisticbeauty.com.",
     ],
   },
@@ -22,7 +22,7 @@ const COPY = {
     body: [
       "Мы собираем ваше имя, адрес электронной почты и номер телефона исключительно для управления записью: подтверждения, переноса или отмены визита и связи с вами по этому поводу.",
       "Записи обрабатываются через Cal.com — наш сервис планирования, который хранит данные бронирования от нашего имени. Мы не продаём и не передаём ваши данные третьим лицам.",
-      "Сообщения, которые вы отправляете Василию, нашему AI-ассистенту, обрабатываются только для формирования ответа и не используются для вашей идентификации.",
+      "Сообщения, которые вы отправляете Вассили, нашему AI-ассистенту, обрабатываются только для формирования ответа и не используются для вашей идентификации.",
       "По вопросам о ваших данных или для их удаления напишите на victoria@victoriaholisticbeauty.com.",
     ],
   },

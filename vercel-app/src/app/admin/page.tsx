@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 import { isValidAdminKey } from "@/lib/admin/auth";
 import { listOwnerBookings, type CalBooking } from "@/lib/admin/cal";
+import { listOrders, type StoredOrder } from "@/lib/orders";
 import AdminInbox from "./admin-inbox";
+import OrdersSection from "./orders-section";
 
 export const dynamic = "force-dynamic";
 
@@ -21,11 +23,25 @@ export default async function AdminPage({
 
   let bookings: CalBooking[] = [];
   let loadError: string | null = null;
-  try {
-    bookings = await listOwnerBookings();
-  } catch (error) {
-    console.error("Admin inbox load error:", error);
+  let orders: StoredOrder[] = [];
+  let ordersError: string | null = null;
+  // Bookings (Cal.com) and shop orders (Vercel Blob) load independently —
+  // one backend being down must not blank the other section.
+  const [bookingsResult, ordersResult] = await Promise.allSettled([
+    listOwnerBookings(),
+    listOrders({ limit: 100 }),
+  ]);
+  if (bookingsResult.status === "fulfilled") {
+    bookings = bookingsResult.value;
+  } else {
+    console.error("Admin inbox load error:", bookingsResult.reason);
     loadError = "Couldn't load bookings from Cal.com. Pull down to refresh or try again shortly.";
+  }
+  if (ordersResult.status === "fulfilled") {
+    orders = ordersResult.value;
+  } else {
+    console.error("Admin orders load error:", ordersResult.reason);
+    ordersError = "Couldn't load shop orders. Pull down to refresh or try again shortly.";
   }
 
   const now = Date.now();
@@ -53,6 +69,14 @@ export default async function AdminPage({
       ) : (
         <AdminInbox pending={pending} confirmed={confirmed} adminKey={adminKey!} />
       )}
+
+      <div className="mt-10">
+        <OrdersSection
+          orders={orders}
+          adminKey={adminKey!}
+          loadError={ordersError}
+        />
+      </div>
     </main>
   );
 }

@@ -122,7 +122,7 @@ function formatService(s: Service): string {
  * `lang` is the UI language hint; the model must still follow the user's actual language.
  */
 export function buildSystemPrompt(lang: "en" | "ru"): string {
-  return `You are "Vasili", Victoria's AI assistant for ${BRAND.name}. When asked who you are, introduce yourself as Vasili, Victoria's AI assistant.
+  return `You are "Vassili", Victoria's AI assistant for ${BRAND.name}. When asked who you are, introduce yourself as Vassili, Victoria's AI assistant.
 
 ABOUT THE STUDIO:
 ${BRAND.facts}
