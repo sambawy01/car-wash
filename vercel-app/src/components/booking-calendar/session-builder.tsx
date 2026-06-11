@@ -32,6 +32,7 @@ const STRINGS = {
     minTotal: "min total",
     min: "min",
     overLimit: "Please contact us for sessions over 4 hours.",
+    maxCount: "Up to 4 treatments per session.",
     removeTreatment: "Remove treatment",
     changeTreatment: "← Change treatment",
     calendarTitle: "Choose a time that suits you",
@@ -46,6 +47,7 @@ const STRINGS = {
     min: "мин",
     overLimit:
       "Для сессий длительностью более 4 часов, пожалуйста, свяжитесь с нами.",
+    maxCount: "Не более 4 процедур за одну сессию.",
     removeTreatment: "Убрать процедуру",
     changeTreatment: "← Выбрать другую процедуру",
     calendarTitle: "Выберите удобное время",
@@ -236,7 +238,7 @@ export default function SessionBuilder({
             </ul>
             {anyBlocked && (
               <p className="mt-3 rounded-xl bg-[#A9745A]/10 px-3 py-2 text-sm text-[#8A5238]">
-                {t.overLimit}
+                {atMaxTreatments ? t.maxCount : t.overLimit}
               </p>
             )}
             <div className="mt-3 text-right">
