@@ -331,6 +331,41 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 }
 .chat-launcher.calm::before { animation: none; opacity: 0; }
 
+
+/* Golden frame with a traveling flare — launcher + teaser share the animation */
+@property --vg-angle {
+  syntax: "<angle>"; initial-value: 0deg; inherits: false;
+}
+@keyframes vg-sweep { to { --vg-angle: 360deg; } }
+
+.chat-launcher::after {
+  content: ""; position: absolute; inset: -6px; border-radius: 50%;
+  padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--vg-angle),
+    #C9A45C 0deg, #E8CB8F 38deg, #FFF3D6 58deg, #E8CB8F 78deg,
+    #C9A45C 120deg, #B8924C 240deg, #C9A45C 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: vg-sweep 4.5s linear infinite;
+}
+
+.chat-teaser::before {
+  content: ""; position: absolute; inset: -3px; border-radius: 17px;
+  padding: 2px; pointer-events: none;
+  background: conic-gradient(from var(--vg-angle),
+    #C9A45C 0deg, #E8CB8F 38deg, #FFF3D6 58deg, #E8CB8F 78deg,
+    #C9A45C 120deg, #B8924C 240deg, #C9A45C 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: vg-sweep 4.5s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-launcher::after, .chat-teaser::before {
+    animation: none;  /* static golden frame, no moving flare */
+  }
+}
+
 /* Intro teaser — "Meet Vasili" card above the launcher */
 .chat-teaser {
   position: fixed; right: 24px; bottom: 102px; z-index: 80;
