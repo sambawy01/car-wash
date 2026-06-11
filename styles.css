@@ -801,16 +801,30 @@ html.tmodal-open { overflow: hidden; }
 /* Add-to-order — full-width solid clay pill that becomes a full-width stepper */
 .shop-action { margin-top: 16px; min-height: 46px; display: flex; }
 .shop-add {
+  position: relative; isolation: isolate;
   width: 100%; min-height: 46px; padding: 12px 16px; border-radius: 999px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--clay-deep); background: var(--clay-deep); color: var(--card);
+  border: none; background: var(--card); color: var(--clay-deep);
   font-family: var(--sans); font-size: 11.5px; font-weight: 600;
   letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap;
-  transition: background-color 0.3s, border-color 0.3s, transform 0.2s var(--ease);
+  transition: background-color 0.3s, color 0.3s, transform 0.2s var(--ease);
 }
-.shop-add:hover { background: #6F4029; border-color: #6F4029; }
+/* Golden frame — 3px, with a flare that sweeps the frame on hover/focus */
+.shop-add::before {
+  content: ""; position: absolute; inset: 0; border-radius: 999px;
+  padding: 3px; pointer-events: none; z-index: -1;
+  background: conic-gradient(from var(--vg-angle),
+    #C9A45C 0deg, #E8CB8F 38deg, #FFF3D6 58deg, #E8CB8F 78deg,
+    #C9A45C 120deg, #B8924C 240deg, #C9A45C 360deg);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+}
+.shop-add:hover::before, .shop-add:focus-visible::before {
+  animation: vg-sweep 1.6s linear infinite;
+}
+.shop-add:hover { background: #FFFAF0; color: #6F4029; }
 .shop-add:active { transform: scale(0.98); }
-.shop-add:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
+.shop-add:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 4px; }
 .shop-stepper {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
   border: 1px solid var(--clay-deep); border-radius: 999px; overflow: hidden;
@@ -1007,6 +1021,7 @@ html.order-open .chat-card { display: none; }
   .shop-art img { transition: none; }
   .shop-card:hover .shop-art img { transform: none; }
   .shop-add, .shop-add:active { transition: none; transform: none; }
+  .shop-add:hover::before, .shop-add:focus-visible::before { animation: none; }
 }
 
 /* Six links now (Treatments · About · Journal · Shop · lang · CTA): extend the
