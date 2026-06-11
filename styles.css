@@ -713,35 +713,51 @@ html.tmodal-open { overflow: hidden; }
 
 /* ===== Studio Shop =====
    Shop pages reuse the journal shell (.nav-solid, .journal-main, .journal-head).
-   Product cards are rendered by shop.js from the PLACEHOLDER data block; art
-   areas are earthy gradients + a serif initial, swap-ready for real photos
-   (drop an <img> in .shop-art and it covers the frame). */
+   Product cards are rendered by shop.js from the PRODUCT data block. Art areas
+   show real 900×900 product photos (assets/img/shop/<slug>.jpg) under a soft
+   uniform warm grade so the mixed-source set reads as one collection; cards
+   with photo:null fall back to the tinted gradient + serif initial. */
+
+/* Header trust row — one quiet line of buying reassurance under the title */
+.shop-trust {
+  margin-top: 20px; display: flex; flex-wrap: wrap; align-items: baseline;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--clay-deep);
+}
+.shop-trust span { white-space: nowrap; padding: 2px 0; }
+.shop-trust span + span::before { content: "·"; margin: 0 12px; color: var(--clay); font-weight: 400; }
 
 .shop-grid {
   display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 24px; padding-bottom: clamp(130px, 18vh, 200px); /* clearance for the cart bar */
+  gap: 30px 24px; padding-bottom: clamp(130px, 18vh, 200px); /* clearance for the cart bar */
 }
 @media (max-width: 1020px) { .shop-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 780px)  { .shop-grid { grid-template-columns: repeat(2, 1fr); gap: 16px; } }
+@media (max-width: 780px)  { .shop-grid { grid-template-columns: repeat(2, 1fr); gap: 20px 16px; } }
+@media (max-width: 540px)  { .shop-grid { grid-template-columns: 1fr; gap: 26px; } }
 
 .shop-card {
   display: flex; flex-direction: column;
-  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  background: var(--card); border: 1px solid var(--line); border-radius: 14px;
   overflow: hidden;
-  box-shadow: 0 2px 14px rgba(58, 51, 44, 0.06);
-  transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease);
+  box-shadow: 0 1px 2px rgba(58, 51, 44, 0.05), 0 12px 32px -20px rgba(58, 51, 44, 0.2);
+  transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease), border-color 0.45s var(--ease);
 }
 @media (hover: hover) {
-  .shop-card:hover { transform: translateY(-4px); box-shadow: 0 14px 36px rgba(58, 51, 44, 0.13); }
+  .shop-card:hover {
+    transform: translateY(-5px);
+    border-color: rgba(169, 116, 90, 0.45);
+    box-shadow: 0 2px 4px rgba(58, 51, 44, 0.05), 0 26px 48px -20px rgba(58, 51, 44, 0.3);
+  }
+  .shop-card:hover .shop-art img { transform: scale(1.03); }
 }
 
-/* Placeholder art: per-card earthy gradient via --tint-a/--tint-b + serif initial */
+/* Art frame — photo (or placeholder gradient) edge-to-edge, square */
 .shop-art {
   position: relative; aspect-ratio: 1 / 1; overflow: hidden;
   background: linear-gradient(165deg, var(--tint-a, var(--bg-2)), var(--tint-b, var(--bg-3)));
   display: grid; place-items: center;
 }
-.shop-art::before { /* soft window light, keeps the placeholder from feeling flat */
+.shop-art::before { /* soft window light for the placeholder art (photos cover it) */
   content: ""; position: absolute; inset: 0; pointer-events: none;
   background: radial-gradient(85% 65% at 28% 18%, rgba(255, 253, 249, 0.5), transparent 70%);
 }
@@ -752,47 +768,63 @@ html.tmodal-open { overflow: hidden; }
   color: var(--clay-deep); opacity: 0.32; /* decorative, aria-hidden */
   user-select: none; -webkit-user-select: none;
 }
-.shop-art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.shop-art img {
+  position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+  /* uniform warm grade, same family as .photo-portrait — unifies mixed sources */
+  filter: sepia(0.16) saturate(0.92) contrast(1.02) brightness(1.01);
+  transition: transform 0.6s var(--ease);
+}
+.shop-art::after { /* faint clay veil + hairline keeps photos seated in the card */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(233, 205, 175, 0.1), rgba(138, 82, 56, 0.07));
+  mix-blend-mode: multiply;
+  box-shadow: inset 0 -1px 0 rgba(58, 51, 44, 0.1);
+}
 
-.shop-body { display: flex; flex-direction: column; flex: 1; padding: 18px 18px 20px; }
+.shop-body { display: flex; flex-direction: column; flex: 1; padding: 18px 20px 20px; }
 .shop-name {
   font-family: var(--serif); font-weight: 500;
-  font-size: 21px; line-height: 1.2; color: var(--ink); max-width: none;
+  font-size: 22px; line-height: 1.18; color: var(--ink); max-width: none;
 }
 .shop-sub {
   margin-top: 6px;
-  font-size: 12px; font-weight: 500; letter-spacing: 0.08em;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink-soft);
 }
-.shop-price { margin-top: 12px; flex: 1; font-size: 15px; letter-spacing: 0.05em; color: var(--clay-deep); }
-.shop-price small { font-size: 12.5px; color: var(--ink-soft); }
+.shop-price {
+  margin-top: 14px; flex: 1;
+  display: flex; align-items: baseline; gap: 8px;
+  font-size: 17.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--clay-deep);
+}
+.shop-price small { font-size: 12.5px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-soft); }
 
-.shop-action { margin-top: 16px; min-height: 42px; display: flex; }
+/* Add-to-order — full-width solid clay pill that becomes a full-width stepper */
+.shop-action { margin-top: 16px; min-height: 46px; display: flex; }
 .shop-add {
+  width: 100%; min-height: 46px; padding: 12px 16px; border-radius: 999px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  min-height: 42px; padding: 10px 24px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--clay); background: none; color: var(--clay-deep);
-  font-family: var(--sans); font-size: 12px; font-weight: 600;
-  letter-spacing: 0.18em; text-transform: uppercase;
-  transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+  border: 1px solid var(--clay-deep); background: var(--clay-deep); color: var(--card);
+  font-family: var(--sans); font-size: 11.5px; font-weight: 600;
+  letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap;
+  transition: background-color 0.3s, border-color 0.3s, transform 0.2s var(--ease);
 }
-.shop-add:hover { background: var(--clay-deep); border-color: var(--clay-deep); color: var(--bg); }
-@media (max-width: 780px) {
-  .shop-add { width: 100%; padding: 10px 12px; font-size: 11px; letter-spacing: 0.14em; white-space: nowrap; }
-}
+.shop-add:hover { background: #6F4029; border-color: #6F4029; }
+.shop-add:active { transform: scale(0.98); }
+.shop-add:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
 .shop-stepper {
-  display: inline-flex; align-items: center;
-  border: 1px solid var(--clay); border-radius: 999px; overflow: hidden;
-  background: var(--card);
+  display: flex; align-items: center; justify-content: space-between; width: 100%;
+  border: 1px solid var(--clay-deep); border-radius: 999px; overflow: hidden;
+  background: var(--card); min-height: 46px;
 }
 .shop-step {
-  width: 42px; height: 42px; border: none; background: none; cursor: pointer;
-  font-family: var(--sans); font-size: 19px; line-height: 1; color: var(--clay-deep);
+  width: 52px; min-height: 44px; align-self: stretch; border: none; background: none; cursor: pointer;
+  font-family: var(--sans); font-size: 20px; line-height: 1; color: var(--clay-deep);
   display: grid; place-items: center;
   transition: background-color 0.3s;
 }
-.shop-step:hover { background: rgba(169, 116, 90, 0.12); }
-.shop-qty { min-width: 32px; text-align: center; font-size: 15px; font-weight: 600; color: var(--ink); }
+.shop-step:hover { background: rgba(169, 116, 90, 0.14); }
+.shop-step:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: -3px; border-radius: 999px; }
+.shop-qty { min-width: 32px; text-align: center; font-size: 16px; font-weight: 600; color: var(--ink); }
 
 /* CSS-only entrance, mirrors the journal cards */
 @media (prefers-reduced-motion: no-preference) {
@@ -812,26 +844,31 @@ html.tmodal-open { overflow: hidden; }
 .cart-bar {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
   z-index: 60;
-  display: inline-flex; align-items: center; gap: 12px;
+  display: inline-flex; align-items: center; gap: 16px;
   max-width: min(560px, calc(100vw - 200px));
-  padding: 15px 28px; border: none; border-radius: 999px; cursor: pointer;
+  padding: 16px 28px; border: none; border-radius: 999px; cursor: pointer;
   background: var(--clay-deep); color: var(--bg);
-  font-family: var(--sans); font-size: 13px; font-weight: 600; letter-spacing: 0.06em;
+  font-family: var(--sans); font-size: 13.5px; font-weight: 600; letter-spacing: 0.06em;
   box-shadow: 0 14px 36px rgba(33, 27, 22, 0.35), inset 0 1px 0 rgba(255, 253, 249, 0.22);
-  transition: background-color 0.3s;
+  transition: background-color 0.3s, box-shadow 0.3s;
   animation: cart-in 0.4s var(--ease);
 }
-.cart-bar:hover { background: #6F4029; }
+.cart-bar:hover { background: #6F4029; box-shadow: 0 18px 42px rgba(33, 27, 22, 0.42), inset 0 1px 0 rgba(255, 253, 249, 0.22); }
 .cart-bar:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
 .cart-bar[hidden] { display: none; }
 .cart-bar-sum { white-space: nowrap; }
-.cart-bar-cta { white-space: nowrap; text-transform: uppercase; letter-spacing: 0.16em; font-size: 11.5px; color: var(--bg); }
+.cart-bar-cta {
+  white-space: nowrap; text-transform: uppercase; letter-spacing: 0.16em; font-size: 11.5px; color: var(--bg);
+  border-left: 1px solid rgba(255, 253, 249, 0.35); padding-left: 16px;
+}
 @keyframes cart-in { from { opacity: 0; transform: translate(-50%, 14px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (max-width: 640px) {
   .cart-bar {
     left: 16px; right: 92px; bottom: 16px; transform: none;
-    max-width: none; justify-content: space-between; padding: 14px 20px;
+    max-width: none; justify-content: space-between;
+    padding: 14px 16px; gap: 10px; font-size: 13px;
   }
+  .cart-bar-cta { padding-left: 10px; letter-spacing: 0.1em; font-size: 11px; }
   @keyframes cart-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 }
 
@@ -854,8 +891,8 @@ html.order-open .chat-card { display: none; }
   position: relative;
   width: min(540px, 100%); max-height: min(86vh, 760px); overflow-y: auto;
   background: var(--card); color: var(--ink);
-  border: 1px solid var(--line); border-radius: 14px;
-  padding: 36px 34px 32px;
+  border: 1px solid var(--line); border-radius: 16px;
+  padding: 38px 36px 34px;
   box-shadow: 0 24px 70px rgba(33, 27, 22, 0.35);
   animation: tmodal-in 0.4s var(--ease);
 }
@@ -918,14 +955,15 @@ html.order-open .chat-card { display: none; }
 .order-field.invalid .field-error { display: block; }
 
 .order-submit {
-  display: block; width: 100%; margin-top: 24px;
+  display: block; width: 100%; margin-top: 24px; min-height: 50px;
   padding: 15px 34px; border: none; border-radius: 999px; cursor: pointer;
   background: var(--clay-deep); color: var(--bg);
-  font-family: var(--sans); font-size: 13px; font-weight: 500;
-  letter-spacing: 0.22em; text-transform: uppercase;
+  font-family: var(--sans); font-size: 13px; font-weight: 600;
+  letter-spacing: 0.2em; text-transform: uppercase;
   transition: background-color 0.3s, opacity 0.3s;
 }
 .order-submit:hover { background: #6F4029; }
+.order-submit:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
 .order-submit:disabled { opacity: 0.6; cursor: default; }
 
 /* Failure bubble — graceful mailto fallback when the order API is unreachable */
@@ -967,6 +1005,8 @@ html.order-open .chat-card { display: none; }
   .shop-card { animation: none !important; transition: none !important; }
   .shop-card:hover { transform: none; }
   .shop-art img { transition: none; }
+  .shop-card:hover .shop-art img { transform: none; }
+  .shop-add, .shop-add:active { transition: none; transform: none; }
 }
 
 /* Six links now (Treatments · About · Journal · Shop · lang · CTA): extend the

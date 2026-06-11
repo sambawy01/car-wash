@@ -6,10 +6,12 @@
   "use strict";
 
   /* =====================================================================
-     PLACEHOLDER PRODUCT DATA — the single source of truth for the shop.
-     Swap names / prices / tints here. To replace the gradient-and-initial
-     placeholder art with a real photo, set `photo` to an image path
-     (e.g. "assets/img/shop/hydrating-serum.jpg") — nothing else changes.
+     PRODUCT DATA — the single source of truth for the shop.
+     Swap names / prices here. `photo` points at a 900×900 JPEG in
+     assets/img/shop/ (license-safe Unsplash placeholders until the owner's
+     own shots arrive — swap the file, keep the path, nothing else changes).
+     `alt` is the per-language image description. If `photo` is null the
+     card falls back to the tinted-gradient-and-initial placeholder art.
      Prices: `egp` in Egyptian pounds, `rub` in roubles.
      ===================================================================== */
   var PRODUCTS = [
@@ -19,7 +21,11 @@
       sub: { en: "Onmacabim · 30 ml", ru: "Onmacabim · 30 мл" },
       egp: 1450, rub: 2000,
       initial: { en: "S", ru: "С" }, tintA: "#EFE0C8", tintB: "#DCC29B",
-      photo: null
+      photo: "assets/img/shop/hydrating-serum.jpg",
+      alt: {
+        en: "Hydrating serum — white dropper bottle with a gold collar on marble",
+        ru: "Увлажняющая сыворотка — белый флакон с пипеткой и золотым ободком на мраморе"
+      }
     },
     {
       slug: "fruit-peel-mask",
@@ -27,7 +33,11 @@
       sub: { en: "HOLY LAND · 50 ml", ru: "HOLY LAND · 50 мл" },
       egp: 980, rub: 1400,
       initial: { en: "P", ru: "П" }, tintA: "#F0DAC4", tintB: "#DBB592",
-      photo: null
+      photo: "assets/img/shop/fruit-peel-mask.jpg",
+      alt: {
+        en: "Fruit peel mask — amber gel jar with a gold lid on a beige backdrop",
+        ru: "Фруктовая маска-пилинг — янтарная баночка геля с золотой крышкой на бежевом фоне"
+      }
     },
     {
       slug: "alginate-mask-kit",
@@ -35,7 +45,11 @@
       sub: { en: "home kit · 5 uses", ru: "набор · 5 применений" },
       egp: 750, rub: 1050,
       initial: { en: "A", ru: "А" }, tintA: "#E3E4D4", tintB: "#C9CCB0",
-      photo: null
+      photo: "assets/img/shop/alginate-mask-kit.jpg",
+      alt: {
+        en: "Alginate mask home kit — mixing bowl, mask brush, measuring spoons and powder",
+        ru: "Набор альгинатной маски — миска для смешивания, кисть, мерные ложки и пудра"
+      }
     },
     {
       slug: "mineral-sunscreen-spf50",
@@ -43,7 +57,11 @@
       sub: { en: "mineral filter · 50 ml", ru: "минеральный фильтр · 50 мл" },
       egp: 890, rub: 1250,
       initial: { en: "50", ru: "50" }, tintA: "#F4E6C4", tintB: "#E2CC98",
-      photo: null
+      photo: "assets/img/shop/mineral-sunscreen-spf50.jpg",
+      alt: {
+        en: "Mineral sunscreen SPF 50 — white pump bottle on warm stone with a pine sprig",
+        ru: "Минеральный санскрин SPF 50 — белый флакон с помпой на тёплом камне с веткой сосны"
+      }
     },
     {
       slug: "mandelic-toner",
@@ -51,7 +69,11 @@
       sub: { en: "100 ml", ru: "100 мл" },
       egp: 820, rub: 1150,
       initial: { en: "T", ru: "Т" }, tintA: "#EBE3D2", tintB: "#D3C4A6",
-      photo: null
+      photo: "assets/img/shop/mandelic-toner.jpg",
+      alt: {
+        en: "Mandelic renewal toner — amber glass bottle in soft palm-leaf light",
+        ru: "Миндальный тоник — флакон янтарного стекла в мягком свете с тенью пальмы"
+      }
     },
     {
       slug: "collagen-eye-patches",
@@ -59,7 +81,11 @@
       sub: { en: "60 pcs", ru: "60 шт" },
       egp: 640, rub: 900,
       initial: { en: "C", ru: "К" }, tintA: "#E6DDD6", tintB: "#CDBBAE",
-      photo: null
+      photo: "assets/img/shop/collagen-eye-patches.jpg",
+      alt: {
+        en: "Collagen eye patches worn under the eyes",
+        ru: "Коллагеновые патчи под глазами"
+      }
     },
     {
       slug: "gua-sha-tool",
@@ -67,7 +93,11 @@
       sub: { en: "gua sha · stone", ru: "гуаша · камень" },
       egp: 560, rub: 800,
       initial: { en: "G", ru: "Г" }, tintA: "#E0D8CE", tintB: "#BFB1A2",
-      photo: null
+      photo: "assets/img/shop/gua-sha-tool.jpg",
+      alt: {
+        en: "Black stone gua sha sculpting tool on marble",
+        ru: "Скульптурирующий гуаша из чёрного камня на мраморе"
+      }
     },
     {
       slug: "recovery-night-cream",
@@ -75,10 +105,14 @@
       sub: { en: "50 ml", ru: "50 мл" },
       egp: 1120, rub: 1600,
       initial: { en: "N", ru: "Н" }, tintA: "#DED4C9", tintB: "#BCA88F",
-      photo: null
+      photo: "assets/img/shop/recovery-night-cream.jpg",
+      alt: {
+        en: "Recovery night cream — open frosted jar on a wooden slab",
+        ru: "Восстанавливающий ночной крем — открытая матовая банка на деревянном спиле"
+      }
     }
   ];
-  /* ===================== end PLACEHOLDER PRODUCT DATA ================= */
+  /* ========================= end PRODUCT DATA ========================= */
 
   var LANG = (document.documentElement.lang || "en").toLowerCase().indexOf("ru") === 0 ? "ru" : "en";
   var STORAGE_KEY = "vv-cart";
@@ -91,7 +125,7 @@
 
   var T = {
     en: {
-      add: "Add",
+      add: "Add to order",
       decrease: "Decrease quantity",
       increase: "Increase quantity",
       qtyOf: "Quantity of",
@@ -130,7 +164,7 @@
       mailTotal: "Total:"
     },
     ru: {
-      add: "Добавить",
+      add: "Добавить в заказ",
       decrease: "Уменьшить количество",
       increase: "Увеличить количество",
       qtyOf: "Количество:",
@@ -284,8 +318,11 @@
       if (p.photo) {
         var img = document.createElement("img");
         img.src = p.photo;
-        img.alt = p.name[LANG];
+        img.alt = (p.alt && p.alt[LANG]) || p.name[LANG];
+        img.width = 900;
+        img.height = 900;
         img.loading = "lazy";
+        img.decoding = "async";
         art.appendChild(img);
       } else {
         var ini = document.createElement("span");
