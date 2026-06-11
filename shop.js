@@ -1,7 +1,8 @@
 /* ===== Studio Shop — products, cart, cash-on-delivery order flow =====
    Vanilla IIFE, no dependencies. Cart persists in localStorage ("vv-cart").
-   Order POSTs { items:[{slug, qty}], name, phone, address, note, lang }
-   to /api/order on the booking host. */
+   Order POSTs { items:[{slug, qty}], name, phone, email?, address, note, lang }
+   to /api/order on the booking host. `email` is optional — when provided the
+   server sends the buyer an order-confirmation email. */
 (function () {
   "use strict";
 
@@ -117,6 +118,7 @@
   var LANG = (document.documentElement.lang || "en").toLowerCase().indexOf("ru") === 0 ? "ru" : "en";
   var STORAGE_KEY = "vv-cart";
   var PHONE_RE = /^\+?[0-9\s\-()]{8,17}$/;
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
   var API_URL = IS_LOCAL
     ? "http://localhost:3000/api/order"
@@ -136,20 +138,24 @@
       close: "Close",
       total: "Total",
       cod: "Payment: cash on delivery. Victoria will contact you to confirm your order, delivery time and address.",
+      delivery: "Delivery within 24–72 hours across Egypt.",
       name: "Your name",
       namePh: "Anna",
       nameErr: "Please tell us your name.",
       phone: "Mobile",
       phonePh: "+20 100 123 4567",
       phoneErr: "Please enter a valid phone number with country code, e.g. +20 100 123 4567.",
+      email: "Email (for order confirmation)",
+      emailPh: "anna@example.com",
+      emailErr: "Please enter a valid email address, e.g. anna@example.com.",
       address: "City & address",
       addressPh: "City, street, building…",
       addressErr: "Please tell us where to deliver.",
       note: "Note (optional)",
       notePh: "Anything Victoria should know",
-      submit: "Request order",
+      submit: "Place order",
       sending: "Sending…",
-      successTitle: "Order received",
+      successTitle: "Order placed",
       successLine: "Victoria will call you to confirm. Payment on delivery.",
       done: "Done",
       failLead: "We couldn't send your order right now.",
@@ -159,6 +165,7 @@
       mailOrder: "Order:",
       mailName: "Name:",
       mailPhone: "Phone:",
+      mailEmail: "Email:",
       mailAddress: "Address:",
       mailNote: "Note:",
       mailTotal: "Total:"
@@ -175,20 +182,24 @@
       close: "Закрыть",
       total: "Итого",
       cod: "Оплата при получении. Виктория свяжется с вами для подтверждения заказа, времени и адреса доставки.",
+      delivery: "Доставка по Египту в течение 24–72 часов.",
       name: "Ваше имя",
       namePh: "Анна",
       nameErr: "Пожалуйста, представьтесь.",
       phone: "Телефон",
       phonePh: "+7 900 123-45-67",
       phoneErr: "Введите корректный номер с кодом страны, например +7 900 123-45-67.",
+      email: "Эл. почта (для подтверждения заказа)",
+      emailPh: "anna@example.com",
+      emailErr: "Введите корректный адрес эл. почты, например anna@example.com.",
       address: "Город и адрес",
       addressPh: "Город, улица, дом…",
       addressErr: "Укажите, куда доставить заказ.",
       note: "Комментарий (необязательно)",
       notePh: "Что Виктории стоит знать",
-      submit: "Отправить заказ",
+      submit: "Оформить заказ",
       sending: "Отправляем…",
-      successTitle: "Заказ принят",
+      successTitle: "Заказ оформлен",
       successLine: "Виктория позвонит вам для подтверждения. Оплата при получении.",
       done: "Готово",
       failLead: "Не получилось отправить заказ прямо сейчас.",
@@ -198,6 +209,7 @@
       mailOrder: "Заказ:",
       mailName: "Имя:",
       mailPhone: "Телефон:",
+      mailEmail: "Эл. почта:",
       mailAddress: "Адрес:",
       mailNote: "Комментарий:",
       mailTotal: "Итого:"
@@ -426,6 +438,7 @@
       lines.push("");
       lines.push(T.mailName + " " + (f.elements["order-name"].value || "—"));
       lines.push(T.mailPhone + " " + (f.elements["order-phone"].value || "—"));
+      if (f.elements["order-email"].value) lines.push(T.mailEmail + " " + f.elements["order-email"].value);
       lines.push(T.mailAddress + " " + (f.elements["order-address"].value || "—"));
       if (f.elements["order-note"].value) lines.push(T.mailNote + " " + f.elements["order-note"].value);
     }
@@ -454,6 +467,8 @@
     var list = el("ul", "order-items");
     var total = el("p", "order-total");
     var cod = el("p", "cod-note", T.cod);
+    cod.appendChild(document.createElement("br"));
+    cod.appendChild(document.createTextNode(T.delivery));
 
     var form = el("form", "order-form");
     form.noValidate = true;
@@ -470,6 +485,13 @@
     phoneInput.placeholder = T.phonePh;
     phoneInput.autocomplete = "tel";
     phoneInput.inputMode = "tel";
+
+    var emailInput = document.createElement("input");
+    emailInput.type = "email";
+    emailInput.name = "order-email";
+    emailInput.placeholder = T.emailPh;
+    emailInput.autocomplete = "email";
+    emailInput.inputMode = "email";
 
     var addressInput = document.createElement("textarea");
     addressInput.name = "order-address";
@@ -490,6 +512,7 @@
 
     form.appendChild(field("order-name", T.name, T.nameErr, nameInput));
     form.appendChild(field("order-phone", T.phone, T.phoneErr, phoneInput));
+    form.appendChild(field("order-email", T.email, T.emailErr, emailInput));
     form.appendChild(field("order-address", T.address, T.addressErr, addressInput));
     form.appendChild(field("order-note", T.note, null, noteInput));
     form.appendChild(fail);
@@ -502,6 +525,9 @@
       markInvalid(nameInput, !nameOk); ok = ok && nameOk;
       var phoneOk = PHONE_RE.test(phoneInput.value.trim());
       markInvalid(phoneInput, !phoneOk); ok = ok && phoneOk;
+      var emailVal = emailInput.value.trim();
+      var emailOk = emailVal === "" || (emailVal.length <= 120 && EMAIL_RE.test(emailVal));
+      markInvalid(emailInput, !emailOk); ok = ok && emailOk;
       var addrOk = addressInput.value.trim().length >= 5;
       markInvalid(addressInput, !addrOk); ok = ok && addrOk;
       if (!ok) {
@@ -523,6 +549,7 @@
         note: noteInput.value.trim(),
         lang: LANG
       };
+      if (emailVal) payload.email = emailVal;
 
       fetch(API_URL, {
         method: "POST",
@@ -589,12 +616,14 @@
     var title = el("h2", "order-success-title", T.successTitle);
     title.id = "order-title";
     var line = el("p", "order-success-line", T.successLine);
+    var deliveryLine = el("p", "order-success-line", T.delivery);
     var done = el("button", "order-submit", T.done);
     done.type = "button";
     done.addEventListener("click", closePanel);
     box.appendChild(mark);
     box.appendChild(title);
     box.appendChild(line);
+    box.appendChild(deliveryLine);
     box.appendChild(done);
     panel.appendChild(box);
     done.focus();

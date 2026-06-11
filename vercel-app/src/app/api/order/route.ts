@@ -19,15 +19,24 @@ export const runtime = "nodejs";
  * - Owner notification via Resend (same pattern as /api/cal/webhook), with a
  *   graceful console-log no-op when RESEND_API_KEY is unset. A mailer failure
  *   never 500s the order — the client still gets { received: true }.
+ * - Optional buyer `email`: when present, a second confirmation email is sent
+ *   to the buyer. Buyer-email failures never affect the response success or
+ *   Victoria's notification — both outcomes are reported separately in
+ *   { received, emailed, buyerEmailed }.
  */
 
 const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
 const EMAIL_FROM =
   "Victoria Holistic Beauty <orders@victoriaholisticbeauty.com>";
+const BUYER_EMAIL_FROM =
+  "Victoria Vasilyeva Holistic Beauty <bookings@victoriaholisticbeauty.com>";
+const BUYER_REPLY_TO = "victoria@victoriaholisticbeauty.com";
 
 const MAX_DISTINCT_ITEMS = 8;
 const MAX_QTY = 10;
 const PHONE_RE = /^\+?[0-9\s\-()]{8,17}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const MAX_EMAIL_LEN = 120;
 
 // --- CORS preflight --------------------------------------------------------
 
@@ -86,6 +95,7 @@ interface ValidatedOrder {
   totalRub: number;
   name: string;
   phone: string; // normalized (spaces/dashes/parens stripped)
+  email: string; // optional — "" when the buyer left it blank
   address: string;
   note: string;
   lang: "en" | "ru";
@@ -149,6 +159,20 @@ function validateOrder(
     fields.phone = "phone must be 8-17 digits, optionally starting with +";
   }
 
+  // email (optional) ------------------------------------------------------------
+  let email = "";
+  if (b.email !== undefined && b.email !== null && b.email !== "") {
+    if (
+      typeof b.email !== "string" ||
+      b.email.trim().length > MAX_EMAIL_LEN ||
+      !EMAIL_RE.test(b.email.trim())
+    ) {
+      fields.email = `email must be a valid address of at most ${MAX_EMAIL_LEN} characters`;
+    } else {
+      email = b.email.trim();
+    }
+  }
+
   // address -------------------------------------------------------------------
   const address = typeof b.address === "string" ? b.address.trim() : "";
   if (address.length < 5 || address.length > 400) {
@@ -182,6 +206,7 @@ function validateOrder(
       totalRub: lines.reduce((sum, l) => sum + l.lineRub, 0),
       name,
       phone: normalizedPhone,
+      email,
       address,
       note,
       lang: b.lang as "en" | "ru",
@@ -220,6 +245,7 @@ function buildEmail(order: ValidatedOrder): {
     "",
     `Name:     ${order.name}`,
     `Phone:    ${order.phone}`,
+    `Email:    ${order.email || "—"}`,
     `Address:  ${order.address}`,
     `Note:     ${order.note || "—"}`,
     `Language: ${order.lang}`,
@@ -263,6 +289,7 @@ function buildEmail(order: ValidatedOrder): {
       <table style="border-collapse:collapse;width:100%;margin-top:24px;">
         ${row("Name", order.name)}
         ${row("Phone", order.phone)}
+        ${row("Email", order.email || "—")}
         ${row("Address", order.address)}
         ${row("Note", order.note || "—")}
         ${row("Language", order.lang)}
@@ -318,6 +345,166 @@ async function sendNotificationEmail(
   }
 }
 
+// --- Buyer confirmation email ----------------------------------------------------
+
+function buildBuyerEmail(order: ValidatedOrder): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const ru = order.lang === "ru";
+  const subject = ru
+    ? "Ваш заказ — Victoria Vasilyeva Holistic Beauty"
+    : "Your order — Victoria Vasilyeva Holistic Beauty";
+
+  const t = ru
+    ? {
+        greeting: `Здравствуйте, ${order.name}!`,
+        thanks:
+          "Спасибо за ваш заказ в Victoria Vasilyeva Holistic Beauty. Вот его детали:",
+        heading: "Ваш заказ",
+        product: "Товар",
+        qty: "Кол-во",
+        lineTotal: "Сумма",
+        total: "Итого",
+        cod: "Оплата при получении (наличными).",
+        call: "Виктория позвонит вам для подтверждения заказа.",
+        delivery: "Доставка по Египту в течение 24–72 часов.",
+        signoff: "С теплом,",
+      }
+    : {
+        greeting: `Hello ${order.name},`,
+        thanks:
+          "Thank you for your order with Victoria Vasilyeva Holistic Beauty. Here are the details:",
+        heading: "Your order",
+        product: "Product",
+        qty: "Qty",
+        lineTotal: "Line total",
+        total: "Total",
+        cod: "Payment: cash on delivery.",
+        call: "Victoria will call you to confirm your order.",
+        delivery: "Delivery within 24–72 hours across Egypt.",
+        signoff: "Warmly,",
+      };
+
+  const productName = (l: OrderLine) =>
+    ru ? l.product.nameRu : l.product.nameEn;
+
+  const textItems = order.lines.map(
+    (l) =>
+      `- ${productName(l)} × ${l.qty} = ${formatEgp(l.lineEgp)} / ${formatRub(l.lineRub)}`
+  );
+  const text = [
+    t.greeting,
+    "",
+    t.thanks,
+    "",
+    ...textItems,
+    "",
+    `${t.total}: ${formatEgp(order.totalEgp)} / ${formatRub(order.totalRub)}`,
+    "",
+    t.cod,
+    t.call,
+    t.delivery,
+    "",
+    t.signoff,
+    "Victoria Vasilyeva Holistic Beauty",
+  ].join("\n");
+
+  const itemRows = order.lines
+    .map(
+      (l) =>
+        `<tr>` +
+        `<td style="padding:8px 12px 8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;">${escapeHtml(productName(l))}</td>` +
+        `<td style="padding:8px 12px;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:center;">${l.qty}</td>` +
+        `<td style="padding:8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(l.lineEgp))}<br><span style="color:#847866;font-size:13px;">${escapeHtml(formatRub(l.lineRub))}</span></td>` +
+        `</tr>`
+    )
+    .join("");
+
+  const html = `<!DOCTYPE html>
+<html>
+<body style="margin:0;padding:0;background-color:#F4EFE7;font-family:Georgia,'Times New Roman',serif;">
+  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
+    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-radius:16px;padding:32px;">
+      <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
+      <h1 style="margin:0 0 24px;color:#3A332C;font-size:26px;font-weight:normal;">${escapeHtml(t.heading)}</h1>
+      <p style="margin:0 0 8px;color:#3A332C;font-size:15px;">${escapeHtml(t.greeting)}</p>
+      <p style="margin:0 0 24px;color:#3A332C;font-size:15px;">${escapeHtml(t.thanks)}</p>
+      <table style="border-collapse:collapse;width:100%;">
+        <tr>
+          <th style="padding:0 12px 8px 0;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:left;">${escapeHtml(t.product)}</th>
+          <th style="padding:0 12px 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:center;">${escapeHtml(t.qty)}</th>
+          <th style="padding:0 0 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:right;">${escapeHtml(t.lineTotal)}</th>
+        </tr>
+        ${itemRows}
+        <tr>
+          <td colspan="2" style="padding:12px 12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;">${escapeHtml(t.total)}</td>
+          <td style="padding:12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(order.totalEgp))}<br><span style="font-weight:normal;color:#847866;font-size:13px;">${escapeHtml(formatRub(order.totalRub))}</span></td>
+        </tr>
+      </table>
+      <div style="margin-top:28px;padding:14px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;">
+        <p style="margin:0;color:#3A332C;font-size:14px;line-height:1.65;">${escapeHtml(t.cod)}<br>${escapeHtml(t.call)}<br>${escapeHtml(t.delivery)}</p>
+      </div>
+      <p style="margin:28px 0 0;color:#847866;font-size:14px;">${escapeHtml(t.signoff)}<br>Victoria Vasilyeva Holistic Beauty</p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+  return { subject, text, html };
+}
+
+async function sendBuyerConfirmationEmail(
+  order: ValidatedOrder
+): Promise<{ sent: boolean; reason?: string }> {
+  if (!order.email) {
+    return { sent: false, reason: "no-buyer-email" };
+  }
+  const { subject, text, html } = buildBuyerEmail(order);
+  const apiKey = process.env.RESEND_API_KEY;
+
+  if (!apiKey) {
+    // Graceful no-op: never break orders because email isn't configured.
+    console.log(
+      `[order] RESEND_API_KEY not set — would email buyer ${order.email}:\nSubject: ${subject}\n${text}`
+    );
+    return { sent: false, reason: "email-not-configured" };
+  }
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: BUYER_EMAIL_FROM,
+        to: [order.email],
+        reply_to: BUYER_REPLY_TO,
+        subject,
+        text,
+        html,
+      }),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      console.error(
+        `[order] Buyer confirmation send failed (${res.status}): ${body.slice(0, 300)}`
+      );
+      return { sent: false, reason: `resend-${res.status}` };
+    }
+    console.log(
+      `[order] Buyer confirmation email sent to ${order.email}: ${subject}`
+    );
+    return { sent: true };
+  } catch (error) {
+    console.error("[order] Buyer confirmation request error:", error);
+    return { sent: false, reason: "resend-network-error" };
+  }
+}
+
 // --- Handler --------------------------------------------------------------------
 
 export async function POST(request: NextRequest) {
@@ -353,10 +540,17 @@ export async function POST(request: NextRequest) {
   }
 
   // Mailer failures must never fail the order — respond 200 with emailed:false.
+  // The buyer confirmation is fully independent of Victoria's notification:
+  // each has its own try/catch, and both outcomes are reported separately.
   const emailResult = await sendNotificationEmail(result.order);
+  const buyerEmailResult = await sendBuyerConfirmationEmail(result.order);
 
   return NextResponse.json(
-    { received: true, emailed: emailResult.sent },
+    {
+      received: true,
+      emailed: emailResult.sent,
+      buyerEmailed: buyerEmailResult.sent,
+    },
     { headers: cors }
   );
 }
