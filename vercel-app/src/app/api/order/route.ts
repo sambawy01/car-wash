@@ -22,7 +22,13 @@ export const runtime = "nodejs";
  * - Optional buyer `email`: when present, a second confirmation email is sent
  *   to the buyer. Buyer-email failures never affect the response success or
  *   Victoria's notification — both outcomes are reported separately in
- *   { received, emailed, buyerEmailed }.
+ *   { received, orderNumber, emailed, ownerEmails, buyerEmailed }.
+ * - Every order gets a server-generated order number (VV-XXXXXX) included in
+ *   the response and in both emails so it can be quoted over the phone.
+ * - Owner notifications go out as one Resend call PER recipient so a single
+ *   bounced inbox can't take down the other; `emailed` stays true when at
+ *   least one recipient succeeded, with per-recipient counts in
+ *   `ownerEmails: { sent, failed }`.
  */
 
 const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
@@ -214,6 +220,22 @@ function validateOrder(
   };
 }
 
+// --- Order number ----------------------------------------------------------------
+
+/**
+ * Human-readable order number: `VV-` + 6 uppercase base36 chars.
+ * Last 4 base36 digits of the ms timestamp (cycles ~28 min) + 2 random
+ * base36 chars — collisions are vanishingly unlikely at this shop's volume,
+ * and the result is short enough to read over the phone.
+ */
+function generateOrderNumber(): string {
+  const ts = Date.now().toString(36).slice(-4);
+  const rand = Math.floor(Math.random() * 36 * 36)
+    .toString(36)
+    .padStart(2, "0");
+  return `VV-${(ts + rand).toUpperCase()}`;
+}
+
 // --- Notification email --------------------------------------------------------
 
 function escapeHtml(value: string): string {
@@ -224,12 +246,15 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function buildEmail(order: ValidatedOrder): {
+function buildEmail(
+  order: ValidatedOrder,
+  orderNumber: string
+): {
   subject: string;
   text: string;
   html: string;
 } {
-  const subject = `New shop order — ${order.name} · ${order.totalEgp} EGP (COD)`;
+  const subject = `New shop order ${orderNumber} — ${order.name} · ${order.totalEgp} EGP (COD)`;
 
   const textItems = order.lines.map(
     (l) =>
@@ -237,6 +262,8 @@ function buildEmail(order: ValidatedOrder): {
   );
   const text = [
     "New shop order (cash on delivery)",
+    "",
+    `Order number: ${orderNumber}`,
     "",
     "Items:",
     ...textItems,
@@ -250,7 +277,7 @@ function buildEmail(order: ValidatedOrder): {
     `Note:     ${order.note || "—"}`,
     `Language: ${order.lang}`,
     "",
-    "Cash on delivery — call the client to confirm.",
+    "Cash on delivery — contact the client on WhatsApp to confirm delivery time.",
   ].join("\n");
 
   const itemRows = order.lines
@@ -273,7 +300,8 @@ function buildEmail(order: ValidatedOrder): {
   <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
     <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-radius:16px;padding:32px;">
       <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
-      <h1 style="margin:0 0 24px;color:#3A332C;font-size:26px;font-weight:normal;">New shop order</h1>
+      <h1 style="margin:0 0 8px;color:#3A332C;font-size:26px;font-weight:normal;">New shop order</h1>
+      <p style="margin:0 0 24px;color:#3A332C;font-size:16px;font-weight:bold;">Order number: ${escapeHtml(orderNumber)}</p>
       <table style="border-collapse:collapse;width:100%;">
         <tr>
           <th style="padding:0 12px 8px 0;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:left;">Product</th>
@@ -294,7 +322,7 @@ function buildEmail(order: ValidatedOrder): {
         ${row("Note", order.note || "—")}
         ${row("Language", order.lang)}
       </table>
-      <p style="margin:28px 0 0;color:#3A332C;font-size:15px;">Cash on delivery — call the client to confirm.</p>
+      <p style="margin:28px 0 0;color:#3A332C;font-size:15px;">Cash on delivery — contact the client on WhatsApp to confirm delivery time.</p>
     </div>
   </div>
 </body>
@@ -304,62 +332,98 @@ function buildEmail(order: ValidatedOrder): {
 }
 
 async function sendNotificationEmail(
-  order: ValidatedOrder
-): Promise<{ sent: boolean; reason?: string }> {
-  const { subject, text, html } = buildEmail(order);
+  order: ValidatedOrder,
+  orderNumber: string
+): Promise<{ sent: boolean; sentCount: number; failedCount: number; reason?: string }> {
+  const { subject, text, html } = buildEmail(order, orderNumber);
   const apiKey = process.env.RESEND_API_KEY;
-  const to = (process.env.NOTIFY_EMAIL || NOTIFY_EMAIL_DEFAULT)
+  const recipients = (process.env.NOTIFY_EMAIL || NOTIFY_EMAIL_DEFAULT)
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
 
   if (!apiKey) {
     // Graceful no-op: never break orders because email isn't configured.
-    console.log(
-      `[order] RESEND_API_KEY not set — would email ${to}:\nSubject: ${subject}\n${text}`
-    );
-    return { sent: false, reason: "email-not-configured" };
+    // Log one entry per recipient — mirrors the per-recipient real sends.
+    for (const recipient of recipients) {
+      console.log(
+        `[order] RESEND_API_KEY not set — would email ${recipient}:\nSubject: ${subject}\n${text}`
+      );
+    }
+    return {
+      sent: false,
+      sentCount: 0,
+      failedCount: 0,
+      reason: "email-not-configured",
+    };
   }
 
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: EMAIL_FROM, to, subject, text, html }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(
-        `[order] Resend send failed (${res.status}): ${body.slice(0, 300)}`
-      );
-      return { sent: false, reason: `resend-${res.status}` };
-    }
-    console.log(`[order] Notification email sent to ${to}: ${subject}`);
-    return { sent: true };
-  } catch (error) {
-    console.error("[order] Resend request error:", error);
-    return { sent: false, reason: "resend-network-error" };
-  }
+  // One Resend call per recipient so a single bounced/rejected inbox can't
+  // prevent the other owner address from being notified.
+  const outcomes = await Promise.all(
+    recipients.map(async (recipient): Promise<boolean> => {
+      try {
+        const res = await fetch("https://api.resend.com/emails", {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            from: EMAIL_FROM,
+            to: [recipient],
+            subject,
+            text,
+            html,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.text();
+          console.error(
+            `[order] Resend send to ${recipient} failed (${res.status}): ${body.slice(0, 300)}`
+          );
+          return false;
+        }
+        console.log(
+          `[order] Notification email sent to ${recipient}: ${subject}`
+        );
+        return true;
+      } catch (error) {
+        console.error(`[order] Resend request error for ${recipient}:`, error);
+        return false;
+      }
+    })
+  );
+
+  const sentCount = outcomes.filter(Boolean).length;
+  const failedCount = outcomes.length - sentCount;
+  return {
+    sent: sentCount > 0,
+    sentCount,
+    failedCount,
+    ...(sentCount === 0 ? { reason: "resend-failed-all-recipients" } : {}),
+  };
 }
 
 // --- Buyer confirmation email ----------------------------------------------------
 
-function buildBuyerEmail(order: ValidatedOrder): {
+function buildBuyerEmail(
+  order: ValidatedOrder,
+  orderNumber: string
+): {
   subject: string;
   text: string;
   html: string;
 } {
   const ru = order.lang === "ru";
   const subject = ru
-    ? "Ваш заказ — Victoria Vasilyeva Holistic Beauty"
-    : "Your order — Victoria Vasilyeva Holistic Beauty";
+    ? `Ваш заказ ${orderNumber} — Victoria Vasilyeva Holistic Beauty`
+    : `Your order ${orderNumber} — Victoria Vasilyeva Holistic Beauty`;
 
   const t = ru
     ? {
         greeting: `Здравствуйте, ${order.name}!`,
+        orderNumber: `Номер заказа: ${orderNumber}`,
         thanks:
           "Спасибо за ваш заказ в Victoria Vasilyeva Holistic Beauty. Вот его детали:",
         heading: "Ваш заказ",
@@ -368,12 +432,13 @@ function buildBuyerEmail(order: ValidatedOrder): {
         lineTotal: "Сумма",
         total: "Итого",
         cod: "Оплата при получении (наличными).",
-        call: "Виктория позвонит вам для подтверждения заказа.",
+        call: "Наша команда свяжется с вами в WhatsApp, чтобы подтвердить время доставки.",
         delivery: "Доставка по Египту в течение 24–72 часов.",
         signoff: "С теплом,",
       }
     : {
         greeting: `Hello ${order.name},`,
+        orderNumber: `Order number: ${orderNumber}`,
         thanks:
           "Thank you for your order with Victoria Vasilyeva Holistic Beauty. Here are the details:",
         heading: "Your order",
@@ -382,7 +447,7 @@ function buildBuyerEmail(order: ValidatedOrder): {
         lineTotal: "Line total",
         total: "Total",
         cod: "Payment: cash on delivery.",
-        call: "Victoria will call you to confirm your order.",
+        call: "Our team will get in touch via WhatsApp to confirm your delivery time.",
         delivery: "Delivery within 24–72 hours across Egypt.",
         signoff: "Warmly,",
       };
@@ -396,6 +461,8 @@ function buildBuyerEmail(order: ValidatedOrder): {
   );
   const text = [
     t.greeting,
+    "",
+    t.orderNumber,
     "",
     t.thanks,
     "",
@@ -426,10 +493,18 @@ function buildBuyerEmail(order: ValidatedOrder): {
 <html>
 <body style="margin:0;padding:0;background-color:#F4EFE7;font-family:Georgia,'Times New Roman',serif;">
   <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-radius:16px;padding:32px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;width:100%;">
+      <tr>
+        <td align="center" bgcolor="#100D0B" style="background-color:#100D0B;padding:24px;border-radius:16px 16px 0 0;">
+          <img src="https://victoriaholisticbeauty.com/assets/logo-white.png" width="220" alt="Victoria Vasilyeva — Holistic Beauty" style="display:block;width:220px;max-width:100%;height:auto;border:0;margin:0 auto;" />
+        </td>
+      </tr>
+    </table>
+    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-top:0;border-radius:0 0 16px 16px;padding:32px;">
       <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
       <h1 style="margin:0 0 24px;color:#3A332C;font-size:26px;font-weight:normal;">${escapeHtml(t.heading)}</h1>
       <p style="margin:0 0 8px;color:#3A332C;font-size:15px;">${escapeHtml(t.greeting)}</p>
+      <p style="margin:0 0 16px;color:#3A332C;font-size:16px;font-weight:bold;">${escapeHtml(t.orderNumber)}</p>
       <p style="margin:0 0 24px;color:#3A332C;font-size:15px;">${escapeHtml(t.thanks)}</p>
       <table style="border-collapse:collapse;width:100%;">
         <tr>
@@ -456,12 +531,13 @@ function buildBuyerEmail(order: ValidatedOrder): {
 }
 
 async function sendBuyerConfirmationEmail(
-  order: ValidatedOrder
+  order: ValidatedOrder,
+  orderNumber: string
 ): Promise<{ sent: boolean; reason?: string }> {
   if (!order.email) {
     return { sent: false, reason: "no-buyer-email" };
   }
-  const { subject, text, html } = buildBuyerEmail(order);
+  const { subject, text, html } = buildBuyerEmail(order, orderNumber);
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
@@ -539,16 +615,26 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  const orderNumber = generateOrderNumber();
+
   // Mailer failures must never fail the order — respond 200 with emailed:false.
   // The buyer confirmation is fully independent of Victoria's notification:
   // each has its own try/catch, and both outcomes are reported separately.
-  const emailResult = await sendNotificationEmail(result.order);
-  const buyerEmailResult = await sendBuyerConfirmationEmail(result.order);
+  const emailResult = await sendNotificationEmail(result.order, orderNumber);
+  const buyerEmailResult = await sendBuyerConfirmationEmail(
+    result.order,
+    orderNumber
+  );
 
   return NextResponse.json(
     {
       received: true,
+      orderNumber,
       emailed: emailResult.sent,
+      ownerEmails: {
+        sent: emailResult.sentCount,
+        failed: emailResult.failedCount,
+      },
       buyerEmailed: buyerEmailResult.sent,
     },
     { headers: cors }

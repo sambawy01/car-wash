@@ -158,8 +158,9 @@
       notePh: "Anything Victoria should know",
       submit: "Place order",
       sending: "Sending…",
-      successTitle: "Order placed",
-      successLine: "Victoria will call you to confirm. Payment on delivery.",
+      successTitle: "Thank you — order placed!",
+      orderNumberLabel: "Order number: ",
+      successLine: "Our team will get in touch via WhatsApp to confirm your delivery time. Payment on delivery.",
       done: "Done",
       failLead: "We couldn't send your order right now.",
       failLink: "Email it to Victoria instead",
@@ -202,8 +203,9 @@
       notePh: "Что Виктории стоит знать",
       submit: "Оформить заказ",
       sending: "Отправляем…",
-      successTitle: "Заказ оформлен",
-      successLine: "Виктория позвонит вам для подтверждения. Оплата при получении.",
+      successTitle: "Спасибо — заказ оформлен!",
+      orderNumberLabel: "Номер заказа: ",
+      successLine: "Наша команда свяжется с вами в WhatsApp, чтобы подтвердить время доставки. Оплата при получении.",
       done: "Готово",
       failLead: "Не получилось отправить заказ прямо сейчас.",
       failLink: "Отправьте его Виктории по почте",
@@ -560,7 +562,11 @@
         body: JSON.stringify(payload)
       }).then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
-        showSuccess();
+        /* Body parse failures must not turn a placed order into an error —
+           degrade to a success modal without the order number. */
+        return res.json().catch(function () { return {}; });
+      }).then(function (data) {
+        showSuccess(data && typeof data.orderNumber === "string" ? data.orderNumber : "");
       }).catch(function () {
         submit.disabled = false;
         submit.textContent = T.submit;
@@ -610,7 +616,7 @@
     total.appendChild(sum);
   }
 
-  function showSuccess() {
+  function showSuccess(orderNumber) {
     panel.textContent = "";
     var box = el("div", "order-success");
     var mark = el("div", "order-success-mark");
@@ -625,6 +631,12 @@
     done.addEventListener("click", closePanel);
     box.appendChild(mark);
     box.appendChild(title);
+    if (orderNumber) {
+      /* Server-issued order number — omitted gracefully when absent. */
+      var numLine = el("p", "order-success-line order-success-num");
+      numLine.appendChild(el("strong", null, T.orderNumberLabel + orderNumber));
+      box.appendChild(numLine);
+    }
     box.appendChild(line);
     box.appendChild(deliveryLine);
     box.appendChild(done);
