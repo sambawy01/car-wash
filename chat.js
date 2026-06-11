@@ -97,14 +97,16 @@
 
   card.append(header, list, form);
 
-  // ---- Intro teaser: a one-time invitation so visitors know who Vasili is ----
+  // ---- Intro teaser: greets on every new visit; once dismissed or the chat is
+  // opened it stays away for the rest of the browsing session (sessionStorage,
+  // not localStorage — the owner wants Vasili hard to miss for returning visitors). ----
   const INTRO_KEY = "vv-vasili-intro-seen";
   const introSeen = () => {
-    try { return localStorage.getItem(INTRO_KEY) === "1"; }
+    try { return sessionStorage.getItem(INTRO_KEY) === "1"; }
     catch { return true; } // storage unavailable — stay quiet rather than nag on every load
   };
   const markIntroSeen = () => {
-    try { localStorage.setItem(INTRO_KEY, "1"); } catch { /* ignore */ }
+    try { sessionStorage.setItem(INTRO_KEY, "1"); } catch { /* ignore */ }
   };
 
   const teaser = el("aside", "chat-teaser", { hidden: "" });
