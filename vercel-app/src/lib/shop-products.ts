@@ -39,7 +39,7 @@ export const SHOP_PRODUCTS: readonly ShopProduct[] = [
     priceRub: 1050,
   },
   {
-    slug: "mineral-spf50",
+    slug: "mineral-sunscreen-spf50",
     nameEn: "Mineral Sunscreen SPF 50",
     nameRu: "Минеральный SPF 50",
     priceEgp: 890,
@@ -53,21 +53,21 @@ export const SHOP_PRODUCTS: readonly ShopProduct[] = [
     priceRub: 1150,
   },
   {
-    slug: "collagen-patches",
+    slug: "collagen-eye-patches",
     nameEn: "Collagen Eye Patches 60pcs",
     nameRu: "Коллагеновые патчи",
     priceEgp: 640,
     priceRub: 900,
   },
   {
-    slug: "sculpting-tool",
+    slug: "gua-sha-tool",
     nameEn: "Facial Sculpting Tool gua sha",
     nameRu: "Скульптурирующий гуаша",
     priceEgp: 560,
     priceRub: 800,
   },
   {
-    slug: "night-cream",
+    slug: "recovery-night-cream",
     nameEn: "Recovery Night Cream 50ml",
     nameRu: "Восстанавливающий ночной крем",
     priceEgp: 1120,
