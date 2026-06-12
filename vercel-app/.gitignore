@@ -40,3 +40,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# email template QA previews (scripts/render-email-previews.mjs)
+/.email-preview/

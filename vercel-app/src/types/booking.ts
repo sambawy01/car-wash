@@ -33,6 +33,8 @@ export interface CalcomBookingRequest {
   metadata?: {
     notes?: string;
     referralSource?: string;
+    /** UI language at booking time — becomes Cal booking metadata.lang */
+    lang?: "en" | "ru";
     [key: string]: string | undefined;
   };
   bookingFieldsResponses?: {

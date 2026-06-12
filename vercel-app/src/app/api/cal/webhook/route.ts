@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import {
+  parseBookingLang,
+  sendAttendeeEmail,
+  sendOwnerNotificationEmail,
+  type AttendeeEmailKind,
+  type BookingDetails,
+} from "@/lib/booking-emails";
 
 /**
  * Cal.com webhook receiver.
@@ -10,17 +17,29 @@ import { createHmac, timingSafeEqual } from "node:crypto";
  *    `x-cal-signature-256` header. We verify with a timing-safe compare.
  * 2. Fallback (secret unset, header missing, or mismatch): we do NOT trust the
  *    payload. Instead we fetch the booking by uid from the Cal API and build
- *    the notification from that canonical data. A forged payload can therefore
- *    at worst trigger an email about a real, existing booking.
+ *    the emails from that canonical data. A forged payload can therefore at
+ *    worst trigger an email about a real, existing booking.
  *
- * This route must NEVER break bookings: every handled outcome returns 200.
- * Only malformed JSON returns 400.
+ * Routing (branded emails replace/augment Cal's generic ones):
+ * - BOOKING_REQUESTED, or BOOKING_CREATED while still pending
+ *     → Victoria's "New booking request" + attendee "request received".
+ * - BOOKING_CREATED with status accepted — this is what Cal fires when the
+ *   host CONFIRMS a pending booking (verified in cal.com
+ *   handleConfirmation.ts; there is no BOOKING_CONFIRMED/ACCEPTED trigger)
+ *     → attendee "your appointment is confirmed".
+ * - BOOKING_REJECTED → attendee decline email (incl. Cal's rejectionReason).
+ * - BOOKING_CANCELLED → attendee cancellation email (incl. cancellationReason).
+ *
+ * Attendee language: `payload.metadata.lang` ("en"/"ru"), recorded by
+ * /api/booking-calendar/book at creation time. The confirmation-time
+ * BOOKING_CREATED payload does NOT carry booking metadata (Cal only sends
+ * { videoCallUrl } there), so when lang is missing we fetch the canonical
+ * booking — GET /bookings/{uid} (2024-08-13) returns the stored metadata.
+ * Fallback: "en".
+ *
+ * This route must NEVER break bookings: every handled outcome returns 200,
+ * email failures are logged. Only malformed JSON returns 400.
  */
-
-const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
-const ADMIN_URL_BASE = "https://book.victoriaholisticbeauty.com/admin";
-const EMAIL_FROM =
-  "Victoria Holistic Beauty <bookings@victoriaholisticbeauty.com>";
 
 interface WebhookAttendee {
   name?: string;
@@ -38,26 +57,19 @@ interface WebhookPayload {
   status?: string;
   startTime?: string;
   endTime?: string;
+  /** Event type length in minutes (spread from Cal's eventTypeInfo). */
+  length?: number;
   attendees?: WebhookAttendee[];
   responses?: Record<string, { label?: string; value?: unknown } | undefined>;
+  metadata?: Record<string, unknown> | null;
+  rejectionReason?: string;
+  cancellationReason?: string;
 }
 
 interface WebhookBody {
   triggerEvent?: string;
   createdAt?: string;
   payload?: WebhookPayload;
-}
-
-interface BookingDetails {
-  uid: string;
-  service: string;
-  start: string;
-  status: string;
-  attendeeName: string;
-  attendeeEmail: string;
-  attendeePhone: string;
-  /** Client notes incl. the "Treatments: …" line for combined sessions. */
-  notes: string;
 }
 
 function verifySignature(
@@ -73,7 +85,14 @@ function verifySignature(
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Canonical booking lookup — used when the payload cannot be trusted. */
+function minutesBetween(startIso: string, endIso: string): number | null {
+  const start = new Date(startIso).getTime();
+  const end = new Date(endIso).getTime();
+  if (Number.isNaN(start) || Number.isNaN(end) || end <= start) return null;
+  return Math.round((end - start) / 60_000);
+}
+
+/** Canonical booking lookup — used for untrusted payloads and lang backfill. */
 async function fetchBookingFromCal(
   uid: string
 ): Promise<BookingDetails | null> {
@@ -95,9 +114,13 @@ async function fetchBookingFromCal(
         title?: string;
         status?: string;
         start?: string;
+        end?: string;
+        duration?: number;
+        cancellationReason?: string;
         eventType?: { slug?: string };
         attendees?: WebhookAttendee[];
         bookingFieldsResponses?: Record<string, unknown>;
+        metadata?: Record<string, unknown> | null;
       };
     };
     const b = json.data;
@@ -108,11 +131,19 @@ async function fetchBookingFromCal(
       uid: b.uid,
       service: b.title || b.eventType?.slug || "Booking",
       start: b.start || "",
+      durationMinutes:
+        typeof b.duration === "number" && b.duration > 0
+          ? b.duration
+          : b.start && b.end
+            ? minutesBetween(b.start, b.end)
+            : null,
       status: (b.status || "").toLowerCase(),
       attendeeName: attendee.name || "Unknown",
       attendeeEmail: attendee.email || "unknown",
       attendeePhone: attendee.phoneNumber || "not provided",
       notes: typeof rawNotes === "string" ? rawNotes : "",
+      lang: parseBookingLang(b.metadata?.lang),
+      reason: typeof b.cancellationReason === "string" ? b.cancellationReason : "",
     };
   } catch (error) {
     console.error("[cal-webhook] Cal API lookup failed:", error);
@@ -124,10 +155,17 @@ function detailsFromPayload(payload: WebhookPayload): BookingDetails {
   const attendee = payload.attendees?.[0] ?? {};
   const responsePhone = payload.responses?.attendeePhoneNumber?.value;
   const responseNotes = payload.responses?.notes?.value;
+  const reason = payload.rejectionReason || payload.cancellationReason || "";
   return {
     uid: payload.uid || "",
     service: payload.eventTitle || payload.title || payload.type || "Booking",
     start: payload.startTime || "",
+    durationMinutes:
+      typeof payload.length === "number" && payload.length > 0
+        ? payload.length
+        : payload.startTime && payload.endTime
+          ? minutesBetween(payload.startTime, payload.endTime)
+          : null,
     status: (payload.status || "").toLowerCase(),
     attendeeName: attendee.name || "Unknown",
     attendeeEmail: attendee.email || "unknown",
@@ -136,131 +174,9 @@ function detailsFromPayload(payload: WebhookPayload): BookingDetails {
       (typeof responsePhone === "string" ? responsePhone : "") ||
       "not provided",
     notes: typeof responseNotes === "string" ? responseNotes : "",
+    lang: parseBookingLang(payload.metadata?.lang),
+    reason: typeof reason === "string" ? reason : "",
   };
-}
-
-function formatCairoTime(iso: string): string {
-  if (!iso) return "unknown time";
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Africa/Cairo",
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function buildEmail(details: BookingDetails): {
-  subject: string;
-  text: string;
-  html: string;
-} {
-  const cairoTime = formatCairoTime(details.start);
-  const adminToken = process.env.ADMIN_TOKEN || "";
-  const reviewLink = adminToken
-    ? `${ADMIN_URL_BASE}?key=${encodeURIComponent(adminToken)}`
-    : ADMIN_URL_BASE;
-  const subject = `New booking request — ${details.service} · ${cairoTime}`;
-
-  const showNotes =
-    details.notes && details.notes !== "No additional notes provided";
-
-  const text = [
-    "New booking request",
-    "",
-    `Service:  ${details.service}`,
-    `Time:     ${cairoTime} (Cairo)`,
-    `Name:     ${details.attendeeName}`,
-    `Email:    ${details.attendeeEmail}`,
-    `Phone:    ${details.attendeePhone}`,
-    ...(showNotes ? [`Notes:    ${details.notes}`] : []),
-    "",
-    "Confirm, decline with a note, or suggest another time here:",
-    reviewLink,
-  ].join("\n");
-
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 0;color:#3A332C;font-size:15px;">${escapeHtml(value)}</td></tr>`;
-
-  const html = `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background-color:#F4EFE7;font-family:Georgia,'Times New Roman',serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-radius:16px;padding:32px;">
-      <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
-      <h1 style="margin:0 0 24px;color:#3A332C;font-size:26px;font-weight:normal;">New booking request</h1>
-      <table style="border-collapse:collapse;width:100%;">
-        ${row("Service", details.service)}
-        ${row("Time", `${cairoTime} (Cairo)`)}
-        ${row("Name", details.attendeeName)}
-        ${row("Email", details.attendeeEmail)}
-        ${row("Phone", details.attendeePhone)}
-        ${showNotes ? row("Notes", details.notes) : ""}
-      </table>
-      <p style="margin:28px 0 16px;color:#3A332C;font-size:15px;">Confirm, decline with a note, or suggest another time here:</p>
-      <a href="${reviewLink}" style="display:inline-block;background-color:#3A332C;color:#FFFDF9;text-decoration:none;padding:12px 28px;border-radius:9999px;font-size:15px;">Open booking inbox</a>
-    </div>
-    <p style="margin:16px 8px 0;color:#847866;font-size:12px;">Times shown in Cairo time (Africa/Cairo).</p>
-  </div>
-</body>
-</html>`;
-
-  return { subject, text, html };
-}
-
-async function sendNotificationEmail(
-  details: BookingDetails
-): Promise<{ sent: boolean; reason?: string }> {
-  const { subject, text, html } = buildEmail(details);
-  const apiKey = process.env.RESEND_API_KEY;
-  const to = (process.env.NOTIFY_EMAIL || NOTIFY_EMAIL_DEFAULT)
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-
-  if (!apiKey) {
-    // Graceful no-op: never break the webhook because email isn't configured.
-    console.log(
-      `[cal-webhook] RESEND_API_KEY not set — would email ${to}:\nSubject: ${subject}\n${text}`
-    );
-    return { sent: false, reason: "email-not-configured" };
-  }
-
-  try {
-    const res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ from: EMAIL_FROM, to, subject, text, html }),
-    });
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(
-        `[cal-webhook] Resend send failed (${res.status}): ${body.slice(0, 300)}`
-      );
-      return { sent: false, reason: `resend-${res.status}` };
-    }
-    console.log(`[cal-webhook] Notification email sent to ${to}: ${subject}`);
-    return { sent: true };
-  } catch (error) {
-    console.error("[cal-webhook] Resend request error:", error);
-    return { sent: false, reason: "resend-network-error" };
-  }
 }
 
 export async function POST(request: NextRequest) {
@@ -287,7 +203,7 @@ export async function POST(request: NextRequest) {
   if (signatureValid) {
     details = detailsFromPayload(payload);
   } else if (uid) {
-    // Untrusted payload: only the uid is used; everything in the email comes
+    // Untrusted payload: only the uid is used; everything in the emails comes
     // from the canonical booking fetched from the Cal API.
     details = await fetchBookingFromCal(uid);
     if (!details) {
@@ -304,17 +220,53 @@ export async function POST(request: NextRequest) {
   }
 
   // --- route by trigger -----------------------------------------------------
-  const shouldEmail =
+  const isPending = details.status.includes("pending");
+  const isRequested =
     triggerEvent === "BOOKING_REQUESTED" ||
-    (triggerEvent === "BOOKING_CREATED" && details.status.includes("pending"));
+    (triggerEvent === "BOOKING_CREATED" && isPending);
 
-  if (shouldEmail) {
-    const result = await sendNotificationEmail(details);
-    return NextResponse.json({ received: true, emailed: result.sent });
+  let attendeeKind: AttendeeEmailKind | null = null;
+  if (isRequested) {
+    attendeeKind = "requested";
+  } else if (
+    triggerEvent === "BOOKING_CREATED" &&
+    details.status.includes("accepted")
+  ) {
+    // Cal fires BOOKING_CREATED (status ACCEPTED) when the host confirms a
+    // pending booking — and for event types booked without confirmation.
+    attendeeKind = "confirmed";
+  } else if (triggerEvent === "BOOKING_REJECTED") {
+    attendeeKind = "rejected";
+  } else if (triggerEvent === "BOOKING_CANCELLED") {
+    attendeeKind = "cancelled";
   }
 
-  console.log(
-    `[cal-webhook] Received ${triggerEvent || "UNKNOWN"} for uid=${details.uid} (status=${details.status}) — no email needed`
-  );
-  return NextResponse.json({ received: true, emailed: false });
+  if (!attendeeKind) {
+    console.log(
+      `[cal-webhook] Received ${triggerEvent || "UNKNOWN"} for uid=${details.uid} (status=${details.status}) — no email needed`
+    );
+    return NextResponse.json({ received: true, emailed: false });
+  }
+
+  // Backfill lang from the canonical booking when the payload lacks it (the
+  // confirmation-time BOOKING_CREATED payload never carries booking metadata).
+  if (details.lang === null && details.uid) {
+    const canonical = await fetchBookingFromCal(details.uid);
+    if (canonical?.lang) details.lang = canonical.lang;
+  }
+
+  // Victoria's notification only for new requests; attendee email for every
+  // lifecycle step. Failures are logged and reported — never re-thrown, and
+  // the attendee email is never blocked by an owner-email failure.
+  let ownerSent = false;
+  if (isRequested) {
+    ownerSent = (await sendOwnerNotificationEmail(details)).sent;
+  }
+  const attendeeResult = await sendAttendeeEmail(attendeeKind, details);
+
+  return NextResponse.json({
+    received: true,
+    emailed: isRequested ? ownerSent : attendeeResult.sent,
+    attendeeEmail: { kind: attendeeKind, sent: attendeeResult.sent },
+  });
 }

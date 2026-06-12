@@ -88,6 +88,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // UI language ("en"/"ru") from the form — recorded on the booking as
+    // metadata.lang so /api/cal/webhook can send the attendee lifecycle
+    // emails in the right language. Cal v2 accepts free-form metadata on
+    // bookings (≤50 keys, string values ≤500 chars) and returns it on
+    // GET /bookings/{uid}. Defaults to "en" for anything unexpected.
+    const lang: "en" | "ru" =
+      bookingData.metadata?.lang === "ru" || bookingData.lang === "ru"
+        ? "ru"
+        : "en";
+
     // Format the booking data for Cal.com v2 API
     const calcomBookingData: BookingRequestV2 = {
       start: bookingData.start,
@@ -96,9 +106,11 @@ export async function POST(request: NextRequest) {
         email: bookingData.attendee.email,
         ...(phoneNumber && { phoneNumber }),
         timeZone: bookingData.attendee.timeZone,
-        language: "en",
+        // Also drives the language of any emails Cal itself sends.
+        language: lang,
       },
       eventTypeId,
+      metadata: { lang },
       // Optional: explicit duration for multi-duration event types
       ...(bookingData.lengthInMinutes &&
         !isNaN(parseInt(bookingData.lengthInMinutes)) && {

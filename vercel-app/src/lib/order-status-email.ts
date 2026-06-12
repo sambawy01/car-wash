@@ -1,10 +1,11 @@
-import { formatEgp, formatRub } from "@/lib/shop-products";
+import { formatEgp, formatRub } from "./shop-products";
+import { brandedEmailHtml, escapeHtml } from "./branded-email";
 import type {
   CancelReason,
   CancelReasonCode,
   StoredOrder,
   StoredOrderItem,
-} from "@/lib/orders";
+} from "./orders";
 
 /**
  * Client-facing status emails for shop orders
@@ -58,14 +59,6 @@ function cancelReasonText(reason: CancelReason | undefined, ru: boolean): string
   const label = CANCEL_REASON_LABELS[reason.code];
   const base = ru ? label.ru : label.en;
   return reason.note ? `${base} — ${reason.note}` : base;
-}
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 interface StatusCopy {
@@ -279,21 +272,7 @@ export function buildOrderStatusEmail(
     )
     .join("");
 
-  const html = `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background-color:#F4EFE7;font-family:Georgia,'Times New Roman',serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;width:100%;">
-      <tr>
-        <td align="center" bgcolor="#100D0B" style="background-color:#100D0B;padding:24px;border-radius:16px 16px 0 0;">
-          <img src="https://victoriaholisticbeauty.com/assets/logo-white.png" width="220" alt="Victoria Vasilyeva — Holistic Beauty" style="display:block;width:220px;max-width:100%;height:auto;border:0;margin:0 auto;" />
-        </td>
-      </tr>
-    </table>
-    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-top:0;border-radius:0 0 16px 16px;padding:32px;">
-      <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
-      <h1 style="margin:0 0 24px;color:#3A332C;font-size:26px;font-weight:normal;">${escapeHtml(t.heading)}</h1>
-      <p style="margin:0 0 8px;color:#3A332C;font-size:15px;">${escapeHtml(t.greeting)}</p>
+  const contentHtml = `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;">${escapeHtml(t.greeting)}</p>
       ${paragraphsHtml}
       <table style="border-collapse:collapse;width:100%;margin-top:8px;">
         <tr>
@@ -312,11 +291,9 @@ export function buildOrderStatusEmail(
           ? `<div style="margin-top:28px;padding:14px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;"><p style="margin:0;color:#3A332C;font-size:14px;line-height:1.65;">${escapeHtml(t.footnote)}</p></div>`
           : ""
       }
-      <p style="margin:28px 0 0;color:#847866;font-size:14px;">${escapeHtml(t.signoff)}<br>Victoria Vasilyeva Holistic Beauty</p>
-    </div>
-  </div>
-</body>
-</html>`;
+      <p style="margin:28px 0 0;color:#847866;font-size:14px;">${escapeHtml(t.signoff)}<br>Victoria Vasilyeva Holistic Beauty</p>`;
+
+  const html = brandedEmailHtml({ heading: t.heading, contentHtml });
 
   return { subject: t.subject, text, html };
 }

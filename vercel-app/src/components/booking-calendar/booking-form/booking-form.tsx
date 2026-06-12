@@ -106,6 +106,9 @@ export const BookingForm: React.FC<BookingFormProps> = ({
           timeZone: userTimezone,
         },
         metadata: {
+          // UI language — forwarded by the booking API to Cal as
+          // metadata.lang so lifecycle emails reach the client in their language.
+          lang,
           ...(data.referralSource && { referralSource: data.referralSource }),
           ...(notes && { notes }),
         },

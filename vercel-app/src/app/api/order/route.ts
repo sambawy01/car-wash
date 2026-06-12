@@ -5,10 +5,13 @@ import {
   getCatalog,
   effectiveSoldOut,
   decrementQuantities,
-  formatEgp,
-  formatRub,
   type Product,
 } from "@/lib/catalog";
+import {
+  buildBuyerOrderEmail,
+  buildOwnerOrderEmail,
+  type OrderEmailInput,
+} from "@/lib/order-emails";
 
 export const runtime = "nodejs";
 
@@ -269,104 +272,38 @@ function generateOrderNumber(): string {
 
 // --- Notification email --------------------------------------------------------
 
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function buildEmail(
+/** Adapt the validated order to the pure email builders in @/lib/order-emails. */
+function toOrderEmailInput(
   order: ValidatedOrder,
   orderNumber: string
-): {
-  subject: string;
-  text: string;
-  html: string;
-} {
-  const subject = `New shop order ${orderNumber} — ${order.name} · ${order.totalEgp} EGP (COD)`;
-
-  const textItems = order.lines.map(
-    (l) =>
-      `- ${l.product.en.name} / ${l.product.ru.name} × ${l.qty} = ${formatEgp(l.lineEgp)} / ${formatRub(l.lineRub)}`
-  );
-  const text = [
-    "New shop order (cash on delivery)",
-    "",
-    `Order number: ${orderNumber}`,
-    "",
-    "Items:",
-    ...textItems,
-    "",
-    `Total:    ${formatEgp(order.totalEgp)} / ${formatRub(order.totalRub)}`,
-    "",
-    `Name:     ${order.name}`,
-    `Phone:    ${order.phone}`,
-    `Email:    ${order.email || "—"}`,
-    `Address:  ${order.address}`,
-    `Note:     ${order.note || "—"}`,
-    `Language: ${order.lang}`,
-    "",
-    "Cash on delivery — contact the client on WhatsApp to confirm delivery time.",
-  ].join("\n");
-
-  const itemRows = order.lines
-    .map(
-      (l) =>
-        `<tr>` +
-        `<td style="padding:8px 12px 8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;">${escapeHtml(l.product.en.name)}<br><span style="color:#847866;font-size:13px;">${escapeHtml(l.product.ru.name)}</span></td>` +
-        `<td style="padding:8px 12px;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:center;">${l.qty}</td>` +
-        `<td style="padding:8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(l.lineEgp))}<br><span style="color:#847866;font-size:13px;">${escapeHtml(formatRub(l.lineRub))}</span></td>` +
-        `</tr>`
-    )
-    .join("");
-
-  const row = (label: string, value: string) =>
-    `<tr><td style="padding:6px 16px 6px 0;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 0;color:#3A332C;font-size:15px;">${escapeHtml(value)}</td></tr>`;
-
-  const html = `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background-color:#F4EFE7;font-family:Georgia,'Times New Roman',serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-radius:16px;padding:32px;">
-      <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
-      <h1 style="margin:0 0 8px;color:#3A332C;font-size:26px;font-weight:normal;">New shop order</h1>
-      <p style="margin:0 0 24px;color:#3A332C;font-size:16px;font-weight:bold;">Order number: ${escapeHtml(orderNumber)}</p>
-      <table style="border-collapse:collapse;width:100%;">
-        <tr>
-          <th style="padding:0 12px 8px 0;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:left;">Product</th>
-          <th style="padding:0 12px 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:center;">Qty</th>
-          <th style="padding:0 0 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:right;">Line total</th>
-        </tr>
-        ${itemRows}
-        <tr>
-          <td colspan="2" style="padding:12px 12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;">Total</td>
-          <td style="padding:12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(order.totalEgp))}<br><span style="font-weight:normal;color:#847866;font-size:13px;">${escapeHtml(formatRub(order.totalRub))}</span></td>
-        </tr>
-      </table>
-      <table style="border-collapse:collapse;width:100%;margin-top:24px;">
-        ${row("Name", order.name)}
-        ${row("Phone", order.phone)}
-        ${row("Email", order.email || "—")}
-        ${row("Address", order.address)}
-        ${row("Note", order.note || "—")}
-        ${row("Language", order.lang)}
-      </table>
-      <p style="margin:28px 0 0;color:#3A332C;font-size:15px;">Cash on delivery — contact the client on WhatsApp to confirm delivery time.</p>
-    </div>
-  </div>
-</body>
-</html>`;
-
-  return { subject, text, html };
+): OrderEmailInput {
+  return {
+    orderNumber,
+    name: order.name,
+    phone: order.phone,
+    email: order.email,
+    address: order.address,
+    note: order.note,
+    lang: order.lang,
+    lines: order.lines.map((l) => ({
+      nameEn: l.product.en.name,
+      nameRu: l.product.ru.name,
+      qty: l.qty,
+      lineEgp: l.lineEgp,
+      lineRub: l.lineRub,
+    })),
+    totalEgp: order.totalEgp,
+    totalRub: order.totalRub,
+  };
 }
 
 async function sendNotificationEmail(
   order: ValidatedOrder,
   orderNumber: string
 ): Promise<{ sent: boolean; sentCount: number; failedCount: number; reason?: string }> {
-  const { subject, text, html } = buildEmail(order, orderNumber);
+  const { subject, text, html } = buildOwnerOrderEmail(
+    toOrderEmailInput(order, orderNumber)
+  );
   const apiKey = process.env.RESEND_API_KEY;
   const recipients = (process.env.NOTIFY_EMAIL || NOTIFY_EMAIL_DEFAULT)
     .split(",")
@@ -438,129 +375,6 @@ async function sendNotificationEmail(
 
 // --- Buyer confirmation email ----------------------------------------------------
 
-function buildBuyerEmail(
-  order: ValidatedOrder,
-  orderNumber: string
-): {
-  subject: string;
-  text: string;
-  html: string;
-} {
-  const ru = order.lang === "ru";
-  const subject = ru
-    ? `Ваш заказ ${orderNumber} — Victoria Vasilyeva Holistic Beauty`
-    : `Your order ${orderNumber} — Victoria Vasilyeva Holistic Beauty`;
-
-  const t = ru
-    ? {
-        greeting: `Здравствуйте, ${order.name}!`,
-        orderNumber: `Номер заказа: ${orderNumber}`,
-        thanks:
-          "Спасибо за ваш заказ в Victoria Vasilyeva Holistic Beauty. Вот его детали:",
-        heading: "Ваш заказ",
-        product: "Товар",
-        qty: "Кол-во",
-        lineTotal: "Сумма",
-        total: "Итого",
-        cod: "Оплата при получении (наличными).",
-        call: "Наша команда свяжется с вами в WhatsApp, чтобы подтвердить время доставки.",
-        delivery: "Доставка по Египту в течение 24–72 часов.",
-        signoff: "С теплом,",
-      }
-    : {
-        greeting: `Hello ${order.name},`,
-        orderNumber: `Order number: ${orderNumber}`,
-        thanks:
-          "Thank you for your order with Victoria Vasilyeva Holistic Beauty. Here are the details:",
-        heading: "Your order",
-        product: "Product",
-        qty: "Qty",
-        lineTotal: "Line total",
-        total: "Total",
-        cod: "Payment: cash on delivery.",
-        call: "Our team will get in touch via WhatsApp to confirm your delivery time.",
-        delivery: "Delivery within 24–72 hours across Egypt.",
-        signoff: "Warmly,",
-      };
-
-  const productName = (l: OrderLine) =>
-    ru ? l.product.ru.name : l.product.en.name;
-
-  const textItems = order.lines.map(
-    (l) =>
-      `- ${productName(l)} × ${l.qty} = ${formatEgp(l.lineEgp)} / ${formatRub(l.lineRub)}`
-  );
-  const text = [
-    t.greeting,
-    "",
-    t.orderNumber,
-    "",
-    t.thanks,
-    "",
-    ...textItems,
-    "",
-    `${t.total}: ${formatEgp(order.totalEgp)} / ${formatRub(order.totalRub)}`,
-    "",
-    t.cod,
-    t.call,
-    t.delivery,
-    "",
-    t.signoff,
-    "Victoria Vasilyeva Holistic Beauty",
-  ].join("\n");
-
-  const itemRows = order.lines
-    .map(
-      (l) =>
-        `<tr>` +
-        `<td style="padding:8px 12px 8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;">${escapeHtml(productName(l))}</td>` +
-        `<td style="padding:8px 12px;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:center;">${l.qty}</td>` +
-        `<td style="padding:8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(l.lineEgp))}<br><span style="color:#847866;font-size:13px;">${escapeHtml(formatRub(l.lineRub))}</span></td>` +
-        `</tr>`
-    )
-    .join("");
-
-  const html = `<!DOCTYPE html>
-<html>
-<body style="margin:0;padding:0;background-color:#F4EFE7;font-family:Georgia,'Times New Roman',serif;">
-  <div style="max-width:560px;margin:0 auto;padding:32px 16px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;width:100%;">
-      <tr>
-        <td align="center" bgcolor="#100D0B" style="background-color:#100D0B;padding:24px;border-radius:16px 16px 0 0;">
-          <img src="https://victoriaholisticbeauty.com/assets/logo-white.png" width="220" alt="Victoria Vasilyeva — Holistic Beauty" style="display:block;width:220px;max-width:100%;height:auto;border:0;margin:0 auto;" />
-        </td>
-      </tr>
-    </table>
-    <div style="background-color:#FFFDF9;border:1px solid #E5DCCB;border-top:0;border-radius:0 0 16px 16px;padding:32px;">
-      <p style="margin:0 0 4px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.2em;">Victoria Vasilyeva Holistic Beauty</p>
-      <h1 style="margin:0 0 24px;color:#3A332C;font-size:26px;font-weight:normal;">${escapeHtml(t.heading)}</h1>
-      <p style="margin:0 0 8px;color:#3A332C;font-size:15px;">${escapeHtml(t.greeting)}</p>
-      <p style="margin:0 0 16px;color:#3A332C;font-size:16px;font-weight:bold;">${escapeHtml(t.orderNumber)}</p>
-      <p style="margin:0 0 24px;color:#3A332C;font-size:15px;">${escapeHtml(t.thanks)}</p>
-      <table style="border-collapse:collapse;width:100%;">
-        <tr>
-          <th style="padding:0 12px 8px 0;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:left;">${escapeHtml(t.product)}</th>
-          <th style="padding:0 12px 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:center;">${escapeHtml(t.qty)}</th>
-          <th style="padding:0 0 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:right;">${escapeHtml(t.lineTotal)}</th>
-        </tr>
-        ${itemRows}
-        <tr>
-          <td colspan="2" style="padding:12px 12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;">${escapeHtml(t.total)}</td>
-          <td style="padding:12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(order.totalEgp))}<br><span style="font-weight:normal;color:#847866;font-size:13px;">${escapeHtml(formatRub(order.totalRub))}</span></td>
-        </tr>
-      </table>
-      <div style="margin-top:28px;padding:14px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;">
-        <p style="margin:0;color:#3A332C;font-size:14px;line-height:1.65;">${escapeHtml(t.cod)}<br>${escapeHtml(t.call)}<br>${escapeHtml(t.delivery)}</p>
-      </div>
-      <p style="margin:28px 0 0;color:#847866;font-size:14px;">${escapeHtml(t.signoff)}<br>Victoria Vasilyeva Holistic Beauty</p>
-    </div>
-  </div>
-</body>
-</html>`;
-
-  return { subject, text, html };
-}
-
 async function sendBuyerConfirmationEmail(
   order: ValidatedOrder,
   orderNumber: string
@@ -568,7 +382,9 @@ async function sendBuyerConfirmationEmail(
   if (!order.email) {
     return { sent: false, reason: "no-buyer-email" };
   }
-  const { subject, text, html } = buildBuyerEmail(order, orderNumber);
+  const { subject, text, html } = buildBuyerOrderEmail(
+    toOrderEmailInput(order, orderNumber)
+  );
   const apiKey = process.env.RESEND_API_KEY;
 
   if (!apiKey) {
