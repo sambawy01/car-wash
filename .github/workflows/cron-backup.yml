@@ -1,0 +1,40 @@
+# Business backup — Monday 03:00 Africa/Cairo.
+#
+# Snapshots orders/*, both catalogs and the audit log to
+# backups/YYYY-MM-DD.json in Blob (newest 8 kept) and emails the snapshot
+# as a .json attachment.
+#
+# Double UTC schedule + server-side Cairo guard (weekday Monday AND hour 3)
+# — same DST-proof pattern as the daily brief. Both firings land on Monday
+# in Cairo (00:00/01:00 UTC → 02:00–04:00 Cairo). Auth: Bearer CRON_SECRET,
+# fail closed.
+name: cron-backup
+
+on:
+  schedule:
+    - cron: "0 0 * * 1" # Mon 03:00 Cairo while Cairo is UTC+3 (DST)
+    - cron: "0 1 * * 1" # Mon 03:00 Cairo while Cairo is UTC+2 (winter)
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cron-backup
+  cancel-in-progress: false
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/backup
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -m 180 -o /tmp/resp.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://book.victoriaholisticbeauty.com/api/cron/backup")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json
+          test "${code}" = "200"

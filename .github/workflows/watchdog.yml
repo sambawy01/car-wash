@@ -1,0 +1,145 @@
+# Site watchdog — every 30 minutes, FROM GitHub's infrastructure.
+#
+# Deliberately does NOT route alerts through the app: the whole point is to
+# detect the app being down, so the WORKFLOW ITSELF probes the public
+# endpoints and sends the alerts directly (Telegram Bot API + Resend API).
+#
+# Checks (each gets 2 attempts 15s apart to absorb transient network blips):
+#   a) https://victoriaholisticbeauty.com            → 200 + "Holistic Beauty"
+#   b) https://book.victoriaholisticbeauty.com/book  → 200
+#   c) https://book.victoriaholisticbeauty.com/api/treatments
+#                                                    → 200 + JSON with .treatments array
+#
+# DEBOUNCE POLICY (deliberate): no debounce — every failing 30-min run
+# alerts again. During a real outage a reminder every 30 minutes is
+# acceptable (useful, even) noise, and statelessness means no cache/artifact
+# marker that could itself fail and suppress a real alert.
+#
+# Secrets:
+#   RESEND_API_KEY      — required for email alerts (recipients hardcoded
+#                         below in NOTIFY_RECIPIENTS; they are the same
+#                         NOTIFY_EMAIL owner addresses the app emails).
+#   TELEGRAM_BOT_TOKEN  — optional; Telegram alert skipped gracefully if unset.
+#   OWNER_CHAT_ID       — optional; cannot exist until Victoria binds her
+#                         chat to the bot. Set later with:
+#                         gh secret set OWNER_CHAT_ID --body "<chat id>"
+name: watchdog
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: watchdog
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Probe site endpoints
+        id: checks
+        run: |
+          set -uo pipefail
+          FAILURES=""
+
+          probe() { # probe <label> <url> <mode>  (mode: status|string|json)
+            local label="$1" url="$2" mode="$3" attempt code ok=0
+            for attempt in 1 2; do
+              code=$(curl -sS -m 30 -o /tmp/body -w '%{http_code}' "$url" 2>/tmp/curlerr) || code="000"
+              if [ "$code" = "200" ]; then
+                case "$mode" in
+                  status) ok=1 ;;
+                  string) grep -q "Holistic Beauty" /tmp/body && ok=1 ;;
+                  json)   jq -e '.treatments | type == "array"' /tmp/body >/dev/null 2>&1 && ok=1 ;;
+                esac
+              fi
+              [ "$ok" = "1" ] && break
+              echo "Attempt ${attempt} failed for ${label}: HTTP ${code} $(cat /tmp/curlerr 2>/dev/null | head -c 200)"
+              [ "$attempt" = "1" ] && sleep 15
+            done
+            if [ "$ok" = "1" ]; then
+              echo "OK: ${label}"
+            else
+              FAILURES="${FAILURES}- ${label}: HTTP ${code}"$'\n'
+            fi
+          }
+
+          probe "homepage (victoriaholisticbeauty.com)" "https://victoriaholisticbeauty.com" string
+          probe "booking page (/book)" "https://book.victoriaholisticbeauty.com/book" status
+          probe "treatments API (/api/treatments)" "https://book.victoriaholisticbeauty.com/api/treatments" json
+
+          {
+            echo "failures<<WATCHDOG_EOF"
+            printf '%s' "$FAILURES"
+            echo "WATCHDOG_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+          if [ -n "$FAILURES" ]; then
+            echo "FAILING CHECKS:"
+            printf '%s' "$FAILURES"
+            exit 1
+          fi
+
+      - name: Telegram alert
+        if: ${{ failure() }}
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          OWNER_CHAT_ID: ${{ secrets.OWNER_CHAT_ID }}
+          FAILURES: ${{ steps.checks.outputs.failures }}
+        run: |
+          set -uo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN}" ] || [ -z "${OWNER_CHAT_ID}" ]; then
+            echo "Telegram alert skipped (TELEGRAM_BOT_TOKEN / OWNER_CHAT_ID not set)"
+            exit 0
+          fi
+          TEXT="SITE WATCHDOG ALERT
+          The following checks are failing:
+          ${FAILURES:-"(checks step crashed before reporting)"}
+          Probed from GitHub Actions (runs every 30 min; alerts repeat while the outage lasts)."
+          jq -n --arg chat "$OWNER_CHAT_ID" --arg text "$TEXT" \
+            '{chat_id: $chat, text: $text}' \
+          | curl -sS -m 30 -X POST \
+              -H 'Content-Type: application/json' \
+              -d @- \
+              "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+          || echo "Telegram alert send failed"
+
+      - name: Email alert (Resend)
+        if: ${{ failure() }}
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FAILURES: ${{ steps.checks.outputs.failures }}
+          # The owner notification addresses (same as the app's NOTIFY_EMAIL).
+          NOTIFY_RECIPIENTS: "victoriaholisticbeauty@outlook.com vasilyeva.v.m@mail.ru"
+        run: |
+          set -uo pipefail
+          if [ -z "${RESEND_API_KEY}" ]; then
+            echo "Email alert skipped (RESEND_API_KEY not set)"
+            exit 0
+          fi
+          BODY="The site watchdog (GitHub Actions, every 30 min) found failing checks:
+
+          ${FAILURES:-"(checks step crashed before reporting)"}
+
+          Checks: homepage, booking page (/book), treatments API.
+          Alerts repeat every 30 minutes while the outage lasts."
+          for TO in ${NOTIFY_RECIPIENTS}; do
+            jq -n \
+              --arg from "Victoria Holistic Beauty <bookings@victoriaholisticbeauty.com>" \
+              --arg to "$TO" \
+              --arg subject "SITE DOWN — watchdog alert" \
+              --arg text "$BODY" \
+              '{from: $from, to: [$to], subject: $subject, text: $text}' \
+            | curl -sS -m 30 -X POST \
+                -H "Authorization: Bearer ${RESEND_API_KEY}" \
+                -H 'Content-Type: application/json' \
+                -d @- \
+                "https://api.resend.com/emails" \
+            || echo "Email alert to ${TO} failed"
+            echo
+          done

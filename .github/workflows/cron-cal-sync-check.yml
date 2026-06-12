@@ -1,0 +1,38 @@
+# Cal.com drift check — Monday 09:00 Africa/Cairo (read-only vs api.cal.eu).
+#
+# Verifies every treatment's linked Cal event type (exists / title /
+# duration / hidden matches active). Drift alerts Victoria; clean is silent.
+#
+# Double UTC schedule + server-side Cairo guard (weekday Monday AND hour 9)
+# — same DST-proof pattern as the daily brief. Auth: Bearer CRON_SECRET,
+# fail closed.
+name: cron-cal-sync-check
+
+on:
+  schedule:
+    - cron: "0 6 * * 1" # Mon 09:00 Cairo while Cairo is UTC+3 (DST)
+    - cron: "0 7 * * 1" # Mon 09:00 Cairo while Cairo is UTC+2 (winter)
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cron-cal-sync-check
+  cancel-in-progress: false
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/cal-sync-check
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -m 120 -o /tmp/resp.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://book.victoriaholisticbeauty.com/api/cron/cal-sync-check")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json
+          test "${code}" = "200"

@@ -1,0 +1,42 @@
+# Evening digest — 20:00 Africa/Cairo daily.
+#
+# Vercel Hobby caps the project at 2 crons (both used by the 8am daily
+# brief), so this fires from GitHub cron instead. Cairo flips between UTC+2
+# and UTC+3, and GitHub cron is fixed UTC — so we fire at BOTH candidate UTC
+# hours and the endpoint itself guards "Cairo hour == 20" server-side
+# (DST-proof; the off-hour firing returns {skipped}, so jitter or the double
+# schedule can never double-send).
+#
+# Auth: the endpoint requires `Authorization: Bearer ${CRON_SECRET}` and
+# fails closed. Set the repo secret with:
+#   gh secret set CRON_SECRET --body "<value>"
+name: cron-evening-digest
+
+on:
+  schedule:
+    - cron: "0 17 * * *" # 20:00 Cairo while Cairo is UTC+3 (DST)
+    - cron: "0 18 * * *" # 20:00 Cairo while Cairo is UTC+2 (winter)
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cron-evening-digest
+  cancel-in-progress: false
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/evening-digest
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -m 120 -o /tmp/resp.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://book.victoriaholisticbeauty.com/api/cron/evening-digest")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json
+          test "${code}" = "200"

@@ -1,0 +1,35 @@
+# Weekly report — Sunday 18:00 Africa/Cairo.
+#
+# Double UTC schedule + server-side Cairo guard (weekday Sunday AND hour 18)
+# — same DST-proof pattern as the daily brief; the off-hour firing returns
+# {skipped} and can never double-send. Auth: Bearer CRON_SECRET, fail closed.
+name: cron-weekly-report
+
+on:
+  schedule:
+    - cron: "0 15 * * 0" # Sun 18:00 Cairo while Cairo is UTC+3 (DST)
+    - cron: "0 16 * * 0" # Sun 18:00 Cairo while Cairo is UTC+2 (winter)
+  workflow_dispatch: {}
+
+permissions: {}
+
+concurrency:
+  group: cron-weekly-report
+  cancel-in-progress: false
+
+jobs:
+  call:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Call /api/cron/weekly-report
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -m 120 -o /tmp/resp.json -w '%{http_code}' \
+            -H "Authorization: Bearer ${CRON_SECRET}" \
+            "https://book.victoriaholisticbeauty.com/api/cron/weekly-report")
+          echo "HTTP ${code}"
+          cat /tmp/resp.json
+          test "${code}" = "200"
