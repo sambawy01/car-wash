@@ -4,6 +4,7 @@ import {
   describeMutation,
   executeTool,
   requiresConfirmation,
+  validateMutationArgs,
   type ToolContext,
 } from "./tools";
 import {
@@ -27,13 +28,21 @@ import {
  *   tool call short-circuits the loop into a pending action + confirmation
  *   keyboard (the model never gets to see mutating results directly — those
  *   arrive via the callback handler editing the Telegram message).
- * - Overall budget enforced by the route's maxDuration (60 s); each upstream
- *   model call gets its own 30 s timeout.
+ * - Overall budget: callers pass an absolute `deadlineAt` (the webhook route
+ *   derives it from its maxDuration). No NEW model call starts with less
+ *   than DEADLINE_MIN_MODEL_MS remaining, and each call's own timeout is
+ *   capped so it cannot run past the deadline minus the reply reserve —
+ *   otherwise the function gets killed mid-run and Telegram redelivers the
+ *   update, double-running the agent.
  */
 
 const MAX_TOOL_ROUNDS = 4;
 const UPSTREAM_TIMEOUT_MS = 30_000;
 const NUM_PREDICT = 700;
+/** Don't START a model call with less budget than this before the deadline. */
+const DEADLINE_MIN_MODEL_MS = 20_000;
+/** Time reserved after the last model call to send the Telegram reply. */
+const REPLY_RESERVE_MS = 8_000;
 
 interface OllamaToolCall {
   function: { name: string; arguments?: Record<string, unknown> | string };
@@ -47,7 +56,8 @@ interface OllamaChatMessage {
 }
 
 async function callOllama(
-  messages: OllamaChatMessage[]
+  messages: OllamaChatMessage[],
+  timeoutMs: number = UPSTREAM_TIMEOUT_MS
 ): Promise<OllamaChatMessage> {
   const apiKey = process.env.OLLAMA_API_KEY;
   const baseUrl = apiKey
@@ -68,7 +78,7 @@ async function callOllama(
       messages,
       tools: TOOLS,
     }),
-    signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS),
+    signal: AbortSignal.timeout(timeoutMs),
   });
   if (!res.ok) {
     const detail = (await res.text()).slice(0, 500);
@@ -110,7 +120,8 @@ export type AgentOutcome =
  */
 export async function runAgent(
   userText: string,
-  ctx: ToolContext
+  ctx: ToolContext,
+  opts: { deadlineAt?: number } = {}
 ): Promise<AgentOutcome> {
   const history = await loadHistory();
   const messages: OllamaChatMessage[] = [
@@ -129,9 +140,30 @@ export async function runAgent(
 
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     const finalRound = round === MAX_TOOL_ROUNDS;
+
+    // Deadline gate: never start a model call that could outlive the route's
+    // execution budget (the function would be killed and Telegram would
+    // redeliver the update, double-running the agent).
+    const remainingMs =
+      opts.deadlineAt !== undefined
+        ? opts.deadlineAt - Date.now()
+        : Number.POSITIVE_INFINITY;
+    if (remainingMs < DEADLINE_MIN_MODEL_MS) {
+      const text =
+        "Sorry — this one is taking me too long to work through. Please try again in a moment.";
+      await appendHistory(
+        { role: "user", content: userText },
+        { role: "assistant", content: text }
+      );
+      return { kind: "text", text };
+    }
+
     let reply: OllamaChatMessage;
     try {
-      reply = await callOllama(messages);
+      reply = await callOllama(
+        messages,
+        Math.min(UPSTREAM_TIMEOUT_MS, remainingMs - REPLY_RESERVE_MS)
+      );
     } catch (error) {
       console.error("[assistant] Model call failed:", error);
       return {
@@ -157,11 +189,40 @@ export async function runAgent(
       const name = call.function?.name ?? "";
       const args = parseArgs(call);
       if (requiresConfirmation(name, args)) {
-        const summary = describeMutation(name, args);
+        // Validate/normalize ONCE — summary and executor must consume the
+        // SAME validated object, so what Victoria confirms is exactly what
+        // executes. Invalid args (wrong types, empty required strings, bad
+        // emails) are REFUSED outright, never queued: a malformed value
+        // could render blank on the confirmation card while the executor's
+        // String() coercion acts on the real payload (prompt injection).
+        const validated = validateMutationArgs(name, args);
+        if (!validated.ok) {
+          const text = `I can't do that as asked — ${validated.error}. Nothing was queued. Please rephrase and I'll try again.`;
+          await appendHistory(
+            { role: "user", content: userText },
+            {
+              role: "assistant",
+              content: "",
+              tool_calls: [{ function: { name, arguments: args } }],
+            },
+            {
+              role: "tool",
+              tool_name: name,
+              content: `REFUSED — ${validated.error}. Nothing was queued or executed.`,
+            }
+          );
+          await appendAudit({
+            chatId: ctx.chatId,
+            kind: "tool-refused",
+            detail: { tool: name, args, error: validated.error },
+          });
+          return { kind: "text", text };
+        }
+        const summary = describeMutation(name, validated.args);
         const pending = await createPendingAction({
           chatId: ctx.chatId,
           tool: name,
-          args,
+          args: validated.args,
           summary,
         });
         const text = `⚠️ Please confirm:\n${summary}`;
@@ -173,7 +234,7 @@ export async function runAgent(
           {
             role: "assistant",
             content: "",
-            tool_calls: [{ function: { name, arguments: args } }],
+            tool_calls: [{ function: { name, arguments: validated.args } }],
           },
           {
             role: "tool",
@@ -184,7 +245,7 @@ export async function runAgent(
         await appendAudit({
           chatId: ctx.chatId,
           kind: "pending-created",
-          detail: { id: pending.id, tool: name, args },
+          detail: { id: pending.id, tool: name, args: validated.args },
         });
         return { kind: "confirm", text, pendingId: pending.id };
       }

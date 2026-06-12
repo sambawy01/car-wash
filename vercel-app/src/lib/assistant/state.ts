@@ -1,4 +1,4 @@
-import { del, get, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 
 /**
  * Vassili's state on Vercel Blob (same private store as orders/catalog,
@@ -8,6 +8,7 @@ import { del, get, put } from "@vercel/blob";
  * - telegram/owner.json          — the ONE bound owner chat ({ chatId, boundAt })
  * - telegram/history.json        — rolling conversation memory (last ~12 turns)
  * - telegram/pending/<uuid>.json — confirmation-gated actions awaiting a tap
+ * - telegram/claims/<uuid>.json  — exactly-once claim markers for pending taps
  * - telegram/audit.jsonl         — append-only action log (best effort)
  * - telegram/alerts.json         — intrusion-alert rate-limit state per stranger
  *
@@ -53,9 +54,32 @@ interface OwnerRecord {
   boundAt: string;
 }
 
+/**
+ * The bound owner's chat id, or null when NO owner has ever been bound.
+ *
+ * Fails CLOSED: only a true missing blob (404) means "unbound". A corrupt or
+ * ill-shaped owner record throws — mapping it to null would silently reopen
+ * one-time binding to the next /start, which is a takeover vector. Callers
+ * (webhook route) must treat a throw as a hard error, never as "unbound".
+ */
 export async function getOwnerChatId(): Promise<number | null> {
-  const owner = await readJson<OwnerRecord>(OWNER_PATH);
-  return owner && typeof owner.chatId === "number" ? owner.chatId : null;
+  const result = await get(OWNER_PATH, { access: "private", useCache: false });
+  // The SDK returns null only for a genuinely missing blob (true 404).
+  if (!result) return null;
+  if (result.statusCode !== 200) {
+    throw new Error(`Owner record read failed (status ${result.statusCode})`);
+  }
+  let parsed: unknown;
+  try {
+    parsed = await new Response(result.stream).json();
+  } catch {
+    throw new Error("Owner record is corrupt (unparseable JSON)");
+  }
+  const chatId = (parsed as { chatId?: unknown } | null)?.chatId;
+  if (typeof chatId !== "number" || !Number.isFinite(chatId)) {
+    throw new Error("Owner record is corrupt (ill-shaped chatId)");
+  }
+  return chatId;
 }
 
 /**
@@ -217,12 +241,62 @@ export interface PendingAction {
 const PENDING_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
+export const CLAIMS_PREFIX = "telegram/claims/";
+
 function pendingPath(id: string): string {
   if (!PENDING_ID_RE.test(id)) {
     // Defense in depth: ids come back via callback_data from the network.
     throw new Error("Invalid pending action id");
   }
   return `telegram/pending/${id}.json`;
+}
+
+function claimPath(id: string): string {
+  if (!PENDING_ID_RE.test(id)) throw new Error("Invalid pending action id");
+  return `${CLAIMS_PREFIX}${id}.json`;
+}
+
+/**
+ * Atomically claim a pending action id — the EXACTLY-ONCE gate. The Blob API
+ * enforces `allowOverwrite: false` server-side (x-allow-overwrite: 0): when
+ * two taps race, exactly one put succeeds and the loser gets an error. We
+ * fail CLOSED on any error (including transport): a tap that cannot prove it
+ * claimed first must never execute — `del()` alone cannot provide this
+ * because it succeeds silently on already-deleted blobs.
+ */
+async function claimPending(id: string): Promise<boolean> {
+  try {
+    await put(claimPath(id), JSON.stringify({ claimedAt: new Date().toISOString() }), {
+      access: "private",
+      contentType: "application/json",
+      addRandomSuffix: false,
+      allowOverwrite: false,
+    });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Drop claim markers (and orphaned pending blobs) older than twice the
+ * confirmation TTL. Best effort — claims are tiny, this just keeps the
+ * prefix bounded over time. Runs piggybacked on createPendingAction.
+ */
+async function sweepStalePendingState(): Promise<void> {
+  try {
+    const cutoff = Date.now() - 2 * PENDING_TTL_MS;
+    for (const prefix of [CLAIMS_PREFIX, "telegram/pending/"]) {
+      const { blobs } = await list({ prefix });
+      for (const blob of blobs) {
+        if (new Date(blob.uploadedAt).getTime() < cutoff) {
+          await del(blob.pathname);
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[assistant] Stale pending-state sweep failed:", error);
+  }
 }
 
 export async function createPendingAction(
@@ -234,6 +308,7 @@ export async function createPendingAction(
     createdAt: new Date().toISOString(),
   };
   await writeJson(pendingPath(pending.id), pending);
+  await sweepStalePendingState();
   return pending;
 }
 
@@ -242,9 +317,11 @@ export type TakePendingResult =
   | { ok: false; reason: "not-found" | "expired" | "invalid-id" };
 
 /**
- * Fetch a pending action and delete its blob — each action can execute at
- * most once (a second Confirm tap finds nothing). Expired actions are
- * deleted too.
+ * Fetch a pending action for execution — EXACTLY ONCE. The atomic claim blob
+ * (not the delete) is what guarantees a second Confirm tap, or a racing
+ * Cancel tap, can never also win: `del()` succeeds silently on
+ * already-deleted blobs, so read-then-delete alone is a double-execute race.
+ * Expired actions are claimed and deleted too (so the loser sees not-found).
  */
 export async function takePendingAction(
   id: string
@@ -253,12 +330,15 @@ export async function takePendingAction(
   const action = await readJson<PendingAction>(pendingPath(id));
   if (!action) return { ok: false, reason: "not-found" };
 
+  // First claimer wins; everyone else treats the action as already handled.
+  if (!(await claimPending(id))) return { ok: false, reason: "not-found" };
+
+  // Claim won — remove the pending blob. Best effort: exactly-once is already
+  // guaranteed by the claim, so a failed delete must not block execution.
   try {
     await del(pendingPath(id));
   } catch (error) {
-    // If the delete fails we must NOT execute — a retry could double-fire.
     console.error("[assistant] Failed to delete pending action:", error);
-    return { ok: false, reason: "not-found" };
   }
 
   const age = Date.now() - new Date(action.createdAt).getTime();
@@ -268,14 +348,21 @@ export async function takePendingAction(
   return { ok: true, action };
 }
 
-/** Discard a pending action (Cancel tap). Best effort. */
-export async function discardPendingAction(id: string): Promise<void> {
-  if (!PENDING_ID_RE.test(id)) return;
+/**
+ * Discard a pending action (Cancel tap). Goes through the same atomic claim
+ * as takePendingAction so Cancel can never race Confirm into a double
+ * outcome. Returns true when THIS call claimed (and thus cancelled) the
+ * action; false when it was already executed/cancelled by another tap.
+ */
+export async function discardPendingAction(id: string): Promise<boolean> {
+  if (!PENDING_ID_RE.test(id)) return false;
+  if (!(await claimPending(id))) return false;
   try {
     await del(pendingPath(id));
   } catch (error) {
     console.error("[assistant] Failed to discard pending action:", error);
   }
+  return true;
 }
 
 // --- Audit log --------------------------------------------------------------------

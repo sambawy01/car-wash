@@ -50,7 +50,45 @@ import {
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const maxDuration = 60;
+export const maxDuration = 90;
+
+/**
+ * Absolute deadline for one update's processing, derived from maxDuration
+ * with a safety margin. Threaded into runAgent so the agent loop stops
+ * calling the model (and replies "taking too long") instead of being killed
+ * mid-run — a killed invocation answers no 2xx and Telegram redelivers.
+ */
+const DEADLINE_MARGIN_MS = 10_000;
+
+// --- update_id dedupe (best effort, in-memory) ---------------------------------
+// Telegram redelivers an update whenever it saw no 2xx (e.g. a timed-out
+// invocation). Remember recently seen update_ids per instance and skip
+// repeats — best effort by design: a fresh instance starts empty, and the
+// confirmation gate + atomic pending-action claim remain the real
+// exactly-once guarantees for anything mutating.
+
+const RECENT_UPDATE_TTL_MS = 15 * 60 * 1000;
+const RECENT_UPDATE_MAX = 1000;
+const recentUpdateIds = new Map<number, number>(); // update_id → first-seen ms
+
+function alreadySeenUpdate(updateId: number): boolean {
+  const now = Date.now();
+  if (recentUpdateIds.has(updateId)) return true;
+  recentUpdateIds.set(updateId, now);
+  if (recentUpdateIds.size > RECENT_UPDATE_MAX) {
+    for (const [id, seenAt] of recentUpdateIds) {
+      if (
+        now - seenAt > RECENT_UPDATE_TTL_MS ||
+        recentUpdateIds.size > RECENT_UPDATE_MAX
+      ) {
+        recentUpdateIds.delete(id);
+      } else {
+        break; // Map iterates in insertion order — the rest are newer.
+      }
+    }
+  }
+  return false;
+}
 
 // --- Telegram update types (the subset we consume) ----------------------------
 
@@ -164,11 +202,28 @@ async function alertOwnerOfIntrusion(
 
 // --- message handling ----------------------------------------------------------------
 
-async function handleMessage(message: TgMessage): Promise<void> {
+const OWNER_READ_ERROR =
+  "Sorry — something went wrong on my side. Please try again in a minute.";
+
+async function handleMessage(
+  message: TgMessage,
+  deadlineAt: number
+): Promise<void> {
   const chatId = message.chat.id;
   const from = message.from;
   const text = (message.text ?? "").trim();
-  const owner = await getOwnerChatId();
+
+  // FAIL CLOSED on a corrupt/unreadable owner record: getOwnerChatId throws
+  // for anything except a true 404. Treating that as "unbound" would reopen
+  // one-time owner binding to the next /start — a takeover vector.
+  let owner: number | null;
+  try {
+    owner = await getOwnerChatId();
+  } catch (error) {
+    console.error("[telegram] Owner record unreadable — failing closed:", error);
+    await sendMessage(chatId, OWNER_READ_ERROR);
+    return;
+  }
 
   // /start <pass> — ONE-TIME owner binding.
   // [\s\S] instead of the `s` flag — tsconfig targets pre-es2018.
@@ -244,7 +299,7 @@ async function handleMessage(message: TgMessage): Promise<void> {
     return;
   }
 
-  const outcome = await runAgent(text, { chatId });
+  const outcome = await runAgent(text, { chatId }, { deadlineAt });
   if (outcome.kind === "confirm") {
     await sendMessage(chatId, outcome.text, {
       replyMarkup: confirmCancelKeyboard(outcome.pendingId),
@@ -261,8 +316,29 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
   const messageId = cb.message?.message_id;
   const data = cb.data ?? "";
 
-  const owner = await getOwnerChatId();
+  // FAIL CLOSED on a corrupt/unreadable owner record (see handleMessage).
+  let owner: number | null;
+  try {
+    owner = await getOwnerChatId();
+  } catch (error) {
+    console.error("[telegram] Owner record unreadable — failing closed:", error);
+    await answerCallbackQuery(cb.id, "Something went wrong — please try again.");
+    return;
+  }
   const presser = cb.from?.id;
+
+  // The OWNER tapping a button on a stale/inaccessible message (Telegram
+  // omits cb.message after ~48h or when the message is unreachable): there
+  // is no intruder here — answer quietly, never alert Victoria about
+  // herself. The pending action behind it expired long ago anyway.
+  if (owner !== null && presser === owner && chatId === undefined) {
+    await answerCallbackQuery(
+      cb.id,
+      "That button has expired — please ask me again."
+    );
+    return;
+  }
+
   // Both the chat holding the keyboard AND the user who pressed it must be
   // the bound owner. Telegram always sets `from` on callback_query — a
   // missing sender is malformed input and fails closed.
@@ -298,7 +374,21 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
   const [, verb, pendingId] = match;
 
   if (verb === "cancel") {
-    await discardPendingAction(pendingId);
+    // discardPendingAction goes through the same atomic claim as Confirm:
+    // false means another tap (Confirm or Cancel) already won — never tell
+    // Victoria "nothing was changed" when a racing Confirm executed.
+    const discarded = await discardPendingAction(pendingId);
+    if (!discarded) {
+      await answerCallbackQuery(cb.id);
+      if (messageId !== undefined) {
+        await editMessageText(
+          chatId,
+          messageId,
+          "This action is no longer available (already executed or cancelled)."
+        );
+      }
+      return;
+    }
     await appendAudit({
       chatId,
       kind: "pending-cancelled",
@@ -375,11 +465,23 @@ export async function POST(request: NextRequest) {
     return ok({ ignored: "invalid-json" });
   }
 
+  // Skip redelivered updates (best effort — see alreadySeenUpdate). Must be
+  // checked BEFORE processing: redelivery happens precisely because a slow
+  // first run produced no 2xx in time.
+  if (
+    typeof update.update_id === "number" &&
+    alreadySeenUpdate(update.update_id)
+  ) {
+    return ok({ deduped: true });
+  }
+
+  const deadlineAt = Date.now() + maxDuration * 1000 - DEADLINE_MARGIN_MS;
+
   try {
     if (update.callback_query) {
       await handleCallback(update.callback_query);
     } else if (update.message) {
-      await handleMessage(update.message);
+      await handleMessage(update.message, deadlineAt);
     }
   } catch (error) {
     // Never bubble a 5xx to Telegram — it would redeliver the update forever.

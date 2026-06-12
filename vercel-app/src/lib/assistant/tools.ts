@@ -320,6 +320,96 @@ export function requiresConfirmation(
   return true;
 }
 
+// --- Mutation argument validation ----------------------------------------------
+
+/** Tool parameters that must be a single valid email address when present. */
+const EMAIL_PARAMS: Record<string, readonly string[]> = {
+  email_send: ["to"],
+};
+
+export type ValidatedArgs =
+  | { ok: true; args: Record<string, unknown> }
+  | { ok: false; error: string };
+
+/**
+ * Normalize and validate a MUTATING tool call's arguments against its
+ * declared schema — ONCE, before the pending action is created. Both the
+ * confirmation summary (describeMutation) and the executor must consume the
+ * returned object, so what Victoria confirms is exactly what executes.
+ *
+ * This closes the disclosure/executor divergence: e.g. `to: ["a@evil.com"]`
+ * used to render as a BLANK recipient on the confirmation card while the
+ * executor's String() coercion emailed the real address. Now any param whose
+ * runtime type differs from the declared type — or a missing/empty required
+ * string, or an invalid email — REFUSES the call outright; it is never
+ * queued. Undeclared params are dropped.
+ */
+export function validateMutationArgs(
+  name: string,
+  args: Record<string, unknown>
+): ValidatedArgs {
+  const schema = TOOLS.find((t) => t.function.name === name);
+  if (!schema) return { ok: false, error: `unknown tool "${name}"` };
+  const { properties, required } = schema.function.parameters;
+  const requiredSet = new Set(required);
+  const emailParams = new Set(EMAIL_PARAMS[name] ?? []);
+  const normalized: Record<string, unknown> = {};
+
+  for (const [key, spec] of Object.entries(properties)) {
+    const declared = (spec as { type?: string; enum?: string[] }) ?? {};
+    const value = args[key];
+
+    if (value === undefined || value === null) {
+      if (requiredSet.has(key)) {
+        return { ok: false, error: `required parameter "${key}" is missing` };
+      }
+      continue;
+    }
+
+    if (declared.type === "string") {
+      if (typeof value !== "string") {
+        return {
+          ok: false,
+          error: `parameter "${key}" must be a single text value`,
+        };
+      }
+      const trimmed = value.trim();
+      if (requiredSet.has(key) && trimmed.length === 0) {
+        return { ok: false, error: `required parameter "${key}" is empty` };
+      }
+      if (emailParams.has(key) && !EMAIL_RE.test(trimmed)) {
+        return {
+          ok: false,
+          error: `parameter "${key}" must be one valid email address`,
+        };
+      }
+      if (declared.enum && !declared.enum.includes(trimmed)) {
+        return {
+          ok: false,
+          error: `parameter "${key}" must be one of: ${declared.enum.join(", ")}`,
+        };
+      }
+      normalized[key] = trimmed;
+    } else if (declared.type === "number") {
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        return { ok: false, error: `parameter "${key}" must be a number` };
+      }
+      normalized[key] = value;
+    } else if (declared.type === "boolean") {
+      if (typeof value !== "boolean") {
+        return { ok: false, error: `parameter "${key}" must be true or false` };
+      }
+      normalized[key] = value;
+    } else {
+      // No other parameter types are declared in TOOLS today; refuse rather
+      // than pass through something the summary cannot faithfully render.
+      return { ok: false, error: `parameter "${key}" has an unsupported type` };
+    }
+  }
+
+  return { ok: true, args: normalized };
+}
+
 /**
  * Human summary of a mutating call, shown above [Confirm | Cancel].
  *
@@ -927,6 +1017,7 @@ async function execEmailSend(args: Record<string, unknown>): Promise<string> {
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
+    signal: AbortSignal.timeout(12_000),
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",

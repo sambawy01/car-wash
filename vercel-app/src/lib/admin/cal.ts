@@ -21,6 +21,13 @@
 
 const CAL_API_VERSION = "2024-08-13";
 
+/**
+ * Hard timeout on every Cal.com call. Vassili's agent loop and the webhook
+ * route run under an execution deadline — an unresponsive Cal upstream must
+ * surface as a tool error, not hang until the function is killed.
+ */
+const CAL_FETCH_TIMEOUT_MS = 12_000;
+
 export interface CalAttendee {
   name: string;
   email: string;
@@ -69,7 +76,11 @@ export async function listOwnerBookings(): Promise<CalBooking[]> {
   const { apiUrl, apiKey } = getCalEnv();
   const res = await fetch(
     `${apiUrl}/bookings?status=upcoming,unconfirmed&take=100`,
-    { headers: calHeaders(apiKey), cache: "no-store" }
+    {
+      headers: calHeaders(apiKey),
+      cache: "no-store",
+      signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
+    }
   );
   if (!res.ok) {
     const body = await res.text();
@@ -101,6 +112,7 @@ export async function listBookingsInRange(
   const res = await fetch(`${apiUrl}/bookings?${params}`, {
     headers: calHeaders(apiKey),
     cache: "no-store",
+    signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -131,6 +143,7 @@ async function postBookingAction(
       method: "POST",
       headers: calHeaders(apiKey),
       body: JSON.stringify(body ?? {}),
+      signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
     }
   );
   let parsed: unknown;
@@ -189,6 +202,7 @@ export async function createOutOfOffice(
   const res = await fetch(`${apiUrl}/me/ooo`, {
     method: "POST",
     headers: calHeaders(apiKey),
+    signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
     body: JSON.stringify({
       start: `${startDate}T00:00:00.000Z`,
       end: `${endDate}T23:59:59.999Z`,
@@ -212,6 +226,7 @@ export async function listOutOfOffice(): Promise<CalOutOfOffice[]> {
   const res = await fetch(`${apiUrl}/me/ooo`, {
     headers: calHeaders(apiKey),
     cache: "no-store",
+    signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
   });
   if (!res.ok) {
     const body = await res.text();
@@ -227,6 +242,7 @@ export async function deleteOutOfOffice(id: number): Promise<CalActionResult> {
   const res = await fetch(`${apiUrl}/me/ooo/${encodeURIComponent(String(id))}`, {
     method: "DELETE",
     headers: calHeaders(apiKey),
+    signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
   });
   const text = await res.text();
   let parsed: unknown;

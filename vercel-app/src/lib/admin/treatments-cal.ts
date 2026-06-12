@@ -60,6 +60,9 @@ async function calRequest(
       method,
       headers: calHeaders(env.apiKey),
       body: JSON.stringify(body),
+      // Cal sync is best-effort: a hung upstream must fail this helper, not
+      // pin the admin route until the function's execution limit kills it.
+      signal: AbortSignal.timeout(12_000),
     });
     const json = (await res.json().catch(() => ({}))) as {
       status?: string;
