@@ -352,10 +352,20 @@ export async function takePendingAction(
  * Discard a pending action (Cancel tap). Goes through the same atomic claim
  * as takePendingAction so Cancel can never race Confirm into a double
  * outcome. Returns true when THIS call claimed (and thus cancelled) the
- * action; false when it was already executed/cancelled by another tap.
+ * action; false when it was already executed/cancelled by another tap — or
+ * when the pending blob no longer exists at all.
  */
 export async function discardPendingAction(id: string): Promise<boolean> {
   if (!PENDING_ID_RE.test(id)) return false;
+  // Existence check FIRST: a stale Cancel on an action the sweeper already
+  // removed (pending blob AND claim marker gone) would otherwise claim
+  // successfully and report "Cancelled — nothing was changed" for something
+  // that may long since have executed. Missing pending → false, so the route
+  // answers "no longer available" instead.
+  const existing = await readJson<PendingAction>(pendingPath(id));
+  if (!existing) return false;
+  // The atomic claim still decides the Cancel-vs-Confirm race when the
+  // pending DOES exist: only the claim winner reports the cancellation.
   if (!(await claimPending(id))) return false;
   try {
     await del(pendingPath(id));

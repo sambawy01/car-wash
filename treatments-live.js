@@ -147,10 +147,27 @@
   function apply(rawTreatments) {
     /* Skip invalid entries; if NOTHING valid remains, bail out entirely and
        leave the server-rendered rows untouched — a corrupt API response must
-       degrade to the static menu, never hide it. */
+       degrade to the static menu, never hide it.
+
+       Mixed-validity payloads: an invalid entry that still names a usable
+       string slug marks that slug "skip" — its static row is left exactly as
+       the server rendered it. Filtering it out silently would hide the row
+       like a deactivated treatment, when really one garbled entry must never
+       remove a treatment from the menu. */
     var treatments = [];
+    var skipSlugs = {};
     for (var v = 0; v < rawTreatments.length; v++) {
-      if (isValidTreatment(rawTreatments[v])) treatments.push(rawTreatments[v]);
+      var entry = rawTreatments[v];
+      if (isValidTreatment(entry)) {
+        treatments.push(entry);
+      } else if (
+        entry &&
+        typeof entry === "object" &&
+        typeof entry.slug === "string" &&
+        entry.slug
+      ) {
+        skipSlugs[entry.slug] = true;
+      }
     }
     if (treatments.length === 0) return;
 
@@ -169,6 +186,12 @@
 
       var t = bySlug[slug];
       if (!t) {
+        if (skipSlugs[slug]) {
+          // An INVALID payload entry named this slug — intent unknown, so
+          // leave the static row untouched rather than hide it. (A slug with
+          // both a valid and a garbled entry takes the valid branch above.)
+          continue;
+        }
         // Deactivated or removed — hide the server-rendered row.
         row.style.display = "none";
         continue;

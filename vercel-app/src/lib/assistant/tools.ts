@@ -342,7 +342,10 @@ export type ValidatedArgs =
  * executor's String() coercion emailed the real address. Now any param whose
  * runtime type differs from the declared type — or a missing/empty required
  * string, or an invalid email — REFUSES the call outright; it is never
- * queued. Undeclared params are dropped.
+ * queued. Undeclared params are dropped. One deliberate exception: a string
+ * that round-trips losslessly through Number() for a number-typed param is
+ * coerced (LLMs emit numbers-as-strings constantly) — the summary renders
+ * the coerced value, so confirm-what-executes is preserved.
  */
 export function validateMutationArgs(
   name: string,
@@ -391,10 +394,27 @@ export function validateMutationArgs(
       }
       normalized[key] = trimmed;
     } else if (declared.type === "number") {
-      if (typeof value !== "number" || !Number.isFinite(value)) {
+      let num: unknown = value;
+      // LLMs routinely emit numbers as strings ('"priceEgp": "250"').
+      // Coerce ONLY when the round-trip is lossless (Number() then back to
+      // the exact same string) — the summary then renders the coerced
+      // number, so what Victoria confirms is exactly what executes. Anything
+      // lossy ("015", "1e3", "250.0") or non-numeric is still refused.
+      if (typeof num === "string") {
+        const trimmed = num.trim();
+        const coerced = Number(trimmed);
+        if (
+          trimmed.length > 0 &&
+          Number.isFinite(coerced) &&
+          String(coerced) === trimmed
+        ) {
+          num = coerced;
+        }
+      }
+      if (typeof num !== "number" || !Number.isFinite(num)) {
         return { ok: false, error: `parameter "${key}" must be a number` };
       }
-      normalized[key] = value;
+      normalized[key] = num;
     } else if (declared.type === "boolean") {
       if (typeof value !== "boolean") {
         return { ok: false, error: `parameter "${key}" must be true or false` };

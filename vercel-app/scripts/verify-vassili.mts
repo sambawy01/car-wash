@@ -61,6 +61,17 @@ const calMutations: Captured[] = [];
 const resendCalls: Captured[] = [];
 let lastPdf: Buffer | null = null;
 
+/**
+ * When non-null, Ollama chat calls are answered from this queue instead of
+ * the real model (request bodies captured in ollamaRequests for assertions).
+ * Used to script EXACT tool calls — e.g. numbers-as-strings arguments — that
+ * the real model can't be forced to emit deterministically.
+ */
+let scriptedOllama: { message: Record<string, unknown> }[] | null = null;
+const ollamaRequests: {
+  messages: { role: string; tool_name?: string; content: string }[];
+}[] = [];
+
 const realFetch = globalThis.fetch;
 globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   const url =
@@ -102,6 +113,26 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
       body: typeof init?.body === "string" ? JSON.parse(init.body) : undefined,
     });
     return new Response(JSON.stringify({ status: "success", data: {} }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  if (
+    scriptedOllama !== null &&
+    (url.includes("ollama.com/api/chat") || url.includes(":11434/api/chat"))
+  ) {
+    if (typeof init?.body === "string") {
+      ollamaRequests.push(JSON.parse(init.body));
+    }
+    const next = scriptedOllama.shift();
+    if (!next) {
+      return new Response(
+        JSON.stringify({ error: "scripted Ollama queue exhausted" }),
+        { status: 500 }
+      );
+    }
+    return new Response(JSON.stringify(next), {
       status: 200,
       headers: { "Content-Type": "application/json" },
     });
@@ -236,10 +267,25 @@ async function readAuditEntries(): Promise<
     });
 }
 
-/** Raw bytes of a blob, or null when it does not exist. */
-async function readBlobText(pathname: string): Promise<string | null> {
-  const r = await get(pathname, { access: "private", useCache: false });
-  if (!r || r.statusCode !== 200) return null;
+/**
+ * Raw bytes of a blob, or null ONLY when the blob truly does not exist (the
+ * SDK's 404 → null result). ANY other outcome — transport error, non-200
+ * status — THROWS so the run aborts BEFORE mutating anything. Treating a
+ * transient failure as "absent" at snapshot time would skip the real-owner
+ * refusal gate below and make cleanup delete the production owner binding
+ * (or restore catalog/products.json to "absent", deleting the live catalog).
+ */
+async function readBlobText(
+  pathname: string,
+  getImpl: typeof get = get
+): Promise<string | null> {
+  const r = await getImpl(pathname, { access: "private", useCache: false });
+  if (r === null) return null; // SDK's true not-found — the blob is absent
+  if (r.statusCode !== 200 || !r.stream) {
+    throw new Error(
+      `readBlobText(${pathname}): unexpected non-200 blob read (statusCode=${r.statusCode}) — refusing to treat as absent`
+    );
+  }
   return new Response(r.stream).text();
 }
 
@@ -274,12 +320,52 @@ function check(name: string, cond: boolean, detail = "") {
 const RUN_STARTED_AT = new Date().toISOString();
 
 // ====================================================================================
+// Fail-closed self-test BEFORE the snapshot reads: a non-404 failure must
+// THROW (aborting the run pre-mutation), never classify as "absent".
+{
+  let transportThrew = false;
+  try {
+    await readBlobText("telegram/owner.json", (async () => {
+      throw new Error("simulated transient blob transport failure");
+    }) as unknown as typeof get);
+  } catch {
+    transportThrew = true;
+  }
+  let non200Threw = false;
+  try {
+    await readBlobText("telegram/owner.json", (async () => ({
+      statusCode: 304,
+      stream: null,
+    })) as unknown as typeof get);
+  } catch {
+    non200Threw = true;
+  }
+  check(
+    "snapshot reads fail closed: non-404 blob failures throw, never read as 'absent'",
+    transportThrew && non200Threw
+  );
+}
+
+// ====================================================================================
 // Snapshot production state FIRST — restored byte-identical in the finally
-// cleanup at the bottom, even when the run crashes.
+// cleanup at the bottom, even when the run crashes. These top-level awaits
+// run BEFORE the mutating try block: any snapshot-read throw aborts the
+// process with nothing touched.
+// VASSILI_SIMULATE_SNAPSHOT_READ_FAILURE=1 injects a transient-500-style
+// failure here so the abort-before-mutation behaviour can be verified from
+// the outside (expected: non-zero exit, section 0 never runs).
+const snapshotGet: typeof get =
+  process.env.VASSILI_SIMULATE_SNAPSHOT_READ_FAILURE === "1"
+    ? ((async () => {
+        throw new Error(
+          "simulated transient blob 500 (VASSILI_SIMULATE_SNAPSHOT_READ_FAILURE=1)"
+        );
+      }) as unknown as typeof get)
+    : get;
 console.log("=== snapshot: owner.json / audit.jsonl / products.json ===");
-const ownerSnapshot = await readBlobText("telegram/owner.json");
-const auditSnapshot = await readBlobText("telegram/audit.jsonl");
-const productsSnapshot = await readBlobText("catalog/products.json");
+const ownerSnapshot = await readBlobText("telegram/owner.json", snapshotGet);
+const auditSnapshot = await readBlobText("telegram/audit.jsonl", snapshotGet);
+const productsSnapshot = await readBlobText("catalog/products.json", snapshotGet);
 console.log(
   `owner=${ownerSnapshot === null ? "absent" : "present"}, audit=${
     auditSnapshot === null ? "absent" : `${auditSnapshot.length} bytes`
@@ -1072,6 +1158,15 @@ try {
     // Sequential second tap after a win still finds nothing.
     const r3 = await takePendingAction(a.id);
     check("third (late) Confirm tap → not-found", !r3.ok);
+
+    // Stale Cancel honesty: once the pending blob is gone (executed,
+    // cancelled, or swept after expiry), discard must return false — the
+    // route then says "no longer available", never the lie
+    // "Cancelled — nothing was changed".
+    const staleCancel = await discardPendingAction(b.id);
+    check("stale Cancel on already-handled pending → false", staleCancel === false);
+    const ghostCancel = await discardPendingAction(crypto.randomUUID());
+    check("Cancel on a never-existing pending id → false", ghostCancel === false);
   }
 
   console.log("\n=== 15. Mutation-arg validation (summary/executor parity) ===");
@@ -1109,11 +1204,37 @@ try {
     });
     check("non-string slug on product_update → REFUSED", objSlug.ok === false);
 
+    // Numbers-as-strings: lossless ones coerce (and the summary renders the
+    // coerced value — confirm-what-executes preserved); lossy/non-numeric
+    // strings are still refused.
     const strQty = validateMutationArgs("product_update", {
       slug: "tohar-hamidbar-concentrate",
       quantity: "15",
     });
-    check("string quantity on product_update → REFUSED", strQty.ok === false);
+    check(
+      "lossless numeric string quantity '15' → coerced to number 15",
+      strQty.ok === true && strQty.args.quantity === 15
+    );
+    const strPrice = validateMutationArgs("product_update", {
+      slug: "tohar-hamidbar-concentrate",
+      priceEgp: "250",
+    });
+    check(
+      "string priceEgp '250' → coerced; summary renders 250 EGP",
+      strPrice.ok === true &&
+        strPrice.args.priceEgp === 250 &&
+        /price 250 EGP/.test(describeMutation("product_update", strPrice.args))
+    );
+    const lossyQty = validateMutationArgs("product_update", {
+      slug: "tohar-hamidbar-concentrate",
+      quantity: "015",
+    });
+    check("lossy numeric string '015' → still REFUSED", lossyQty.ok === false);
+    const nonNumQty = validateMutationArgs("product_update", {
+      slug: "tohar-hamidbar-concentrate",
+      quantity: "lots",
+    });
+    check("non-numeric string quantity → REFUSED", nonNumQty.ok === false);
 
     const missingReason = validateMutationArgs("booking_decline", { uid: "u1" });
     check("missing required reason on booking_decline → REFUSED", missingReason.ok === false);
@@ -1123,6 +1244,90 @@ try {
       status: "exploded",
     });
     check("enum violation on order_set_status → REFUSED", badStatus.ok === false);
+  }
+
+  console.log(
+    "\n=== 15b. Agent loop (scripted model): string price parks coerced; invalid arg → retry round ==="
+  );
+  {
+    // (a) Model emits '"priceEgp": "250"' (numbers-as-strings) — must be
+    // coerced, parked behind the keyboard, and the summary must show 250.
+    telegramCalls.length = 0;
+    ollamaRequests.length = 0;
+    scriptedOllama = [
+      {
+        message: {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              function: {
+                name: "product_update",
+                arguments: { slug: "tohar-hamidbar-concentrate", priceEgp: "250" },
+              },
+            },
+          ],
+        },
+      },
+    ];
+    await sendText(OWNER_CHAT, "set tohar price to 250 EGP");
+    const coercedId = lastKeyboardPendingId();
+    const coercedPrompt = lastTelegramText();
+    check(
+      "model's string '250' price → coerced, parked, summary shows 250 EGP",
+      coercedId !== null && /price 250 EGP/.test(coercedPrompt),
+      coercedPrompt.slice(0, 160)
+    );
+    if (coercedId) await tapButton(OWNER_CHAT, `cancel:${coercedId}`);
+
+    // (b) Genuinely invalid arg: REFUSED goes back to the model as a tool
+    // result and it gets a retry round — Victoria sees the model's
+    // self-correction, not an immediate refusal ending the loop.
+    telegramCalls.length = 0;
+    ollamaRequests.length = 0;
+    scriptedOllama = [
+      {
+        message: {
+          role: "assistant",
+          content: "",
+          tool_calls: [
+            {
+              function: {
+                name: "product_update",
+                arguments: { slug: "tohar-hamidbar-concentrate", quantity: "lots" },
+              },
+            },
+          ],
+        },
+      },
+      {
+        message: {
+          role: "assistant",
+          content: "Quantity needs to be a number — how many units should I set?",
+        },
+      },
+    ];
+    await sendText(OWNER_CHAT, "set tohar quantity to lots");
+    const retryReply = lastTelegramText();
+    check(
+      "invalid arg → REFUSED fed back to the model as a tool result (retry round granted)",
+      ollamaRequests.length === 2 &&
+        ollamaRequests[1].messages.some(
+          (m) => m.role === "tool" && /REFUSED/.test(m.content)
+        ),
+      `ollama calls=${ollamaRequests.length}`
+    );
+    check(
+      "user sees the model's self-correction, not an immediate refusal",
+      /how many units/i.test(retryReply) &&
+        !/I can't do that as asked/.test(retryReply),
+      retryReply.slice(0, 160)
+    );
+    check(
+      "nothing parked for the invalid call",
+      lastKeyboardPendingId() === null
+    );
+    scriptedOllama = null;
   }
 
   console.log("\n=== 16. Telegram update_id dedupe (redelivery protection) ===");

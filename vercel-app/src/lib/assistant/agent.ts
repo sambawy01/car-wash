@@ -138,6 +138,11 @@ export async function runAgent(
     { role: "user", content: userText },
   ];
 
+  // Most recent validation-refusal error, kept so that when the round budget
+  // runs out with no usable model text, the user still sees WHY nothing
+  // happened instead of a generic empty-handed shrug.
+  let lastRefusal: string | null = null;
+
   for (let round = 0; round <= MAX_TOOL_ROUNDS; round++) {
     const finalRound = round === MAX_TOOL_ROUNDS;
 
@@ -176,7 +181,9 @@ export async function runAgent(
     if (toolCalls.length === 0 || finalRound) {
       const text =
         (reply.content || "").trim() ||
-        "Hmm, I came back empty-handed. Could you rephrase that?";
+        (lastRefusal
+          ? `I can't do that as asked — ${lastRefusal}. Nothing was queued. Please rephrase and I'll try again.`
+          : "Hmm, I came back empty-handed. Could you rephrase that?");
       await appendHistory(
         { role: "user", content: userText },
         { role: "assistant", content: text }
@@ -185,6 +192,7 @@ export async function runAgent(
     }
 
     // Mutating call? → pending action + keyboard, loop ends here.
+    let refusedThisRound = false;
     for (const call of toolCalls) {
       const name = call.function?.name ?? "";
       const args = parseArgs(call);
@@ -197,26 +205,31 @@ export async function runAgent(
         // String() coercion acts on the real payload (prompt injection).
         const validated = validateMutationArgs(name, args);
         if (!validated.ok) {
-          const text = `I can't do that as asked — ${validated.error}. Nothing was queued. Please rephrase and I'll try again.`;
-          await appendHistory(
-            { role: "user", content: userText },
-            {
-              role: "assistant",
-              content: "",
-              tool_calls: [{ function: { name, arguments: args } }],
-            },
-            {
-              role: "tool",
-              tool_name: name,
-              content: `REFUSED — ${validated.error}. Nothing was queued or executed.`,
-            }
-          );
+          // Don't end the loop with a user-facing refusal over a fixable
+          // slip (e.g. '"priceEgp": "abc"'): rounds always remain here
+          // (finalRound returned above), so feed REFUSED back as a tool
+          // result and let the model self-correct. Victoria only sees a
+          // refusal if the round budget runs out without usable text
+          // (the lastRefusal fallback above).
+          lastRefusal = validated.error;
           await appendAudit({
             chatId: ctx.chatId,
             kind: "tool-refused",
             detail: { tool: name, args, error: validated.error },
           });
-          return { kind: "text", text };
+          messages.push(reply);
+          for (const c of toolCalls) {
+            messages.push({
+              role: "tool",
+              tool_name: c.function?.name ?? "",
+              content:
+                c === call
+                  ? `REFUSED — ${validated.error}. Nothing was queued or executed. Correct the arguments and call the tool again.`
+                  : "NOT EXECUTED — another tool call in this turn was refused; correct it and retry.",
+            });
+          }
+          refusedThisRound = true;
+          break;
         }
         const summary = describeMutation(name, validated.args);
         const pending = await createPendingAction({
@@ -250,6 +263,7 @@ export async function runAgent(
         return { kind: "confirm", text, pendingId: pending.id };
       }
     }
+    if (refusedThisRound) continue; // refusal already fed back — next round
 
     // All read-only — execute and feed results back.
     messages.push(reply);
