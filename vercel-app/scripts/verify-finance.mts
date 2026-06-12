@@ -92,6 +92,7 @@ const {
   __setLedgerStore,
   addLedgerEntry,
   listLedger,
+  listAllBlobPathnames,
   updateLedgerEntry,
   removeLedgerEntry,
   filterByPeriod,
@@ -123,7 +124,7 @@ const { NextRequest } = await import("next/server");
 import type { StoredOrder } from "../src/lib/orders";
 import type { CalBooking } from "../src/lib/admin/cal";
 import type { Treatment } from "../src/lib/treatments";
-import type { LedgerStore, LedgerEntry } from "../src/lib/finance";
+import type { LedgerStore, LedgerEntry, BlobListPage } from "../src/lib/finance";
 import type { PnLInputs } from "../src/lib/finance-report";
 
 // --- in-memory ledger store (the orders model: one blob per entry) -----------
@@ -212,6 +213,50 @@ console.log("\n=== 1b. CONCURRENT adds never lose an entry (per-blob, not single
     `count=${all.length}`
   );
   check("each concurrent add wrote its OWN blob", ids.size === 3);
+}
+
+// ============================================================================
+console.log("\n=== 1c. Blob list PAGINATION: >1000 entries across pages are all aggregated (no silent truncation) ===");
+{
+  // @vercel/blob's list() caps at 1000 blobs/page. Before the cursor walk, the
+  // store read only page 1 → the P&L silently UNDERCOUNTED past 1000 entries.
+  // Drive the REAL cursor loop (listAllBlobPathnames) with a mock lister that
+  // serves TWO pages via hasMore/cursor and assert the FULL union comes back.
+  const ENTRIES = "finance/entries/";
+  const TOTAL = 1500; // straddles the 1000 cap → forces a second page
+  const all = Array.from({ length: TOTAL }, (_, i) => `${ENTRIES}e${i}.json`);
+
+  let listCalls = 0;
+  const pagedLister = async (opts: { prefix: string; cursor?: string; limit: number }): Promise<BlobListPage> => {
+    listCalls++;
+    const start = opts.cursor ? Number(opts.cursor) : 0;
+    const slice = all.filter((p) => p.startsWith(opts.prefix)).slice(start, start + opts.limit);
+    const next = start + opts.limit;
+    const more = next < TOTAL;
+    return {
+      blobs: slice.map((pathname) => ({ pathname })),
+      cursor: more ? String(next) : undefined,
+      hasMore: more,
+    };
+  };
+
+  const aggregated = await listAllBlobPathnames(ENTRIES, pagedLister);
+  check(
+    "cursor walk aggregates ALL 1500 pathnames (not truncated at 1000)",
+    aggregated.length === TOTAL,
+    `got ${aggregated.length}`
+  );
+  check("cursor walk made >1 list() call (followed hasMore)", listCalls >= 2, `calls=${listCalls}`);
+  check("no duplicates / no gaps in the aggregated set", new Set(aggregated).size === TOTAL);
+
+  // A single full page (hasMore=false on the first call) must stop after ONE call.
+  let oneShot = 0;
+  const singlePage = async (opts: { prefix: string; cursor?: string; limit: number }): Promise<BlobListPage> => {
+    oneShot++;
+    return { blobs: [{ pathname: `${opts.prefix}only.json` }], hasMore: false };
+  };
+  const single = await listAllBlobPathnames(ENTRIES, singlePage);
+  check("single-page result stops after one call (no needless paging)", single.length === 1 && oneShot === 1);
 }
 
 // ============================================================================
@@ -353,6 +398,42 @@ console.log("\n=== 2. Read-error semantics (per-blob layout: throws on transient
   const e1 = merged.find((e) => e.id === "E1");
   check("dual-layout merge: union of entries + legacy", merged.length === 2 && merged.some((e) => e.id === "L9"));
   check("dual-layout merge: per-entry blob WINS over legacy dup", e1?.amountEgp === 150);
+}
+
+// ============================================================================
+console.log("\n=== 2b. Legacy-only id: update rewrites the legacy array, remove filters it out ===");
+{
+  // A row that lives ONLY in the legacy finance/ledger.json (no per-entry blob)
+  // must stay editable: update/remove fall back to rewriting the legacy array.
+  const LEGACY = "finance/ledger.json";
+  const ENTRIES = "finance/entries/";
+  const store = makeMemoryStore();
+  __setLedgerStore(store);
+
+  const legacyUpd: LedgerEntry = { ...mkEntry("2026-06-04", "expense", "rent", 5000, "legacy rent"), id: "LEGACY-UPD" };
+  const legacyRem: LedgerEntry = { ...mkEntry("2026-06-05", "income", "treatment-cash", 700), id: "LEGACY-REM" };
+  store.dump().set(LEGACY, JSON.stringify([legacyUpd, legacyRem]));
+
+  // sanity: both surface via listLedger even though no per-entry blob exists
+  const before = await listLedger();
+  check("legacy-only rows surface via listLedger", before.length === 2 && before.some((e) => e.id === "LEGACY-UPD") && before.some((e) => e.id === "LEGACY-REM"));
+
+  // UPDATE a legacy-only id → rewrites the legacy array (no per-entry blob made)
+  const updated = await updateLedgerEntry("LEGACY-UPD", { amountEgp: 5250, note: "legacy rent (adjusted)" });
+  check("update(legacy-only) returns the patched entry", updated?.amountEgp === 5250 && updated?.note === "legacy rent (adjusted)");
+  check("update(legacy-only) kept id/createdAt immutable", updated?.id === "LEGACY-UPD" && updated?.createdAt === legacyUpd.createdAt);
+  check("update(legacy-only) did NOT create a per-entry blob", !store.dump().has(`${ENTRIES}LEGACY-UPD.json`));
+  const rewritten = JSON.parse(store.dump().get(LEGACY)!) as LedgerEntry[];
+  check("update(legacy-only) rewrote the legacy array in place", rewritten.find((e) => e.id === "LEGACY-UPD")?.amountEgp === 5250 && rewritten.length === 2);
+
+  // REMOVE a legacy-only id → filters it out of the legacy array
+  const removed = await removeLedgerEntry("LEGACY-REM");
+  check("remove(legacy-only) returns true", removed === true);
+  const afterRemove = JSON.parse(store.dump().get(LEGACY)!) as LedgerEntry[];
+  check("remove(legacy-only) filtered the row out of the legacy array", afterRemove.length === 1 && !afterRemove.some((e) => e.id === "LEGACY-REM"));
+  const finalList = await listLedger();
+  check("remove(legacy-only) reflected in listLedger (1 row left)", finalList.length === 1 && finalList[0].id === "LEGACY-UPD");
+  check("remove(legacy-only) unknown id → false", (await removeLedgerEntry("LEGACY-NOPE")) === false);
 }
 
 // ============================================================================

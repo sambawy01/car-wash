@@ -120,6 +120,42 @@ export interface LedgerStore {
   remove(pathname: string): Promise<void>;
 }
 
+/**
+ * The narrow page shape this module needs from a blob `list` call: the blob
+ * pathnames plus the cursor/hasMore pagination signal.
+ */
+export interface BlobListPage {
+  blobs: { pathname: string }[];
+  cursor?: string;
+  hasMore: boolean;
+}
+type BlobLister = (opts: {
+  prefix: string;
+  cursor?: string;
+  limit: number;
+}) => Promise<BlobListPage>;
+
+/**
+ * Walk @vercel/blob's cursor until `hasMore` is false so a prefix holding MORE
+ * THAN 1000 blobs is fully aggregated. A single `list()` call caps at 1000
+ * blobs per page and silently truncates beyond that — past 1000 ledger entries
+ * the P&L would UNDERCOUNT with no error. `lister` is injectable so the cursor
+ * loop is unit-testable with a two-page mock (no prod Blob touched).
+ */
+export async function listAllBlobPathnames(
+  prefix: string,
+  lister: BlobLister
+): Promise<string[]> {
+  const out: string[] = [];
+  let cursor: string | undefined;
+  do {
+    const page = await lister({ prefix, cursor, limit: 1000 });
+    out.push(...page.blobs.map((b) => b.pathname));
+    cursor = page.hasMore ? page.cursor : undefined;
+  } while (cursor);
+  return out;
+}
+
 const blobStore: LedgerStore = {
   async read(pathname) {
     const result = await get(pathname, { access: "private", useCache: false });
@@ -137,9 +173,10 @@ const blobStore: LedgerStore = {
     });
   },
   async list(prefix) {
-    // Transient/auth failures propagate (throw) — never read as "empty".
-    const { blobs } = await list({ prefix });
-    return blobs.map((b) => b.pathname);
+    // Transient/auth failures propagate (throw) — never read as "empty". The
+    // cursor walk (listAllBlobPathnames) aggregates every page so a store with
+    // >1000 entries is never silently truncated.
+    return listAllBlobPathnames(prefix, list);
   },
   async remove(pathname) {
     await del(pathname);
@@ -328,7 +365,10 @@ export async function updateLedgerEntry(
     return updated;
   }
 
-  // Legacy fallback: the row may still live in finance/ledger.json.
+  // Legacy fallback: the row may still live in finance/ledger.json. This path
+  // is a read-modify-write on the shared legacy array, so it is NOT concurrency-
+  // safe for two different legacy rows (the slower writer clobbers the other's
+  // edit) — acceptable by design: clean cutover, no legacy doc exists in prod.
   const legacy = await readLegacyLedger();
   const index = legacy.findIndex((e) => e.id === id);
   if (index === -1) return null;
@@ -352,7 +392,10 @@ export async function removeLedgerEntry(id: string): Promise<boolean> {
     return true;
   }
 
-  // Legacy fallback: the row may still live in finance/ledger.json.
+  // Legacy fallback: the row may still live in finance/ledger.json. Like the
+  // update fallback, this read-modify-write on the shared legacy array is NOT
+  // concurrency-safe for two different legacy rows — acceptable by design:
+  // clean cutover, no legacy doc exists in prod.
   const legacy = await readLegacyLedger();
   const remaining = legacy.filter((e) => e.id !== id);
   if (remaining.length === legacy.length) return false;

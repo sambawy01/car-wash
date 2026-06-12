@@ -163,10 +163,12 @@ export async function GET(request: NextRequest) {
 
   // Delivered on NO channel → loud 500 (the workflow's jq filter surfaces
   // `error` and the run goes red). On TOTAL failure we RELEASE the day marker
-  // we claimed so a workflow_dispatch / the other DST firing can re-drive the
-  // same day — a burned marker over a total failure would otherwise suppress
-  // the month's P&L entirely. (Partial success below keeps the marker.) Forced
-  // runs never claimed a marker, so there is nothing to release.
+  // we claimed so a manual workflow_dispatch can re-drive the SAME day — a
+  // burned marker over a total failure would otherwise suppress the month's P&L
+  // entirely. (Note: only ONE of the two scheduled DST firings clears the
+  // cairoHour===9 guard, and it has already run, so the same-day retry path is
+  // workflow_dispatch, not the other firing.) Partial success below keeps the
+  // marker. Forced runs never claimed a marker, so there is nothing to release.
   if (email.sentCount === 0 && !telegram.sent && !documentSent) {
     let markerReleased = false;
     if (!force) {
@@ -186,7 +188,7 @@ export async function GET(request: NextRequest) {
         telegram,
         markerReleased,
         error:
-          "monthly P&L delivered on NO channel (email and telegram both failed); day marker released — retry via workflow_dispatch or the next DST firing",
+          "monthly P&L delivered on NO channel (email and telegram both failed); day marker released — retry via workflow_dispatch",
       },
       { status: 500 }
     );

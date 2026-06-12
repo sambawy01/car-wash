@@ -641,10 +641,11 @@ export default function FinanceSection({
           {pnl.revenue.unmatchedBookings > 0 && (
             <div className="rounded-xl border border-[#E5DCCB] bg-[#F4EFE7] px-4 py-2 text-sm text-[#847866]">
               {pnl.revenue.unmatchedBookings} confirmed booking
-              {pnl.revenue.unmatchedBookings === 1 ? "" : "s"} had no matching
-              catalogue price and {pnl.revenue.unmatchedBookings === 1 ? "was" : "were"}{" "}
-              excluded from treatment revenue. Link the service to a treatment so it
-              counts.
+              {pnl.revenue.unmatchedBookings === 1 ? "" : "s"} weren&apos;t
+              auto-priced (e.g. combined sessions or removed treatments) and{" "}
+              {pnl.revenue.unmatchedBookings === 1 ? "isn't" : "aren't"} in
+              treatment revenue — add {pnl.revenue.unmatchedBookings === 1 ? "it" : "them"}{" "}
+              as manual income if needed.
             </div>
           )}
           {month === currentCairoMonth() && (

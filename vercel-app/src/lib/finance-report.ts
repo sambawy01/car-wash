@@ -527,7 +527,7 @@ export function pnlToCsv(pnl: PnL): string {
   if (pnl.revenue.unmatchedBookings > 0) {
     rows.push(
       csvRow([
-        "Unmatched bookings (no catalogue price — excluded)",
+        "Bookings not auto-priced (e.g. combined sessions / removed treatments — add as manual income if needed)",
         pnl.revenue.unmatchedBookings,
       ])
     );
@@ -602,7 +602,7 @@ export function pnlToLetterheadBody(pnl: PnL): string {
   );
   if (pnl.revenue.unmatchedBookings > 0) {
     lines.push(
-      `- ${pnl.revenue.unmatchedBookings} confirmed booking(s) had no matching catalogue price and were excluded from treatment revenue.`
+      `- ${pnl.revenue.unmatchedBookings} confirmed booking(s) weren't auto-priced (e.g. combined sessions or removed treatments) and aren't in treatment revenue — add as manual income if needed.`
     );
   }
 
