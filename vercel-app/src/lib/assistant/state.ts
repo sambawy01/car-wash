@@ -411,11 +411,39 @@ export async function takePendingAction(
 }
 
 /**
+ * Retire a pending action whose SIBLING just won its claim — the kill
+ * switch for paired pushed buttons (Confirm/Decline, Mark-confirmed/Cancel
+ * on one notification). Deliberately does NO existence read first, unlike
+ * discardPendingAction: a transient read failure there would skip writing
+ * the claim marker and leave the sibling button LIVE for the rest of its
+ * 7-day TTL — a day-3 tap could then cancel an order that already shipped.
+ * The claim marker IS the kill switch (takePendingAction can never win a
+ * claimed id), so it is written unconditionally; the pending-blob delete is
+ * best effort on top. Never throws.
+ *
+ * "Claim already taken" is not an error here: the sibling may have been
+ * tapped concurrently, in which case its own winner claimed it first.
+ */
+export async function retirePendingAction(id: string): Promise<void> {
+  if (!PENDING_ID_RE.test(id)) return;
+  try {
+    await claimPending(id); // false = already claimed elsewhere — fine.
+    await del(pendingPath(id));
+  } catch (error) {
+    console.error("[assistant] Failed to retire sibling pending action:", error);
+  }
+}
+
+/**
  * Discard a pending action (Cancel tap). Goes through the same atomic claim
  * as takePendingAction so Cancel can never race Confirm into a double
  * outcome. Returns true when THIS call claimed (and thus cancelled) the
  * action; false when it was already executed/cancelled by another tap — or
  * when the pending blob no longer exists at all.
+ *
+ * UX path ONLY (the route needs the existence read to answer "no longer
+ * available" honestly) — sibling retirement after a winning claim must use
+ * retirePendingAction above, which cannot be skipped by a failed read.
  */
 export async function discardPendingAction(id: string): Promise<boolean> {
   if (!PENDING_ID_RE.test(id)) return false;

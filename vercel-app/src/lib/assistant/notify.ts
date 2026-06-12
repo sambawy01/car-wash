@@ -104,14 +104,21 @@ interface PushButton {
 }
 
 /**
- * Strip control characters (\r, \n, \t and friends) from client-controlled
- * text interpolated into owner pushes — names, item titles, phones. Without
- * this, a crafted booking/order "name" containing newlines could forge
- * extra lines or fields inside a notification Victoria trusts. Normal
- * content (incl. Russian) passes through unchanged.
+ * Strip line-forging and text-direction trickery from client-controlled
+ * text interpolated into owner pushes — names, item titles, phones:
+ * - C0 controls + DEL (U+0000-U+001F, U+007F): \r, \n, \t and friends —
+ *   newlines could forge extra lines or fields inside a notification
+ *   Victoria trusts.
+ * - C1 controls (U+0080-U+009F): includes NEL (U+0085), another line break.
+ * - Line/paragraph separators (U+2028, U+2029): Unicode line breaks.
+ * - Bidi controls (U+202A-U+202E embeds/overrides, U+2066-U+2069 isolates):
+ *   an RTL override could visually reverse a phone number or relabel a
+ *   field in the rendered push.
+ * Normal content (incl. Russian) passes through unchanged.
  */
 // eslint-disable-next-line no-control-regex
-const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]+/g;
+const CONTROL_CHARS_RE =
+  /[\u0000-\u001f\u007f-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]+/g;
 function pushSafe(value: unknown): string {
   return String(value ?? "").replace(CONTROL_CHARS_RE, " ").trim();
 }

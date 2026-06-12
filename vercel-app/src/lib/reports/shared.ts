@@ -56,6 +56,30 @@ export function cronAuthError(request: NextRequest): NextResponse | null {
 }
 
 /**
+ * Outcome of a day-marker claim:
+ * - "claimed"      — THIS call wrote the marker; proceed with the send.
+ * - "already-sent" — the marker already existed (the other firing won);
+ *                    skip quietly, this is the guard working as designed.
+ * - "error"        — the claim could not be proven either way (Blob outage,
+ *                    auth failure, malformed key). The caller must NOT send
+ *                    (fail closed on duplicates) AND must answer non-2xx so
+ *                    the GitHub Actions run goes red — a bare skip here
+ *                    silently loses the job for the whole day.
+ */
+export type DailyClaimResult = "claimed" | "already-sent" | "error";
+
+/**
+ * The @vercel/blob SDK surfaces an `allowOverwrite: false` conflict as a
+ * plain BlobError whose message is "Vercel Blob: This blob already exists,
+ * use `allowOverwrite: true` …" (no error-code property — verified
+ * empirically against the live API; every other failure mode is a distinct
+ * subclass/message: BlobServiceNotAvailable, BlobAccessError, network
+ * TypeError, …). The message substring is therefore the only available
+ * discriminator between "lost the race" and "Blob is down".
+ */
+const BLOB_CONFLICT_RE = /blob already exists/i;
+
+/**
  * Claim today's send for a job — the codebase's exactly-once claims pattern
  * (see claimPending in ../assistant/state.ts): the Blob API enforces
  * `allowOverwrite: false` server-side, so when two firings race, exactly
@@ -64,13 +88,14 @@ export function cronAuthError(request: NextRequest): NextResponse | null {
  * This closes the double-fire windows the Cairo wall-clock guard cannot:
  * both UTC firings landing in the same Cairo window under 60-minute-plus
  * GitHub schedule delays, and a production workflow_dispatch during the
- * window. Returns true when THIS call claimed the day.
+ * window.
  *
- * FAIL CLOSED: a firing that cannot PROVE it claimed first returns false
- * and skips. Duplicate owner emails are the harm this exists to prevent,
- * and the marker only gates firings that already passed the schedule guard
- * — a same-day retry path is workflow_dispatch + the marker's absence the
- * next day, never a blind resend.
+ * FAIL CLOSED, but LOUD: a firing that cannot PROVE it claimed first never
+ * sends (duplicate owner emails are the harm this exists to prevent) — yet
+ * only a genuine pre-existing marker is a quiet "already-sent" skip. Any
+ * other failure is "error", which callers turn into HTTP 500 so the cron
+ * workflow goes red instead of silently losing the day. The same-day retry
+ * path is workflow_dispatch; the next day gets a fresh marker regardless.
  *
  * Markers are a few bytes each and never swept (a year of daily jobs is
  * well under a thousand tiny blobs) — deliberate: keeping them makes the
@@ -79,11 +104,13 @@ export function cronAuthError(request: NextRequest): NextResponse | null {
 export async function claimDailySend(
   job: string,
   cairoDateKey: string
-): Promise<boolean> {
+): Promise<DailyClaimResult> {
   // Internal-only inputs, but never let a malformed key write a stray path.
+  // A malformed key is a programming bug, not a lost race — report "error"
+  // (→ 500) so it can never masquerade as a normal already-sent skip.
   if (!/^[a-z0-9-]+$/.test(job) || !/^\d{4}-\d{2}-\d{2}$/.test(cairoDateKey)) {
     console.error(`[reports] Invalid day-marker key: ${job}/${cairoDateKey}`);
-    return false;
+    return "error";
   }
   try {
     await put(
@@ -96,9 +123,16 @@ export async function claimDailySend(
         allowOverwrite: false,
       }
     );
-    return true;
-  } catch {
-    return false;
+    return "claimed";
+  } catch (error) {
+    if (error instanceof Error && BLOB_CONFLICT_RE.test(error.message)) {
+      return "already-sent";
+    }
+    console.error(
+      `[reports] Day-marker claim failed for ${job}/${cairoDateKey} (Blob error, NOT a conflict):`,
+      error
+    );
+    return "error";
   }
 }
 

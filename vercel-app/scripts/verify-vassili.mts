@@ -174,8 +174,21 @@ const { MockAgent, setGlobalDispatcher } = await import("undici");
 let blobUrlLog: { method: string; url: string }[] | null = null;
 const blobOwner404Mock = new MockAgent();
 blobOwner404Mock.enableNetConnect(); // everything unmatched → real network
+// MockAgent caches a CONCRETE pool per origin string on first dispatch; a
+// function key's dispatch list is shared into that cache BY REFERENCE. So
+// intercepts added mid-run only take effect when registered on the SAME
+// key instance — a fresh arrow function would create a shadow pool that is
+// never consulted again (verified empirically). Blob READS hit
+// <store>.blob.vercel-storage.com (BLOB_STORE_ORIGIN); blob WRITES hit the
+// API host https://vercel.com/api/blob, addressed by its exact origin
+// string (BLOB_API_ORIGIN), which always resolves to the cached pool.
+const BLOB_STORE_ORIGIN = (origin: string) =>
+  origin.includes("vercel-storage.com");
+const BLOB_API_ORIGIN = new URL(
+  process.env.VERCEL_BLOB_API_URL || "https://vercel.com/api/blob"
+).origin;
 blobOwner404Mock
-  .get((origin: string) => origin.includes("vercel-storage.com"))
+  .get(BLOB_STORE_ORIGIN)
   .intercept({
     path: (p: string) => p.includes("/telegram/owner.json"),
     method: "GET",
@@ -204,6 +217,7 @@ const {
   createPendingAction,
   takePendingAction,
   discardPendingAction,
+  retirePendingAction,
   sweepStalePendingState,
   isSweepStale,
   STALE_SWEEP_RETENTION_MS,
@@ -1346,6 +1360,92 @@ try {
     // keepMe/claim blobs are removed by the final cleanup's full sweep.
   }
 
+  console.log(
+    "\n=== 14c. Sibling retire: claim written even when the pending read fails ==="
+  );
+  {
+    // The webhook executor retires the OTHER button of a pushed pair after
+    // a winning claim. discardPendingAction's existence-read-before-claim
+    // is right for the Cancel-tap UX (honest "no longer available") but
+    // wrong for retirement: a transient Blob read failure would skip the
+    // claim write and leave the sibling button live for the rest of its
+    // 7-day TTL. retirePendingAction does NO read — the claim marker (the
+    // kill switch) is written unconditionally. Simulated read outage: the
+    // undici seam answers 500 for GETs of these two pending blobs (get()
+    // throws on a 500, no retry); PUT/DELETE pass through to the real store.
+    const retireId = crypto.randomUUID();
+    const discardId = crypto.randomUUID();
+    const mkPending = (id: string) =>
+      put(
+        `telegram/pending/${id}.json`,
+        JSON.stringify({
+          id,
+          chatId: OWNER_CHAT,
+          tool: "booking_confirm",
+          args: { uid: "sibling-retire-uid" },
+          summary: "sibling-retire harness pending",
+          createdAt: new Date().toISOString(),
+          ttlMs: NOTIFY_PENDING_TTL_MS,
+        }),
+        {
+          access: "private",
+          contentType: "application/json",
+          addRandomSuffix: false,
+          allowOverwrite: true,
+        }
+      );
+    await mkPending(retireId);
+    await mkPending(discardId);
+    blobOwner404Mock
+      .get(BLOB_STORE_ORIGIN) // SAME key instance — see the MockAgent note
+      .intercept({
+        path: (p: string) =>
+          p.includes(`/telegram/pending/${retireId}.json`) ||
+          p.includes(`/telegram/pending/${discardId}.json`),
+        method: "GET",
+      })
+      .reply(500, "harness simulated blob read outage")
+      .persist();
+    try {
+      blobOwner404Mock.activate();
+      // Baseline — the OLD sibling path (discardPendingAction): the failed
+      // existence read aborts BEFORE the claim, leaving the button live.
+      // This is exactly the gap retirePendingAction closes.
+      let discardOutcome: boolean | "threw" = "threw";
+      try {
+        discardOutcome = await discardPendingAction(discardId);
+      } catch {
+        // get() throwing on the 500 is part of the simulated outage
+      }
+      check(
+        "discardPendingAction under read outage: NO claim marker written (the gap)",
+        discardOutcome !== true &&
+          (await readBlobText(`telegram/claims/${discardId}.json`)) === null,
+        `outcome=${String(discardOutcome)}`
+      );
+      // retirePendingAction: never reads, never throws — the claim marker
+      // lands despite the read outage, so the sibling can never execute.
+      await retirePendingAction(retireId);
+      check(
+        "retirePendingAction under read outage: claim marker written (sibling killed)",
+        (await readBlobText(`telegram/claims/${retireId}.json`)) !== null
+      );
+    } finally {
+      blobOwner404Mock.deactivate();
+    }
+    check(
+      "retired pending blob deleted (best-effort delete succeeded here)",
+      (await readBlobText(`telegram/pending/${retireId}.json`)) === null
+    );
+    const lateTake = await takePendingAction(retireId);
+    check(
+      "post-retire tap on the sibling → not-found (kill switch holds)",
+      !lateTake.ok && lateTake.reason === "not-found",
+      JSON.stringify(lateTake)
+    );
+    // discardId pending + retire claim marker are removed by final cleanup.
+  }
+
   console.log("\n=== 15. Mutation-arg validation (summary/executor parity) ===");
   {
     const arrayTo = validateMutationArgs("email_send", {
@@ -1723,6 +1823,42 @@ try {
       !tookDefault.ok && tookDefault.reason === "expired",
       JSON.stringify(tookDefault)
     );
+
+    // (f) pushSafe hardening: C1 controls (NEL), line/paragraph separators
+    // and bidi controls in client-controlled fields are stripped before the
+    // push text — an RTL override could visually reverse a phone number or
+    // relabel a field, and NEL/LS/PS forge lines just like \n.
+    telegramCalls.length = 0;
+    await calWebhookPOST(
+      calRequest({
+        triggerEvent: "BOOKING_REQUESTED",
+        payload: {
+          ...requestPayload("harness-push-uid-5").payload,
+          attendees: [
+            {
+              name: "Ev\u202Eil\u2066Bidi\u2069\u0085Name\u2028X\u009fY",
+              email: "bidi@example.com",
+              timeZone: "Africa/Cairo",
+              phoneNumber: "+201001234567",
+            },
+          ],
+        },
+      }) as never
+    );
+    const bidiPush = messagesTo(OWNER_CHAT, /New booking request/)[0];
+    const bidiText = String(
+      (bidiPush?.body as { text?: string } | undefined)?.text ?? ""
+    );
+    check(
+      "push strips C1 controls, line/para separators and bidi controls from client text",
+      Boolean(bidiPush) &&
+        !/[\u0080-\u009f\u2028\u2029\u202a-\u202e\u2066-\u2069]/.test(bidiText) &&
+        bidiText.includes("Ev il") && // stripped chars collapse to a space
+        bidiText.includes("Bidi") &&
+        bidiText.includes("Name") &&
+        bidiText.includes("X Y"),
+      JSON.stringify(bidiText).slice(0, 220)
+    );
   }
 
   console.log("\n=== 18. Order route → order push + low-stock alert (REAL blob, byte-restored) ===");
@@ -1984,13 +2120,56 @@ try {
     const first = await claimDailySend(JOB, day1);
     const second = await claimDailySend(JOB, day1);
     const nextDay = await claimDailySend(JOB, day2);
-    check("first firing claims the day marker", first === true);
-    check("second firing, same Cairo day → marker already claimed (skip)", second === false);
-    check("next day → fresh marker, proceeds", nextDay === true);
+    check('first firing claims the day marker → "claimed"', first === "claimed");
     check(
-      "malformed marker keys are refused (never written)",
-      (await claimDailySend("Bad/Job", day1)) === false &&
-        (await claimDailySend(JOB, "2000-1-1")) === false
+      'second firing, same Cairo day → REAL Blob conflict mapped to "already-sent" (quiet skip)',
+      second === "already-sent",
+      `second=${second}`
+    );
+    check('next day → fresh marker → "claimed"', nextDay === "claimed");
+    check(
+      'malformed marker keys → "error" (loud, never written, never a quiet skip)',
+      (await claimDailySend("Bad/Job", day1)) === "error" &&
+        (await claimDailySend(JOB, "2000-1-1")) === "error"
+    );
+
+    // Simulated Blob OUTAGE (undici seam): PUTs for this synthetic job
+    // answer 500 service_unavailable — NOT a conflict — and must map to
+    // "error" (route → HTTP 500, red Actions run), never to the quiet
+    // "already-sent" skip that would silently lose the job for the day.
+    // VERCEL_BLOB_RETRIES=0 keeps the SDK from retrying the 500 ten times.
+    // NOTE: blob WRITES go to the API host (BLOB_API_ORIGIN, default
+    // https://vercel.com/api/blob), NOT *.vercel-storage.com like reads —
+    // the pathname rides in the ?pathname= query, hence the substring match.
+    blobOwner404Mock
+      .get(BLOB_API_ORIGIN)
+      .intercept({
+        path: (p: string) => p.includes("harness-outage"),
+        method: "PUT",
+      })
+      .reply(
+        500,
+        JSON.stringify({
+          error: { code: "service_unavailable", message: "harness simulated outage" },
+        }),
+        { headers: { "content-type": "application/json" } }
+      )
+      .persist();
+    const savedRetries = process.env.VERCEL_BLOB_RETRIES;
+    process.env.VERCEL_BLOB_RETRIES = "0";
+    let outage = "";
+    try {
+      blobOwner404Mock.activate();
+      outage = await claimDailySend("harness-outage", day1);
+    } finally {
+      blobOwner404Mock.deactivate();
+      if (savedRetries === undefined) delete process.env.VERCEL_BLOB_RETRIES;
+      else process.env.VERCEL_BLOB_RETRIES = savedRetries;
+    }
+    check(
+      'simulated Blob outage during claim → "error" (never a silent skip)',
+      outage === "error",
+      `outage=${outage}`
     );
     for (const d of [day1, day2]) {
       try {
@@ -2031,6 +2210,34 @@ try {
       w1.ok === true && !w1.skipped && w2.ok === true && !w2.skipped,
       JSON.stringify({ w1: w1.skipped ?? "sent", w2: w2.skipped ?? "sent" })
     );
+
+    // BOTH delivery channels failing must be LOUD: HTTP 500 with a
+    // top-level error field (the workflows print {ok, skipped, error} and
+    // fail on non-200). Email is already down (RESEND_API_KEY blanked →
+    // sentCount 0); the owner-404 seam makes the Telegram push report
+    // no-owner-bound — zero channels delivered.
+    let bothFailedRes: Awaited<ReturnType<typeof weeklyGET>>;
+    try {
+      blobOwner404Mock.activate();
+      bothFailedRes = await weeklyGET(weeklyReq());
+    } finally {
+      blobOwner404Mock.deactivate();
+    }
+    const bothFailedJson = (await bothFailedRes.json()) as {
+      ok?: boolean;
+      error?: string;
+      telegram?: { sent?: boolean; reason?: string };
+    };
+    check(
+      "email+telegram both failed → HTTP 500 with top-level error (Actions run goes red)",
+      bothFailedRes.status === 500 &&
+        bothFailedJson.ok === false &&
+        typeof bothFailedJson.error === "string" &&
+        bothFailedJson.error.length > 0 &&
+        bothFailedJson.telegram?.sent === false,
+      `status=${bothFailedRes.status} ${JSON.stringify(bothFailedJson).slice(0, 200)}`
+    );
+
     check(
       "forced runs never claim the real weekly marker (untouched, claimed or not)",
       (await readBlobText(realMarkerPath)) === realMarkerBefore
@@ -2053,11 +2260,18 @@ try {
   }
 
   // Pending actions + exactly-once claim markers created by the run — sweep.
-  // reports/sent/harness-idem/ holds ONLY this harness's synthetic day
-  // markers (section 20); real job markers (evening-digest, weekly-report)
-  // live under their own prefixes and are never touched.
+  // reports/sent/harness-idem/ and reports/sent/harness-outage/ hold ONLY
+  // this harness's synthetic day markers (section 20 — the outage marker
+  // should never exist because its PUT is mocked to 500, swept anyway);
+  // real job markers (evening-digest, weekly-report) live under their own
+  // prefixes and are never touched.
   try {
-    for (const prefix of ["telegram/pending/", "telegram/claims/", "reports/sent/harness-idem/"]) {
+    for (const prefix of [
+      "telegram/pending/",
+      "telegram/claims/",
+      "reports/sent/harness-idem/",
+      "reports/sent/harness-outage/",
+    ]) {
       const { blobs } = await list({ prefix });
       for (const blob of blobs) {
         try {

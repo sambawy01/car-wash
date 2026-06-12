@@ -57,14 +57,32 @@ export async function GET(request: NextRequest) {
   // Double-fire guard: claim today's marker (claims pattern, fail closed).
   // `force` (non-production only) bypasses the marker entirely — it neither
   // checks nor claims, so dev/preview test sends never suppress the real
-  // Sunday send.
-  if (!force && !(await claimDailySend("weekly-report", cairoDateKey(new Date())))) {
-    return NextResponse.json({
-      ok: true,
-      cairoWeekday,
-      cairoHour,
-      skipped: "already sent today (day marker)",
-    });
+  // Sunday send. Tri-state outcome: a genuine pre-existing marker is the
+  // quiet already-sent skip; ANY other claim failure (Blob outage) still
+  // refuses to send but answers 500 so the GitHub Actions run goes red
+  // instead of silently losing the report for the week.
+  if (!force) {
+    const claim = await claimDailySend("weekly-report", cairoDateKey(new Date()));
+    if (claim === "already-sent") {
+      return NextResponse.json({
+        ok: true,
+        cairoWeekday,
+        cairoHour,
+        skipped: "already sent today (day marker)",
+      });
+    }
+    if (claim === "error") {
+      return NextResponse.json(
+        {
+          ok: false,
+          cairoWeekday,
+          cairoHour,
+          error:
+            "day-marker claim failed (Blob error, not a conflict) — report NOT sent this firing; retry via workflow_dispatch once Blob recovers",
+        },
+        { status: 500 }
+      );
+    }
   }
 
   const data = await gatherWeeklyReportData();
@@ -75,6 +93,27 @@ export async function GET(request: NextRequest) {
     "weekly-report"
   );
   const telegram = await pushOwnerTelegram(report.text, "weekly-report");
+
+  // The claim is already burned for today (correct — it must stand to keep
+  // the no-duplicates guarantee), but a report that reached NO channel must
+  // be loud: 500 with a top-level error field (the workflows' jq filter
+  // surfaces `error`, and `test "${code}" = "200"` fails the run).
+  if (email.sentCount === 0 && !telegram.sent) {
+    return NextResponse.json(
+      {
+        ok: false,
+        cairoWeekday,
+        cairoHour,
+        forced: force,
+        subject: report.subject,
+        email,
+        telegram,
+        error:
+          "report delivered on NO channel (email and telegram both failed); day marker stands — no automatic retry",
+      },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({
     ok: true,

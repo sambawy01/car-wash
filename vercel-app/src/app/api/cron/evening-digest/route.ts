@@ -66,14 +66,31 @@ export async function GET(request: NextRequest) {
   // booking lands between two same-window firings, the later one may still
   // deliver it. `force` (non-production only) bypasses the marker entirely:
   // it neither checks nor claims, so dev/preview test sends never suppress
-  // the real scheduled send.
-  if (!force && !(await claimDailySend("evening-digest", cairoDateKey(new Date())))) {
-    return NextResponse.json({
-      ok: true,
-      cairoHour,
-      forced: force,
-      skipped: "already sent today (day marker)",
-    });
+  // the real scheduled send. Tri-state outcome: a genuine pre-existing
+  // marker is the quiet already-sent skip; ANY other claim failure (Blob
+  // outage) still refuses to send but answers 500 so the GitHub Actions run
+  // goes red instead of silently losing the digest for the day.
+  if (!force) {
+    const claim = await claimDailySend("evening-digest", cairoDateKey(new Date()));
+    if (claim === "already-sent") {
+      return NextResponse.json({
+        ok: true,
+        cairoHour,
+        forced: force,
+        skipped: "already sent today (day marker)",
+      });
+    }
+    if (claim === "error") {
+      return NextResponse.json(
+        {
+          ok: false,
+          cairoHour,
+          error:
+            "day-marker claim failed (Blob error, not a conflict) — digest NOT sent this firing; retry via workflow_dispatch once Blob recovers",
+        },
+        { status: 500 }
+      );
+    }
   }
 
   const email = await sendReportEmail(
@@ -81,6 +98,28 @@ export async function GET(request: NextRequest) {
     "evening-digest"
   );
   const telegram = await pushOwnerTelegram(digest.text, "evening-digest");
+
+  // The claim is already burned for today (correct — it must stand to keep
+  // the no-duplicates guarantee), but a digest that reached NO channel must
+  // be loud: 500 with a top-level error field (the workflows' jq filter
+  // surfaces `error`, and `test "${code}" = "200"` fails the run).
+  if (email.sentCount === 0 && !telegram.sent) {
+    return NextResponse.json(
+      {
+        ok: false,
+        cairoHour,
+        forced: force,
+        subject: digest.subject,
+        counts: digest.counts,
+        failures,
+        email,
+        telegram,
+        error:
+          "digest delivered on NO channel (email and telegram both failed); day marker stands — no automatic retry",
+      },
+      { status: 500 }
+    );
+  }
 
   return NextResponse.json({
     ok: true,

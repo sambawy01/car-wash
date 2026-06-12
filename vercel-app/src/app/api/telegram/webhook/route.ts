@@ -15,6 +15,7 @@ import {
   bindOwner,
   discardPendingAction,
   getOwnerChatId,
+  retirePendingAction,
   shouldAlertOwner,
   takePendingAction,
   type IntrusionKind,
@@ -417,12 +418,11 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
   // editMessageText below also removes both buttons, but it is best effort
   // and unreliable for aged messages; without this, a day-3 tap on the
   // other button would still execute (e.g. cancelling a shipped order).
+  // retirePendingAction (NOT discardPendingAction): it writes the claim
+  // marker unconditionally, with no existence read a transient Blob failure
+  // could short-circuit into leaving the sibling button live for days.
   if (taken.action.siblingId) {
-    try {
-      await discardPendingAction(taken.action.siblingId);
-    } catch (error) {
-      console.error("[telegram] Sibling pending discard failed:", error);
-    }
+    await retirePendingAction(taken.action.siblingId);
   }
 
   await answerCallbackQuery(cb.id, "On it…");
