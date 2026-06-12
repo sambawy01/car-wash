@@ -126,7 +126,7 @@ import type { Treatment } from "../src/lib/treatments";
 import type { LedgerStore, LedgerEntry } from "../src/lib/finance";
 import type { PnLInputs } from "../src/lib/finance-report";
 
-// --- in-memory ledger store --------------------------------------------------
+// --- in-memory ledger store (the orders model: one blob per entry) -----------
 function makeMemoryStore(): LedgerStore & { dump(): Map<string, string> } {
   const map = new Map<string, string>();
   return {
@@ -135,6 +135,12 @@ function makeMemoryStore(): LedgerStore & { dump(): Map<string, string> } {
     },
     async write(pathname: string, body: string) {
       map.set(pathname, body);
+    },
+    async list(prefix: string) {
+      return [...map.keys()].filter((k) => k.startsWith(prefix));
+    },
+    async remove(pathname: string) {
+      map.delete(pathname);
     },
     dump: () => map,
   };
@@ -186,61 +192,167 @@ console.log("\n=== 1. Ledger CRUD round-trips (in-memory mock) ===");
 }
 
 // ============================================================================
-console.log("\n=== 2. Read-error semantics (throws on transient, [] on 404, throws on corrupt) ===");
+console.log("\n=== 1b. CONCURRENT adds never lose an entry (per-blob, not single-doc RMW) ===");
 {
-  // true 404 → []
+  // The OLD single-document read-modify-write would drop one of these: both
+  // adds read the same array, append, and the slower writer overwrites the
+  // faster one (last-write-wins on MONEY). The per-blob (orders) model writes
+  // a distinct blob per add, so both survive.
+  __setLedgerStore(makeMemoryStore());
+  const [a, b, c] = await Promise.all([
+    addLedgerEntry({ date: "2026-06-10", direction: "expense", category: "supplies", amountEgp: 11, method: "cash" }),
+    addLedgerEntry({ date: "2026-06-10", direction: "expense", category: "marketing", amountEgp: 22, method: "cash" }),
+    addLedgerEntry({ date: "2026-06-10", direction: "income", category: "treatment-cash", amountEgp: 33, method: "cash" }),
+  ]);
+  const all = await listLedger();
+  const ids = new Set(all.map((e) => e.id));
+  check(
+    "three concurrent adds → all three persisted (no lost update)",
+    all.length === 3 && ids.has(a.id) && ids.has(b.id) && ids.has(c.id),
+    `count=${all.length}`
+  );
+  check("each concurrent add wrote its OWN blob", ids.size === 3);
+}
+
+// ============================================================================
+console.log("\n=== 2. Read-error semantics (per-blob layout: throws on transient, [] on fresh, throws on corrupt) ===");
+{
+  const ENTRIES = "finance/entries/";
+  const LEGACY = "finance/ledger.json";
+  const goodEntry = (id: string) =>
+    JSON.stringify(mkEntry("2026-06-05", "expense", "supplies", 150) as LedgerEntry).replace(
+      /"id":"[^"]*"/,
+      `"id":"${id}"`
+    );
+
+  async function expectThrow(name: string, fn: () => Promise<unknown>) {
+    let threw = false;
+    try {
+      await fn();
+    } catch {
+      threw = true;
+    }
+    check(name, threw);
+  }
+
+  // fresh store (no entry blobs, no legacy doc) → []
   __setLedgerStore({
     async read() {
       return null;
     },
     async write() {},
+    async list() {
+      return [];
+    },
+    async remove() {},
   });
-  check("read()=null (true 404) → []", (await listLedger()).length === 0);
+  check("fresh store (list=[], legacy absent) → []", (await listLedger()).length === 0);
 
-  // transient read failure → THROWS (never read as empty by a writer)
+  // transient failure on the LIST call → THROWS (never read as empty)
   __setLedgerStore({
     async read() {
-      throw new Error("simulated transient blob 500");
+      return null;
     },
     async write() {},
+    async list() {
+      throw new Error("simulated transient list 500");
+    },
+    async remove() {},
   });
-  let threw = false;
-  try {
-    await listLedger();
-  } catch {
-    threw = true;
-  }
-  check("transient read error → listLedger THROWS", threw);
+  await expectThrow("transient list() error → listLedger THROWS", () => listLedger());
 
-  // corrupt (not an array) → THROWS
+  // transient failure on an ENTRY read → THROWS
   __setLedgerStore({
     async read() {
-      return JSON.stringify({ not: "an array" });
+      throw new Error("simulated transient entry read 500");
     },
     async write() {},
+    async list() {
+      return [`${ENTRIES}abc.json`];
+    },
+    async remove() {},
   });
-  let corruptThrew = false;
-  try {
-    await listLedger();
-  } catch {
-    corruptThrew = true;
-  }
-  check("corrupt blob (not array) → listLedger THROWS", corruptThrew);
+  await expectThrow("transient entry read error → listLedger THROWS", () => listLedger());
 
-  // malformed entry → THROWS
+  // transient failure on the LEGACY read → THROWS
   __setLedgerStore({
-    async read() {
-      return JSON.stringify([{ id: "x", date: "nope" }]);
+    async read(p: string) {
+      if (p === LEGACY) throw new Error("simulated transient legacy read 500");
+      return null;
     },
     async write() {},
+    async list() {
+      return [];
+    },
+    async remove() {},
   });
-  let malformedThrew = false;
-  try {
-    await listLedger();
-  } catch {
-    malformedThrew = true;
-  }
-  check("malformed entry → listLedger THROWS", malformedThrew);
+  await expectThrow("transient legacy read error → listLedger THROWS", () => listLedger());
+
+  // legacy corrupt (not an array) → THROWS
+  __setLedgerStore({
+    async read(p: string) {
+      return p === LEGACY ? JSON.stringify({ not: "an array" }) : null;
+    },
+    async write() {},
+    async list() {
+      return [];
+    },
+    async remove() {},
+  });
+  await expectThrow("corrupt legacy blob (not array) → listLedger THROWS", () => listLedger());
+
+  // malformed ENTRY blob → THROWS
+  __setLedgerStore({
+    async read(p: string) {
+      return p.startsWith(ENTRIES) ? JSON.stringify({ id: "x", date: "nope" }) : null;
+    },
+    async write() {},
+    async list() {
+      return [`${ENTRIES}x.json`];
+    },
+    async remove() {},
+  });
+  await expectThrow("malformed entry blob → listLedger THROWS", () => listLedger());
+
+  // a listed entry that reads ABSENT (raced delete) is SKIPPED, not fatal
+  __setLedgerStore({
+    async read(p: string) {
+      if (p === `${ENTRIES}present.json`) return goodEntry("present");
+      return null; // "absent.json" races a delete → null
+    },
+    async write() {},
+    async list() {
+      return [`${ENTRIES}present.json`, `${ENTRIES}absent.json`];
+    },
+    async remove() {},
+  });
+  const racedList = await listLedger();
+  check("listed-but-absent entry is skipped (not fatal)", racedList.length === 1 && racedList[0].id === "present");
+
+  // DUAL-LAYOUT MERGE: per-entry blobs ∪ legacy array; per-entry wins on id.
+  const mergeMap = new Map<string, string>();
+  mergeMap.set(`${ENTRIES}E1.json`, goodEntry("E1")); // amount 150
+  mergeMap.set(
+    LEGACY,
+    JSON.stringify([
+      { ...(JSON.parse(goodEntry("E1")) as LedgerEntry), amountEgp: 999 }, // stale dup of E1
+      { ...(JSON.parse(goodEntry("L9")) as LedgerEntry) }, // legacy-only entry
+    ])
+  );
+  __setLedgerStore({
+    async read(p: string) {
+      return mergeMap.has(p) ? mergeMap.get(p)! : null;
+    },
+    async write() {},
+    async list(prefix: string) {
+      return [...mergeMap.keys()].filter((k) => k.startsWith(prefix));
+    },
+    async remove() {},
+  });
+  const merged = await listLedger();
+  const e1 = merged.find((e) => e.id === "E1");
+  check("dual-layout merge: union of entries + legacy", merged.length === 2 && merged.some((e) => e.id === "L9"));
+  check("dual-layout merge: per-entry blob WINS over legacy dup", e1?.amountEgp === 150);
 }
 
 // ============================================================================
@@ -275,16 +387,16 @@ let pnlSample: ReturnType<typeof computePnL>;
     mkOrder("VV-EEEEEE", "confirmed", 700, "2026-05-20T12:00:00.000Z"), // out of range
   ];
   const treatments: Treatment[] = [
-    mkTreatment("facial-massage", "Facial Massage", 3350),
-    mkTreatment("hydrofacial", "HydroFacial + Ultrasonic Cleaning", 3700),
+    mkTreatment("facial-massage", "Facial Massage", 3350, 327658),
+    mkTreatment("hydrofacial", "HydroFacial + Ultrasonic Cleaning", 3700, 327662),
   ];
   const bookings: CalBooking[] = [
-    mkBooking("Facial Massage between Victoria and A", "accepted", "2026-06-08T09:00:00.000Z"),
-    mkBooking("Facial Massage between Victoria and B", "accepted", "2026-06-15T09:00:00.000Z"),
-    mkBooking("HydroFacial + Ultrasonic Cleaning between Victoria and C", "accepted", "2026-06-18T09:00:00.000Z"),
-    mkBooking("Facial Massage between Victoria and D", "pending", "2026-06-19T09:00:00.000Z"), // not confirmed
-    mkBooking("Mystery Service between Victoria and E", "accepted", "2026-06-20T09:00:00.000Z"), // no catalog match
-    mkBooking("Facial Massage between Victoria and F", "accepted", "2026-07-02T09:00:00.000Z"), // out of range
+    mkBooking("Facial Massage between Victoria and A", "accepted", "2026-06-08T09:00:00.000Z", 327658),
+    mkBooking("Facial Massage between Victoria and B", "accepted", "2026-06-15T09:00:00.000Z", 327658),
+    mkBooking("HydroFacial + Ultrasonic Cleaning between Victoria and C", "accepted", "2026-06-18T09:00:00.000Z", 327662),
+    mkBooking("Facial Massage between Victoria and D", "pending", "2026-06-19T09:00:00.000Z", 327658), // not confirmed
+    mkBooking("Mystery Service between Victoria and E", "accepted", "2026-06-20T09:00:00.000Z", 999999), // eventTypeId not in catalogue → unmatched
+    mkBooking("Facial Massage between Victoria and F", "accepted", "2026-07-02T09:00:00.000Z", 327658), // out of range
   ];
   const ledger: LedgerEntry[] = [
     mkEntry("2026-06-03", "income", "treatment-cash", 200),
@@ -312,6 +424,52 @@ let pnlSample: ReturnType<typeof computePnL>;
   // onlyPastBookings flag: nothing is "past" relative to a fixed past `now`.
   const futureNow = computePnL(period, { ...inputs, now: new Date("2026-06-01T00:00:00Z"), onlyPastBookings: true });
   check("onlyPastBookings drops future-dated confirmed bookings", futureNow.revenue.treatmentsEgp === 0);
+}
+
+// ============================================================================
+console.log("\n=== 4b. Treatment match by eventTypeId (robust to renames / RU titles) ===");
+{
+  const treatments: Treatment[] = [
+    mkTreatment("facial-massage", "Facial Massage", 3350, 327658, "Массаж лица"),
+  ];
+
+  // eventTypeId is AUTHORITATIVE: a Russian-titled booking that could never
+  // match the English catalogue name still prices correctly via eventTypeId.
+  const ruTitled = computePnL(period, {
+    orders: [],
+    ledger: [],
+    treatments,
+    bookings: [
+      mkBooking("Массаж лица между Викторией и G", "accepted", "2026-06-09T09:00:00.000Z", 327658),
+    ],
+  });
+  check("eventTypeId prices a RU-titled booking the name match would miss", ruTitled.revenue.treatmentsEgp === 3350 && ruTitled.revenue.unmatchedBookings === 0);
+
+  // A present-but-uncatalogued eventTypeId is UNMATCHED even when the title
+  // would have matched (eventTypeId wins → no coincidental title rescue).
+  const wrongId = computePnL(period, {
+    orders: [],
+    ledger: [],
+    treatments,
+    bookings: [
+      mkBooking("Facial Massage between Victoria and H", "accepted", "2026-06-09T09:00:00.000Z", 111111),
+    ],
+  });
+  check("present-but-uncatalogued eventTypeId → unmatched (no title rescue)", wrongId.revenue.treatmentsEgp === 0 && wrongId.revenue.unmatchedBookings === 1);
+
+  // No eventTypeId on the booking → fall back to the service-title match.
+  const noId = computePnL(period, {
+    orders: [],
+    ledger: [],
+    treatments: [mkTreatment("facial-massage", "Facial Massage", 3350, 327658)],
+    bookings: [
+      {
+        ...mkBooking("Facial Massage between Victoria and J", "accepted", "2026-06-09T09:00:00.000Z"),
+        eventTypeId: undefined as unknown as number,
+      },
+    ],
+  });
+  check("no eventTypeId → falls back to title match", noId.revenue.treatmentsEgp === 3350 && noId.revenue.unmatchedBookings === 0);
 }
 
 // ============================================================================
@@ -352,6 +510,31 @@ console.log("\n=== 6. CSV export is well-formed and round-trips (incl. escaping)
   check("CSV summary carries NET = 7250", net?.[1] === "7250", JSON.stringify(net));
   writeFileSync("/tmp/finance-pnl-sample.csv", csv);
   console.log("CSV saved: /tmp/finance-pnl-sample.csv");
+
+  // --- formula-injection guard (STRING cells) + numeric cells untouched ---
+  const evilPeriod = { from: "2026-06-01", to: "2026-06-30", label: "June 2026", tag: "2026-06" };
+  const evilPnl = computePnL(evilPeriod, {
+    orders: [],
+    bookings: [],
+    treatments: [],
+    ledger: [
+      mkEntry("2026-06-02", "expense", "marketing", 50, "=cmd|'/c calc'!A1"), // formula payload
+      mkEntry("2026-06-03", "expense", "supplies", 50, "@SUM(1+1)"), // @ lead
+      mkEntry("2026-06-04", "expense", "rent", 9000), // makes net NEGATIVE
+    ],
+  });
+  const evilRows = parseCsv(pnlToCsv(evilPnl));
+  const evilHeaderIdx = evilRows.findIndex((r) => r[0] === "date" && r[1] === "direction");
+  const evilData = evilRows.slice(evilHeaderIdx + 1).filter((r) => /^\d{4}-\d{2}-\d{2}$/.test(r[0]));
+  const eqNote = evilData.find((r) => r[2] === "marketing")?.[5];
+  const atNote = evilData.find((r) => r[2] === "supplies")?.[5];
+  check("CSV neutralises a leading '=' note (apostrophe prefix)", eqNote === "'=cmd|'/c calc'!A1", JSON.stringify(eqNote));
+  check("CSV neutralises a leading '@' note (apostrophe prefix)", atNote === "'@SUM(1+1)", JSON.stringify(atNote));
+  // NUMERIC cells must stay numeric — a negative NET keeps its leading '-'.
+  const evilNet = evilRows.find((r) => r[0] === "NET (revenue − expenses)");
+  check("CSV keeps a NEGATIVE net numeric (no apostrophe)", evilNet?.[1] === "-9100", JSON.stringify(evilNet));
+  const evilAmount = evilData.find((r) => r[2] === "marketing")?.[3];
+  check("CSV numeric amount cell is untouched", evilAmount === "50", JSON.stringify(evilAmount));
 }
 
 // ============================================================================
@@ -403,6 +586,19 @@ console.log("\n=== 8. Vassili finance tools: schema, gate, disclosure, executors
   check("validateMutationArgs coerces amountEgp '150' → 150", v1.ok && v1.args.amountEgp === 150);
   const v2 = validateMutationArgs("log_expense", { category: "not-a-category", amountEgp: 10, method: "cash" });
   check("validateMutationArgs refuses an out-of-enum category", !v2.ok);
+
+  // amount>0 GATE: a non-positive / NaN amount is refused before the confirm
+  // card is ever built (so the card can never show a value that fails on tap).
+  const vZero = validateMutationArgs("log_expense", { category: "supplies", amountEgp: 0, method: "cash" });
+  check("gate refuses amountEgp = 0 (log_expense)", !vZero.ok);
+  const vNeg = validateMutationArgs("log_income", { category: "treatment-cash", amountEgp: -5, method: "cash" });
+  check("gate refuses negative amountEgp (log_income)", !vNeg.ok);
+  const vNegStr = validateMutationArgs("log_expense", { category: "supplies", amountEgp: "-5", method: "cash" });
+  check("gate refuses negative amountEgp as string", !vNegStr.ok);
+  const vNan = validateMutationArgs("log_expense", { category: "supplies", amountEgp: "abc", method: "cash" });
+  check("gate refuses non-numeric amountEgp", !vNan.ok);
+  const vGood = validateMutationArgs("log_expense", { category: "supplies", amountEgp: 1, method: "cash" });
+  check("gate accepts a positive amountEgp", vGood.ok);
 
   // structural disclosure
   const disc = describeMutation("log_expense", { category: "rent", amountEgp: 5000, method: "bank-transfer", date: "2026-06-01" });
@@ -498,6 +694,95 @@ console.log("\n=== 10. monthly-pnl cron route: auth + window guard + forced buil
 }
 
 // ============================================================================
+console.log("\n=== 11. Day-marker SELF-CLEAR (claim → already-sent → release → re-claim) ===");
+{
+  // Drive the REAL claimDailySend / releaseDailySend (which call @vercel/blob's
+  // put/del) against a LOOPBACK HTTP server speaking just enough of the Blob
+  // API. The SDK fetches via undici, so a real 127.0.0.1 server is required (a
+  // globalThis.fetch mock would be bypassed). This proves the finding-7
+  // primitive: after a TOTAL send failure releases the marker, the SAME day is
+  // re-drivable (workflow_dispatch / next DST firing) instead of a burned
+  // marker permanently suppressing the month's P&L.
+  const { createServer } = await import("node:http");
+  const markers = new Map<string, string>();
+  const server = createServer((req, res) => {
+    const u = new URL(req.url ?? "/", "http://127.0.0.1");
+    const chunks: Buffer[] = [];
+    req.on("data", (c: Buffer) => chunks.push(c));
+    req.on("end", () => {
+      const reply = (status: number, body: unknown) => {
+        res.writeHead(status, { "Content-Type": "application/json" });
+        res.end(JSON.stringify(body));
+      };
+      if (req.method === "PUT") {
+        const pathname = u.searchParams.get("pathname") ?? "";
+        const overwrite = req.headers["x-allow-overwrite"];
+        if (markers.has(pathname) && overwrite !== "1") {
+          // The code that maps to a message-preserving BlobError so
+          // claimDailySend's /blob already exists/i conflict check fires.
+          reply(400, { error: { code: "bad_request", message: "This blob already exists" } });
+          return;
+        }
+        markers.set(pathname, Buffer.concat(chunks).toString() || "{}");
+        reply(200, {
+          url: `http://127.0.0.1/${pathname}`,
+          downloadUrl: `http://127.0.0.1/${pathname}`,
+          pathname,
+          contentType: "application/json",
+          contentDisposition: `attachment; filename="${pathname}"`,
+          etag: "mock",
+        });
+        return;
+      }
+      if (req.method === "POST" && u.pathname === "/delete") {
+        const parsed = JSON.parse(Buffer.concat(chunks).toString() || "{}") as { urls?: string[] };
+        for (const target of parsed.urls ?? []) {
+          const key = target.replace(/^https?:\/\/[^/]+\//, "");
+          markers.delete(key);
+          markers.delete(target);
+        }
+        reply(200, {});
+        return;
+      }
+      reply(200, {});
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const addr = server.address();
+  const port = typeof addr === "object" && addr ? addr.port : 0;
+
+  const prevBlobToken = process.env.BLOB_READ_WRITE_TOKEN;
+  const prevBlobUrl = process.env.VERCEL_BLOB_API_URL;
+  const prevRetries = process.env.VERCEL_BLOB_RETRIES;
+  process.env.BLOB_READ_WRITE_TOKEN = "vercel_blob_rw_TESTSTORE_secret";
+  process.env.VERCEL_BLOB_API_URL = `http://127.0.0.1:${port}`;
+  process.env.VERCEL_BLOB_RETRIES = "0"; // no backoff — fail fast on any mismatch
+
+  const { claimDailySend, releaseDailySend } = await import("../src/lib/reports/shared");
+  const day = "2026-07-01";
+
+  const first = await claimDailySend("monthly-pnl", day);
+  check("first claim → 'claimed'", first === "claimed", String(first));
+
+  const second = await claimDailySend("monthly-pnl", day);
+  check("second claim (same day) → 'already-sent' (conflict)", second === "already-sent", String(second));
+
+  const released = await releaseDailySend("monthly-pnl", day);
+  check("releaseDailySend deletes the marker → true", released === true);
+
+  const reclaim = await claimDailySend("monthly-pnl", day);
+  check("after release the SAME day is re-claimable → 'claimed' (self-clear)", reclaim === "claimed", String(reclaim));
+
+  await new Promise<void>((resolve) => server.close(() => resolve()));
+  // Restore the blanked tokens so nothing else in the process picks them up.
+  process.env.BLOB_READ_WRITE_TOKEN = prevBlobToken ?? "";
+  if (prevBlobUrl === undefined) delete process.env.VERCEL_BLOB_API_URL;
+  else process.env.VERCEL_BLOB_API_URL = prevBlobUrl;
+  if (prevRetries === undefined) delete process.env.VERCEL_BLOB_RETRIES;
+  else process.env.VERCEL_BLOB_RETRIES = prevRetries;
+}
+
+// ============================================================================
 console.log(`\n=== DONE — ${failures === 0 ? "ALL PASS" : `${failures} FAILURE(S)`} ===`);
 finance.__resetLedgerStore();
 process.exit(failures === 0 ? 0 : 1);
@@ -541,11 +826,17 @@ function mkOrder(orderNumber: string, status: string, egp: number, createdAt: st
   };
 }
 
-function mkTreatment(slug: string, nameEn: string, priceEgp: number): Treatment {
+function mkTreatment(
+  slug: string,
+  nameEn: string,
+  priceEgp: number,
+  eventTypeId = 1,
+  nameRu = nameEn
+): Treatment {
   return {
     slug,
-    eventTypeId: 1,
-    name: { en: nameEn, ru: nameEn },
+    eventTypeId,
+    name: { en: nameEn, ru: nameRu },
     description: { en: "", ru: "" },
     durationMinutes: 60,
     priceEgp,
@@ -556,7 +847,12 @@ function mkTreatment(slug: string, nameEn: string, priceEgp: number): Treatment 
   };
 }
 
-function mkBooking(title: string, status: string, start: string): CalBooking {
+function mkBooking(
+  title: string,
+  status: string,
+  start: string,
+  eventTypeId = 1
+): CalBooking {
   return {
     id: 1,
     uid: crypto.randomUUID(),
@@ -565,7 +861,7 @@ function mkBooking(title: string, status: string, start: string): CalBooking {
     start,
     end: start,
     duration: 60,
-    eventTypeId: 1,
+    eventTypeId,
     attendees: [{ name: "Client", email: "c@example.com", timeZone: "Africa/Cairo" }],
   };
 }
