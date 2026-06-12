@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHmac } from "node:crypto";
 import { del, get, list, put } from "@vercel/blob";
 import { listBookingsInRange, type CalBooking } from "./admin/cal";
 import { listOrders, type StoredOrder } from "./orders";
@@ -17,19 +17,38 @@ import { listAllBlobPathnames, type BlobListPage } from "./finance";
  * - Canonical key = normalized lowercase EMAIL. When a record carries no email
  *   we fall back to the normalized PHONE (digits only, last 9). Email is
  *   authoritative; the phone fallback only groups records that have no email.
- * - `clientId` = a stable 16-hex hash of the canonical key — used for Blob
- *   overlay paths and admin URLs (so a client's email never appears in a URL).
+ * - `clientId` = a stable 16-hex HMAC-SHA256 of the canonical key, keyed by a
+ *   server secret (CRON_SECRET). Used for Blob overlay paths and admin URLs so
+ *   a client's email never appears in a URL AND the id is not a plain offline
+ *   hash anyone can recompute from a guessed email/phone. See `crmIdSecret`.
+ * - PHONE→EMAIL reconciliation: a phone-only client who later books WITH an
+ *   email would otherwise SPLIT into two profiles (phone-key vs email-key) and
+ *   the phone-keyed overlay could orphan once the phone-only records age out.
+ *   buildProfilesWithOverlay therefore (a) folds phone-only records into the
+ *   email profile when that phone appears on ANY email-bearing record, and
+ *   (b) attaches the phone-keyed overlay to the merged email profile. Any
+ *   overlay that still matches NO profile is SURFACED as "unlinked" (never
+ *   silently dropped).
  *
- * OVERLAY STORAGE (mirrors @/lib/finance's one-blob-per-entry model):
- * - One blob per client at `crm/clients/<clientId>.json` holding
- *   `{ clientId, notes, tags, updatedAt }`. Distinct clients write distinct
- *   blobs, so two clients' overlays can never clobber each other.
- * - Within a SINGLE client, note/tag mutations are a read-modify-write on that
- *   one blob, so concurrent edits to the SAME client are serialized through an
- *   in-process per-client async lock (`withOverlayLock`) — no lost updates.
+ * OVERLAY STORAGE (one-blob-per-NOTE, mirroring @/lib/finance's one-blob-per-
+ * entry model — chosen specifically to kill the lost-update race):
+ * - TAGS live in one small per-client blob `crm/clients/<clientId>.json`
+ *   holding `{ clientId, tags, updatedAt }`. Tag mutations read-modify-write
+ *   that one blob; the in-process per-client lock (`withOverlayLock`) serializes
+ *   same-instance edits. Across serverless instances that lock does NOT hold —
+ *   a tag write can still be lost in a true cross-instance race, accepted as a
+ *   LOW-COST tradeoff (a re-applied tag is cheap; a lost note is not).
+ * - NOTES are each their OWN blob `crm/clients/<clientId>/notes/<noteId>.json`
+ *   holding `{ id, text, createdAt }`. addNote writes a fresh blob with a fresh
+ *   id, so there is NO read-modify-write window and NO lock needed: two (or
+ *   five) concurrent addNote calls — even on different serverless instances —
+ *   can never clobber each other. A profile's notes are ASSEMBLED on read by
+ *   listing the per-client notes prefix. This is the fix for the "silently
+ *   loses Victoria's notes" race the single-document overlay had.
  * - Read-error semantics match the ledger EXACTLY: a missing blob (fresh
- *   client) yields an EMPTY overlay; any transient read failure THROWS (never
- *   read as "no notes" by a writer); a corrupt blob THROWS (loud corruption).
+ *   client) yields an EMPTY overlay; any transient read/list failure THROWS
+ *   (never read as "no notes" by a writer); a corrupt blob THROWS (loud
+ *   corruption).
  * - All Blob I/O goes through an injectable `CrmStore` (`__setCrmStore`) and
  *   the derived sources through `__setCrmSources`, so the whole module is
  *   verifiable offline against in-memory mocks (the local BLOB token 403s on
@@ -74,9 +93,37 @@ export function canonicalKey(
   return null;
 }
 
-/** Stable 16-hex client id derived from the canonical key (Blob paths / URLs). */
+/**
+ * Secret that keys the clientId HMAC. We REUSE `CRON_SECRET` (an existing
+ * server-only secret, always present in prod) so a clientId can't be
+ * recomputed offline from a guessed email/phone the way a plain sha256 could.
+ *
+ * Fail-closed: in production an absent secret THROWS (refusing to derive ids
+ * with an empty key — that would be equivalent to the old offline hash). In
+ * non-production (local dev / the offline verify harness) we fall back to a
+ * fixed, clearly-non-secret dev key so ids stay deterministic without prod
+ * env. The harness sets CRON_SECRET explicitly to exercise the real path.
+ */
+const CRM_ID_DEV_FALLBACK_SECRET = "crm-dev-insecure-clientid-secret";
+
+function crmIdSecret(): string {
+  const secret = process.env.CRON_SECRET ?? "";
+  if (secret) return secret;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "CRM clientId secret missing: set CRON_SECRET. Refusing to derive client ids with an empty key in production."
+    );
+  }
+  return CRM_ID_DEV_FALLBACK_SECRET;
+}
+
+/**
+ * Stable 16-hex client id derived from the canonical key (Blob paths / URLs),
+ * as a keyed HMAC-SHA256 (see `crmIdSecret`). Deterministic for a given
+ * (key, secret); validated downstream by `isValidClientId`.
+ */
 export function clientIdFor(key: string): string {
-  return createHash("sha256").update(key).digest("hex").slice(0, 16);
+  return createHmac("sha256", crmIdSecret()).update(key).digest("hex").slice(0, 16);
 }
 
 const CLIENT_ID_RE = /^[0-9a-f]{16}$/;
@@ -123,6 +170,12 @@ export interface ClientProfile {
   displayName: string;
   email: string;
   phone: string;
+  /**
+   * True when this profile was grouped on the PHONE fallback (no email on any
+   * record) — its identity rests on the last-9-digits match, which can merge
+   * family members / strangers sharing a number. Surfaced in the UI as a hint.
+   */
+  matchedByPhone: boolean;
   lang: string;
   firstSeen: string | null;
   /** Most recent PAST confirmed booking start (ISO), or null. */
@@ -146,6 +199,7 @@ export interface ClientSummary {
   displayName: string;
   email: string;
   phone: string;
+  matchedByPhone: boolean;
   lang: string;
   lastVisit: string | null;
   nextVisit: string | null;
@@ -162,6 +216,7 @@ export function toClientSummary(p: ClientProfile): ClientSummary {
     displayName: p.displayName,
     email: p.email,
     phone: p.phone,
+    matchedByPhone: p.matchedByPhone,
     lang: p.lang,
     lastVisit: p.lastVisit,
     nextVisit: p.nextVisit,
@@ -173,15 +228,86 @@ export function toClientSummary(p: ClientProfile): ClientSummary {
   };
 }
 
+/**
+ * An overlay (notes/tags) whose clientId resolves to NO current profile — e.g.
+ * a phone-only client whose records aged out before they returned with an
+ * email. Surfaced (never silently dropped) so Victoria can re-link or erase it.
+ */
+export interface UnlinkedOverlay {
+  clientId: string;
+  noteCount: number;
+  tags: string[];
+  notes: ClientNote[];
+}
+
 // --- Injectable Blob store (the overlay) --------------------------------------
 
 export const CRM_CLIENTS_PREFIX = "crm/clients/";
 
+/** Per-client TAG overlay blob: `crm/clients/<clientId>.json`. */
 function overlayPathname(clientId: string): string {
   if (!isValidClientId(clientId)) {
     throw new Error(`Invalid clientId: ${clientId}`);
   }
   return `${CRM_CLIENTS_PREFIX}${clientId}.json`;
+}
+
+/** Notes prefix for one client: `crm/clients/<clientId>/notes/`. */
+function notesPrefix(clientId: string): string {
+  if (!isValidClientId(clientId)) {
+    throw new Error(`Invalid clientId: ${clientId}`);
+  }
+  return `${CRM_CLIENTS_PREFIX}${clientId}/notes/`;
+}
+
+/** noteId charset guard (defense in depth on the blob path). */
+const NOTE_ID_RE = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** One NOTE blob: `crm/clients/<clientId>/notes/<noteId>.json`. */
+function notePathname(clientId: string, noteId: string): string {
+  if (!isValidClientId(clientId)) {
+    throw new Error(`Invalid clientId: ${clientId}`);
+  }
+  if (!NOTE_ID_RE.test(noteId)) {
+    throw new Error(`Invalid noteId: ${noteId}`);
+  }
+  return `${notesPrefix(clientId)}${noteId}.json`;
+}
+
+/**
+ * Parse a `crm/clients/…` pathname into the clientId + kind. Distinguishes the
+ * per-client TAG overlay (`<id>.json`) from a NOTE (`<id>/notes/<noteId>.json`)
+ * so a single prefix list can be partitioned. Returns null for anything that
+ * doesn't match either shape (never mis-attributed).
+ */
+function parseCrmPathname(
+  pathname: string
+): { clientId: string; kind: "overlay" } | { clientId: string; kind: "note"; noteId: string } | null {
+  if (!pathname.startsWith(CRM_CLIENTS_PREFIX)) return null;
+  const rest = pathname.slice(CRM_CLIENTS_PREFIX.length);
+  const overlay = /^([0-9a-f]{16})\.json$/.exec(rest);
+  if (overlay) return { clientId: overlay[1], kind: "overlay" };
+  const note = /^([0-9a-f]{16})\/notes\/([A-Za-z0-9_-]{1,64})\.json$/.exec(rest);
+  if (note) return { clientId: note[1], kind: "note", noteId: note[2] };
+  return null;
+}
+
+// --- Input sanitization -------------------------------------------------------
+
+/**
+ * Control / formatting characters stripped from note + tag INPUT. Covers C0
+ * controls (newline \n is KEPT — notes may legitimately span lines), DEL,
+ * zero-width characters, and Unicode bidi overrides/isolates that could spoof
+ * how a stored value renders later (admin UI or a future export). Any future
+ * CRM CSV/PDF export MUST additionally reuse the finance `csvField`
+ * formula-injection guard for leading `= + - @`.
+ */
+const CONTROL_CHARS_RE =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u0009\u000B-\u001F\u007F\u200B-\u200F\u202A-\u202E\u2060\u2066-\u2069\uFEFF]/g;
+
+export function stripControlChars(value: string): string {
+  return value.replace(CONTROL_CHARS_RE, "");
 }
 
 /**
@@ -267,79 +393,156 @@ const MAX_NOTE_LEN = 2000;
 const MAX_TAG_LEN = 40;
 const MAX_TAGS = 50;
 
-function emptyOverlay(clientId: string): ClientOverlay {
-  return { clientId, notes: [], tags: [], updatedAt: "" };
+/** Stored TAG-overlay shape (the small per-client blob). Notes are NOT here. */
+interface StoredTagOverlay {
+  clientId: string;
+  tags: string[];
+  updatedAt: string;
 }
 
-function isValidOverlay(value: unknown): value is ClientOverlay {
-  const o = value as ClientOverlay | null;
+function emptyTagOverlay(clientId: string): StoredTagOverlay {
+  return { clientId, tags: [], updatedAt: "" };
+}
+
+function isValidTagOverlay(value: unknown): value is StoredTagOverlay {
+  const o = value as StoredTagOverlay | null;
   return (
     typeof o === "object" &&
     o !== null &&
     typeof o.clientId === "string" &&
-    Array.isArray(o.notes) &&
-    o.notes.every(
-      (n) =>
-        typeof n === "object" &&
-        n !== null &&
-        typeof n.id === "string" &&
-        typeof n.text === "string" &&
-        typeof n.createdAt === "string"
-    ) &&
     Array.isArray(o.tags) &&
     o.tags.every((t) => typeof t === "string") &&
     typeof o.updatedAt === "string"
   );
 }
 
-/**
- * Read one client's overlay. A missing blob (fresh client) returns an EMPTY
- * overlay. A transient read failure THROWS (never read as "no notes"); a
- * corrupt blob THROWS (loud corruption, like the ledger / orders stores).
- */
-export async function getOverlay(clientId: string): Promise<ClientOverlay> {
-  const text = await store.read(overlayPathname(clientId));
-  if (text === null) return emptyOverlay(clientId);
+function isValidStoredNote(value: unknown): value is ClientNote {
+  const n = value as ClientNote | null;
+  return (
+    typeof n === "object" &&
+    n !== null &&
+    typeof n.id === "string" &&
+    typeof n.text === "string" &&
+    typeof n.createdAt === "string"
+  );
+}
+
+/** Read+validate ONE client's tag-overlay blob; empty when absent. */
+async function readTagOverlay(clientId: string): Promise<StoredTagOverlay> {
+  const path = overlayPathname(clientId);
+  const text = await store.read(path);
+  if (text === null) return emptyTagOverlay(clientId);
   const data = JSON.parse(text) as unknown;
-  if (!isValidOverlay(data)) {
+  if (!isValidTagOverlay(data)) {
     throw new Error(
-      `CRM overlay blob is corrupt (${overlayPathname(clientId)}: ${JSON.stringify(data).slice(0, 200)})`
+      `CRM tag-overlay blob is corrupt (${path}: ${JSON.stringify(data).slice(0, 200)})`
     );
   }
   return data;
 }
 
+/** Read+validate ONE note blob; null when the listed blob raced a delete. */
+async function readNoteBlob(pathname: string): Promise<ClientNote | null> {
+  const text = await store.read(pathname);
+  if (text === null) return null;
+  const data = JSON.parse(text) as unknown;
+  if (!isValidStoredNote(data)) {
+    throw new Error(`CRM note blob is corrupt (${pathname})`);
+  }
+  return data;
+}
+
+/** Assemble ONE client's notes (oldest→newest) from their per-note blobs. */
+async function listNotesForClient(clientId: string): Promise<ClientNote[]> {
+  const pathnames = await store.list(notesPrefix(clientId));
+  const read = await Promise.all(pathnames.map(readNoteBlob));
+  return read
+    .filter((n): n is ClientNote => n !== null)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
 /**
- * Read ALL overlays as a clientId→overlay map. Transient list/read failures
- * throw; an absent listed blob (raced delete) is skipped; a corrupt blob
- * throws. Used to attach overlays to a freshly-built directory in one pass.
+ * Read one client's FULL overlay (tags + assembled notes). A fresh client
+ * yields an EMPTY overlay. A transient read/list failure THROWS (never read as
+ * "no notes"); a corrupt blob THROWS (loud corruption, like the ledger).
+ */
+export async function getOverlay(clientId: string): Promise<ClientOverlay> {
+  const [tagOverlay, notes] = await Promise.all([
+    readTagOverlay(clientId),
+    listNotesForClient(clientId),
+  ]);
+  return {
+    clientId,
+    notes,
+    tags: tagOverlay.tags,
+    updatedAt: tagOverlay.updatedAt,
+  };
+}
+
+/**
+ * Read ALL overlays as a clientId→overlay map, assembling each client's tags
+ * (from its overlay blob) AND notes (from its per-note blobs) in ONE prefix
+ * walk. Transient list/read failures throw; an absent listed blob (raced
+ * delete) is skipped; a corrupt blob throws. Used to attach overlays to a
+ * freshly-built directory in a single pass.
  */
 export async function listOverlays(): Promise<Map<string, ClientOverlay>> {
   const pathnames = await store.list(CRM_CLIENTS_PREFIX);
-  const byId = new Map<string, ClientOverlay>();
-  const read = await Promise.all(
+
+  const tagsById = new Map<string, StoredTagOverlay>();
+  const notesById = new Map<string, ClientNote[]>();
+  // Track every clientId that has ANY blob, so a notes-only client (overlay
+  // blob never written — notes don't write one) still surfaces.
+  const seen = new Set<string>();
+
+  await Promise.all(
     pathnames.map(async (p) => {
+      const parsed = parseCrmPathname(p);
+      if (!parsed) return; // unknown shape under the prefix — ignore, never guess
       const text = await store.read(p);
-      if (text === null) return null; // raced delete — skip, not fatal
+      if (text === null) return; // raced delete — skip, not fatal
       const data = JSON.parse(text) as unknown;
-      if (!isValidOverlay(data)) {
-        throw new Error(`CRM overlay blob is corrupt (${p})`);
+      seen.add(parsed.clientId);
+      if (parsed.kind === "overlay") {
+        if (!isValidTagOverlay(data)) {
+          throw new Error(`CRM tag-overlay blob is corrupt (${p})`);
+        }
+        tagsById.set(parsed.clientId, data);
+      } else {
+        if (!isValidStoredNote(data)) {
+          throw new Error(`CRM note blob is corrupt (${p})`);
+        }
+        const arr = notesById.get(parsed.clientId) ?? [];
+        arr.push(data);
+        notesById.set(parsed.clientId, arr);
       }
-      return data;
     })
   );
-  for (const overlay of read) {
-    if (overlay) byId.set(overlay.clientId, overlay);
+
+  const byId = new Map<string, ClientOverlay>();
+  for (const clientId of seen) {
+    const tagOverlay = tagsById.get(clientId);
+    const notes = (notesById.get(clientId) ?? []).sort((a, b) =>
+      a.createdAt.localeCompare(b.createdAt)
+    );
+    byId.set(clientId, {
+      clientId,
+      notes,
+      tags: tagOverlay?.tags ?? [],
+      updatedAt: tagOverlay?.updatedAt ?? "",
+    });
   }
   return byId;
 }
 
 /**
- * Per-client async lock. Note/tag mutations read-modify-write a single client
- * blob; serializing them per clientId means two near-simultaneous adds to the
- * SAME client can never lose an update (the slower writer no longer clobbers
- * the faster one). Distinct clients never contend (distinct keys, distinct
- * blobs), so this never serializes unrelated work.
+ * Per-client async lock — used ONLY by the TAG mutations, which read-modify-
+ * write the single tag-overlay blob. Serializing same-instance tag edits stops
+ * the slower writer clobbering the faster one. NOTE: across serverless
+ * instances this in-process lock does NOT hold, so a tag write can still be
+ * lost in a true cross-instance race — accepted as a LOW-COST tradeoff (a tag
+ * is cheap to re-apply). NOTES never take this lock: each addNote writes its
+ * OWN blob, so there is no read-modify-write window to serialize at all.
  */
 const overlayLocks = new Map<string, Promise<void>>();
 
@@ -361,50 +564,60 @@ async function withOverlayLock<T>(
   }
 }
 
-async function writeOverlay(overlay: ClientOverlay): Promise<void> {
-  await store.write(
-    overlayPathname(overlay.clientId),
-    JSON.stringify({ ...overlay, updatedAt: new Date().toISOString() }, null, 2)
-  );
+async function writeTagOverlay(clientId: string, tags: string[]): Promise<void> {
+  const overlay: StoredTagOverlay = {
+    clientId,
+    tags,
+    updatedAt: new Date().toISOString(),
+  };
+  await store.write(overlayPathname(clientId), JSON.stringify(overlay, null, 2));
 }
 
-/** Append a private note. Returns the created note. */
+/**
+ * Append a private note as its OWN blob (`…/notes/<noteId>.json`). No lock and
+ * no read-modify-write: each call writes a distinct blob with a distinct id, so
+ * N concurrent addNote calls — even across serverless instances — ALL persist
+ * (this is the fix for the silent lost-note race). Control chars are stripped
+ * on input. Returns the created note.
+ */
 export async function addNote(
   clientId: string,
   text: string
 ): Promise<ClientNote> {
-  const trimmed = text.trim().slice(0, MAX_NOTE_LEN);
+  const trimmed = stripControlChars(text).trim().slice(0, MAX_NOTE_LEN);
   if (!trimmed) throw new Error("Note text is required.");
-  return withOverlayLock(clientId, async () => {
-    const overlay = await getOverlay(clientId);
-    const note: ClientNote = {
-      id: crypto.randomUUID(),
-      text: trimmed,
-      createdAt: new Date().toISOString(),
-    };
-    const next: ClientOverlay = { ...overlay, notes: [...overlay.notes, note] };
-    await writeOverlay(next);
-    return note;
-  });
+  const note: ClientNote = {
+    id: crypto.randomUUID(),
+    text: trimmed,
+    createdAt: new Date().toISOString(),
+  };
+  await store.write(
+    notePathname(clientId, note.id),
+    JSON.stringify(note, null, 2)
+  );
+  return note;
 }
 
-/** Remove a note by id. Returns true when something was removed. */
+/** Remove a note by id (deletes its blob). Returns true when one was removed. */
 export async function removeNote(
   clientId: string,
   noteId: string
 ): Promise<boolean> {
-  return withOverlayLock(clientId, async () => {
-    const overlay = await getOverlay(clientId);
-    const remaining = overlay.notes.filter((n) => n.id !== noteId);
-    if (remaining.length === overlay.notes.length) return false;
-    await writeOverlay({ ...overlay, notes: remaining });
-    return true;
-  });
+  if (!NOTE_ID_RE.test(noteId)) return false;
+  const path = notePathname(clientId, noteId);
+  const existing = await store.read(path);
+  if (existing === null) return false;
+  await store.remove(path);
+  return true;
 }
 
-/** Normalize a tag: lowercase, single-spaced, trimmed, length-capped. */
+/** Normalize a tag: strip control chars, lowercase, single-spaced, capped. */
 export function normalizeTag(tag: string): string {
-  return tag.trim().toLowerCase().replace(/\s+/g, " ").slice(0, MAX_TAG_LEN);
+  return stripControlChars(tag)
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .slice(0, MAX_TAG_LEN);
 }
 
 /** Replace the whole tag set (deduped, normalized, capped). */
@@ -417,8 +630,7 @@ export async function setTags(
     MAX_TAGS
   );
   return withOverlayLock(clientId, async () => {
-    const overlay = await getOverlay(clientId);
-    await writeOverlay({ ...overlay, tags: cleaned });
+    await writeTagOverlay(clientId, cleaned);
     return cleaned;
   });
 }
@@ -431,10 +643,10 @@ export async function addTag(
   const t = normalizeTag(tag);
   if (!t) throw new Error("Tag is required.");
   return withOverlayLock(clientId, async () => {
-    const overlay = await getOverlay(clientId);
+    const overlay = await readTagOverlay(clientId);
     if (overlay.tags.includes(t)) return overlay.tags;
     const next = dedupeTags([...overlay.tags, t]).slice(0, MAX_TAGS);
-    await writeOverlay({ ...overlay, tags: next });
+    await writeTagOverlay(clientId, next);
     return next;
   });
 }
@@ -446,15 +658,42 @@ export async function removeTag(
 ): Promise<string[]> {
   const t = normalizeTag(tag);
   return withOverlayLock(clientId, async () => {
-    const overlay = await getOverlay(clientId);
+    const overlay = await readTagOverlay(clientId);
     const next = overlay.tags.filter((x) => x !== t);
-    await writeOverlay({ ...overlay, tags: next });
+    await writeTagOverlay(clientId, next);
     return next;
   });
 }
 
 function dedupeTags(tags: string[]): string[] {
   return [...new Set(tags)];
+}
+
+/**
+ * Right-to-erasure: delete ALL of a client's internal records (every note blob
+ * under their notes prefix + the tag-overlay blob). Returns how many blobs were
+ * removed. Also the cleanup path for an ORPHANED overlay (no live profile), so
+ * it never requires a resolvable profile — it operates purely on the clientId.
+ */
+export async function deleteClientRecords(
+  clientId: string
+): Promise<{ removed: number }> {
+  if (!isValidClientId(clientId)) {
+    throw new Error(`Invalid clientId: ${clientId}`);
+  }
+  const notePaths = await store.list(notesPrefix(clientId));
+  let removed = 0;
+  for (const p of notePaths) {
+    await store.remove(p);
+    removed++;
+  }
+  // Remove the tag overlay if present (read first so we can report accurately).
+  const overlayPath = overlayPathname(clientId);
+  if ((await store.read(overlayPath)) !== null) {
+    await store.remove(overlayPath);
+    removed++;
+  }
+  return { removed };
 }
 
 // --- Profile derivation -------------------------------------------------------
@@ -537,13 +776,33 @@ export interface BuildOptions {
 }
 
 /**
+ * Normalize a timestamp to canonical UTC ISO (`…Z`). Cal can hand back an
+ * offset form (`+02:00`); comparing those as raw strings against a `…Z` "now"
+ * would sort wrong and could flip a booking across the past/future boundary.
+ * Normalizing every booking start at ingestion makes all downstream string
+ * comparisons (and equality with `lastVisit`) chronologically correct. Falls
+ * back to the original string if it isn't a parseable date.
+ */
+function toIso(value: string): string {
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? value : d.toISOString();
+}
+
+/**
  * Build every client profile from live (or injected) Cal bookings + shop
- * orders, with overlays merged in. Pure aggregation beyond the source reads —
- * fully testable with seeded sources + an in-memory overlay store.
+ * orders, with overlays merged in, PLUS any overlay that matches no profile
+ * ("unlinked"). Pure aggregation beyond the source reads — fully testable with
+ * seeded sources + an in-memory overlay store.
+ *
+ * Identity reconciliation: a phone that appears on ANY email-bearing record is
+ * folded into that email-keyed profile, so a phone-only client who later books
+ * with an email does NOT split into two profiles. The phone-keyed overlay is
+ * then attached to the merged profile; an overlay matching no profile at all is
+ * surfaced as `unlinked` rather than silently dropped.
  */
 async function buildProfilesWithOverlay(
   options: BuildOptions = {}
-): Promise<ClientProfile[]> {
+): Promise<{ profiles: ClientProfile[]; unlinked: UnlinkedOverlay[] }> {
   const sources = options.sources ?? activeSources;
   const now = options.now ?? new Date();
   const nowIso = now.toISOString();
@@ -569,13 +828,47 @@ async function buildProfilesWithOverlay(
     }
   }
 
+  // PASS 1 — phone → email-key reconciliation. Any record carrying BOTH an
+  // email and a phone teaches us that this phone belongs to that email profile;
+  // first email wins for a shared phone (rare; documented).
+  const phoneToEmailKey = new Map<string, string>();
+  function learnPhoneEmail(
+    email: string | null | undefined,
+    phone: string | null | undefined
+  ): void {
+    const e = normalizeEmail(email);
+    const p = normalizePhone(phone);
+    if (e && p && !phoneToEmailKey.has(p)) phoneToEmailKey.set(p, `email:${e}`);
+  }
+  for (const b of bookings) {
+    learnPhoneEmail(b.attendees?.[0]?.email, bookingPhone(b));
+  }
+  for (const o of orders) {
+    learnPhoneEmail(o.email, o.phone);
+  }
+
+  /** Canonical key, redirecting a reconciled phone-only key onto its email. */
+  function resolveKey(
+    email: string | null | undefined,
+    phone: string | null | undefined
+  ): string | null {
+    const key = canonicalKey(email, phone);
+    if (!key) return null;
+    if (key.startsWith("phone:")) {
+      const redirect = phoneToEmailKey.get(key.slice("phone:".length));
+      if (redirect) return redirect;
+    }
+    return key;
+  }
+
+  // PASS 2 — accumulate records under their (reconciled) key.
   const map = new Map<string, ClientAccumulator>();
 
   for (const b of bookings) {
     const attendee = b.attendees?.[0];
     const email = attendee?.email ?? "";
     const phone = bookingPhone(b);
-    const key = canonicalKey(email, phone);
+    const key = resolveKey(email, phone);
     if (!key) continue;
     const acc = getAcc(map, key);
     if (normalizeEmail(email)) acc.emails.add(normalizeEmail(email));
@@ -589,7 +882,7 @@ async function buildProfilesWithOverlay(
       serviceTitle(b);
     acc.bookings.push({
       uid: b.uid,
-      start: b.start,
+      start: toIso(b.start),
       status: (b.status || "").toLowerCase(),
       treatment,
       eventTypeId: typeof b.eventTypeId === "number" ? b.eventTypeId : 0,
@@ -597,7 +890,7 @@ async function buildProfilesWithOverlay(
   }
 
   for (const o of orders) {
-    const key = canonicalKey(o.email, o.phone);
+    const key = resolveKey(o.email, o.phone);
     if (!key) continue;
     const acc = getAcc(map, key);
     if (normalizeEmail(o.email)) acc.emails.add(normalizeEmail(o.email));
@@ -613,6 +906,9 @@ async function buildProfilesWithOverlay(
       items: o.items.map((i) => i.names.en),
     });
   }
+
+  // Track which overlay clientIds we attach, so the rest can surface as unlinked.
+  const consumed = new Set<string>();
 
   const profiles: ClientProfile[] = [];
   for (const acc of map.values()) {
@@ -653,7 +949,24 @@ async function buildProfilesWithOverlay(
       ...new Set(confirmedBookings.map((b) => b.treatment).filter(Boolean)),
     ];
 
-    const overlay = overlays.get(acc.clientId);
+    // Attach overlays from the canonical clientId AND every phone-keyed id this
+    // client owns — so a phone-only client's notes follow them once they gain
+    // an email (the phone-keyed overlay merges into the email profile).
+    const candidateIds = new Set<string>([acc.clientId]);
+    for (const rawPhone of acc.phones) {
+      const phoneKey = canonicalKey("", rawPhone);
+      if (phoneKey) candidateIds.add(clientIdFor(phoneKey));
+    }
+    const mergedNotes: ClientNote[] = [];
+    const mergedTags = new Set<string>();
+    for (const cid of candidateIds) {
+      const ov = overlays.get(cid);
+      if (!ov) continue;
+      consumed.add(cid);
+      for (const n of ov.notes) mergedNotes.push(n);
+      for (const t of ov.tags) mergedTags.add(t);
+    }
+    mergedNotes.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
     const langPick = pickDisplayName(acc.langs);
     const lang = langPick && langPick !== "Unknown" ? langPick : "en";
@@ -664,6 +977,7 @@ async function buildProfilesWithOverlay(
       displayName: pickDisplayName(acc.names),
       email: [...acc.emails][0] ?? "",
       phone: [...acc.phones][0] ?? "",
+      matchedByPhone: acc.canonicalKey.startsWith("phone:"),
       lang,
       firstSeen,
       lastVisit: pastConfirmed[0]?.start ?? null,
@@ -677,12 +991,27 @@ async function buildProfilesWithOverlay(
         .slice()
         .sort((a, b) => b.start.localeCompare(a.start)),
       orders: ordersByDate,
-      notes: overlay?.notes ?? [],
-      tags: overlay?.tags ?? [],
+      notes: mergedNotes,
+      tags: [...mergedTags],
     });
   }
 
-  return profiles;
+  // Any overlay (with notes OR tags) not attached above is orphaned — surface
+  // it so private notes are NEVER silently lost.
+  const unlinked: UnlinkedOverlay[] = [];
+  for (const [cid, ov] of overlays) {
+    if (consumed.has(cid)) continue;
+    if (ov.notes.length === 0 && ov.tags.length === 0) continue;
+    unlinked.push({
+      clientId: cid,
+      noteCount: ov.notes.length,
+      tags: ov.tags,
+      notes: ov.notes,
+    });
+  }
+  unlinked.sort((a, b) => a.clientId.localeCompare(b.clientId));
+
+  return { profiles, unlinked };
 }
 
 /** Latest-activity timestamp for default sort (visit or order, whichever newer). */
@@ -694,17 +1023,24 @@ function lastActivity(p: ClientProfile): string {
   );
 }
 
-/** Build the full client directory (profiles + overlay) and the radar at once. */
+/**
+ * Build the full client directory (profiles + overlay), the re-booking radar,
+ * and any unlinked overlays at once.
+ */
 export async function getClientsOverview(
   options: BuildOptions & { weeks?: number } = {}
-): Promise<{ profiles: ClientProfile[]; rebooking: RebookingClient[] }> {
-  const profiles = await buildProfilesWithOverlay(options);
+): Promise<{
+  profiles: ClientProfile[];
+  rebooking: RebookingClient[];
+  unlinked: UnlinkedOverlay[];
+}> {
+  const { profiles, unlinked } = await buildProfilesWithOverlay(options);
   profiles.sort((a, b) => lastActivity(b).localeCompare(lastActivity(a)));
   const rebooking = computeRebookingRadar(profiles, {
     weeks: options.weeks ?? 6,
     now: options.now,
   });
-  return { profiles, rebooking };
+  return { profiles, rebooking, unlinked };
 }
 
 /**
