@@ -5,11 +5,13 @@ import { listOwnerBookings, type CalBooking } from "@/lib/admin/cal";
 import { listOrders, type StoredOrder } from "@/lib/orders";
 import { getCatalog, type Product } from "@/lib/catalog";
 import { getTreatmentsCatalog, type Treatment } from "@/lib/treatments";
+import { buildPnL, resolvePeriod, type PnL } from "@/lib/finance-report";
 import AdminInbox from "./admin-inbox";
 import AdminTabs from "./admin-tabs";
 import OrdersSection from "./orders-section";
 import ProductsSection from "./products-section";
 import TreatmentsSection from "./treatments-section";
+import FinanceSection from "./finance-section";
 
 export const dynamic = "force-dynamic";
 
@@ -46,15 +48,25 @@ export default async function AdminPage({
   let productsError: string | null = null;
   let treatments: Treatment[] = [];
   let treatmentsError: string | null = null;
-  // Bookings (Cal.com), shop orders and the two catalogs (Vercel Blob) load
-  // independently — one backend being down must not blank the others.
-  const [bookingsResult, ordersResult, catalogResult, treatmentsResult] =
-    await Promise.allSettled([
-      listOwnerBookings(),
-      listOrders({ limit: 100 }),
-      getCatalog(),
-      getTreatmentsCatalog(),
-    ]);
+  let financePnl: PnL | null = null;
+  let financeError: string | null = null;
+  const monthPeriod = resolvePeriod({ period: "month" });
+  // Bookings (Cal.com), shop orders, the two catalogs and the finance P&L
+  // (Vercel Blob + Cal) load independently — one backend being down must not
+  // blank the others.
+  const [
+    bookingsResult,
+    ordersResult,
+    catalogResult,
+    treatmentsResult,
+    financeResult,
+  ] = await Promise.allSettled([
+    listOwnerBookings(),
+    listOrders({ limit: 100 }),
+    getCatalog(),
+    getTreatmentsCatalog(),
+    monthPeriod.ok ? buildPnL(monthPeriod.period) : Promise.reject(new Error("bad period")),
+  ]);
   if (bookingsResult.status === "fulfilled") {
     bookings = bookingsResult.value;
   } else {
@@ -78,6 +90,12 @@ export default async function AdminPage({
   } else {
     console.error("Admin treatments load error:", treatmentsResult.reason);
     treatmentsError = "Couldn't load the treatments. Pull down to refresh or try again shortly.";
+  }
+  if (financeResult.status === "fulfilled") {
+    financePnl = financeResult.value;
+  } else {
+    console.error("Admin finance load error:", financeResult.reason);
+    financeError = "Couldn't load the finance ledger. Pull down to refresh or try again shortly.";
   }
 
   const now = Date.now();
@@ -132,6 +150,13 @@ export default async function AdminPage({
             initialTreatments={treatments}
             adminKey={clientKey}
             loadError={treatmentsError}
+          />
+        }
+        finance={
+          <FinanceSection
+            initialPnl={financePnl}
+            adminKey={clientKey}
+            loadError={financeError}
           />
         }
       />

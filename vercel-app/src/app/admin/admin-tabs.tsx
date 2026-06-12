@@ -4,12 +4,17 @@ import { useState, type ReactNode } from "react";
 
 /**
  * Client-side tab switcher for /admin: Bookings | Orders | Products |
- * Treatments. The server page renders every section once and passes them in
- * as nodes; switching tabs only toggles visibility (hidden sections keep
- * their client state — drafts, inline edits — intact).
+ * Treatments | Finance. The server page renders every section once and passes
+ * them in as nodes; switching tabs only toggles visibility (hidden sections
+ * keep their client state — drafts, inline edits — intact).
  */
 
-export type AdminTabId = "bookings" | "orders" | "products" | "treatments";
+export type AdminTabId =
+  | "bookings"
+  | "orders"
+  | "products"
+  | "treatments"
+  | "finance";
 
 interface TabDef {
   id: AdminTabId;
@@ -24,12 +29,14 @@ export default function AdminTabs({
   orders,
   products,
   treatments,
+  finance,
 }: {
   pendingBookings: number;
   bookings: ReactNode;
   orders: ReactNode;
   products: ReactNode;
   treatments: ReactNode;
+  finance: ReactNode;
 }) {
   const [active, setActive] = useState<AdminTabId>("bookings");
 
@@ -38,6 +45,7 @@ export default function AdminTabs({
     { id: "orders", label: "Orders" },
     { id: "products", label: "Products" },
     { id: "treatments", label: "Treatments" },
+    { id: "finance", label: "Finance" },
   ];
 
   const panels: Record<AdminTabId, ReactNode> = {
@@ -45,6 +53,7 @@ export default function AdminTabs({
     orders,
     products,
     treatments,
+    finance,
   };
 
   return (
