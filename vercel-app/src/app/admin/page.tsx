@@ -6,12 +6,19 @@ import { listOrders, type StoredOrder } from "@/lib/orders";
 import { getCatalog, type Product } from "@/lib/catalog";
 import { getTreatmentsCatalog, type Treatment } from "@/lib/treatments";
 import { buildPnL, resolvePeriod, type PnL } from "@/lib/finance-report";
+import {
+  getClientsOverview,
+  toClientSummary,
+  type ClientSummary,
+  type RebookingClient,
+} from "@/lib/crm";
 import AdminInbox from "./admin-inbox";
 import AdminTabs from "./admin-tabs";
 import OrdersSection from "./orders-section";
 import ProductsSection from "./products-section";
 import TreatmentsSection from "./treatments-section";
 import FinanceSection from "./finance-section";
+import ClientsSection from "./clients-section";
 
 export const dynamic = "force-dynamic";
 
@@ -50,6 +57,9 @@ export default async function AdminPage({
   let treatmentsError: string | null = null;
   let financePnl: PnL | null = null;
   let financeError: string | null = null;
+  let clientSummaries: ClientSummary[] = [];
+  let rebooking: RebookingClient[] = [];
+  let clientsError: string | null = null;
   const monthPeriod = resolvePeriod({ period: "month" });
   // Bookings (Cal.com), shop orders, the two catalogs and the finance P&L
   // (Vercel Blob + Cal) load independently — one backend being down must not
@@ -60,12 +70,14 @@ export default async function AdminPage({
     catalogResult,
     treatmentsResult,
     financeResult,
+    clientsResult,
   ] = await Promise.allSettled([
     listOwnerBookings(),
     listOrders({ limit: 100 }),
     getCatalog(),
     getTreatmentsCatalog(),
     monthPeriod.ok ? buildPnL(monthPeriod.period) : Promise.reject(new Error("bad period")),
+    getClientsOverview({ weeks: 6 }),
   ]);
   if (bookingsResult.status === "fulfilled") {
     bookings = bookingsResult.value;
@@ -97,6 +109,13 @@ export default async function AdminPage({
     console.error("Admin finance load error:", financeResult.reason);
     financeError = "Couldn't load the finance ledger. Pull down to refresh or try again shortly.";
   }
+  if (clientsResult.status === "fulfilled") {
+    clientSummaries = clientsResult.value.profiles.map(toClientSummary);
+    rebooking = clientsResult.value.rebooking;
+  } else {
+    console.error("Admin clients load error:", clientsResult.reason);
+    clientsError = "Couldn't load clients. Pull down to refresh or try again shortly.";
+  }
 
   const now = Date.now();
   const pending = bookings.filter((b) => b.status === "pending");
@@ -118,6 +137,7 @@ export default async function AdminPage({
 
       <AdminTabs
         pendingBookings={pending.length}
+        rebookingDue={rebooking.length}
         bookings={
           loadError ? (
             <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
@@ -157,6 +177,14 @@ export default async function AdminPage({
             initialPnl={financePnl}
             adminKey={clientKey}
             loadError={financeError}
+          />
+        }
+        clients={
+          <ClientsSection
+            initialClients={clientSummaries}
+            initialRebooking={rebooking}
+            adminKey={clientKey}
+            loadError={clientsError}
           />
         }
       />
