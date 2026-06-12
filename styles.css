@@ -14,7 +14,7 @@
   --photo-ink: #F4EFE7;   /* text over photo scrims */
   --line: rgba(58, 51, 44, 0.16);
   --scrim: 33, 27, 22;    /* warm near-black for photo washes */
-  --serif: "Cormorant Garamond", "Playfair Display", Georgia, serif; /* italic accent only */
+  --serif: Georgia, serif; /* legacy fallback — unused */
   --sans: "Manrope", "Jost", system-ui, sans-serif;
   --display: "Tenor Sans", "Manrope", system-ui, sans-serif; /* fashion display — ALL CAPS, tracked */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
@@ -99,7 +99,7 @@ h2 {
 .has-js .nav:not(.visible):not(.nav-solid):not(.menu-open) .nav-cta:hover {
   background: rgba(244, 239, 231, 0.14);
 }
-.nav-brand { font-family: var(--serif); font-style: italic; font-size: 22px; }
+.nav-brand { font-family: var(--display); font-size: 18px; letter-spacing: 0.18em; }
 .nav-links { display: flex; gap: 28px; align-items: center; font-size: 12px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase; }
 .nav-links a { white-space: nowrap; }
 .nav-links a { opacity: 0.85; transition: opacity 0.3s; }
@@ -228,7 +228,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 }
 .about-flourish span {
   display: block;
-  font-family: var(--serif); font-style: italic; font-weight: 500;
+  font-family: var(--display); text-transform: uppercase; letter-spacing: 0.16em;
   font-size: 19px; line-height: 1.5; color: var(--clay-deep);
 }
 
@@ -323,7 +323,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 }
 .stat-num {
   display: block;
-  font-family: var(--serif); font-style: italic; font-weight: 500;
+  font-family: var(--display);
   font-size: clamp(48px, 6.5vw, 84px); line-height: 1;
   color: var(--clay-pale);
   text-shadow: 0 1px 14px rgba(26, 21, 17, 0.4);
@@ -361,14 +361,14 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 
 /* ===== Voice ===== */
 /* Amendment 3: HTML uses figure/figcaption — selectors kept as-is */
-.voice blockquote p { font-family: var(--serif); font-style: italic; font-size: clamp(25px, 3.5vw, 42px); line-height: 1.35; max-width: 24em; color: var(--ink); }
+.voice blockquote p { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.1em; font-size: clamp(17px, 2.3vw, 27px); line-height: 1.6; max-width: 30em; color: var(--ink); }
 .voice figcaption { display: block; margin-top: 28px; font-style: normal; font-size: 13px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--clay-deep); }
 
 /* ===== Reserve — deep sand band, light ===== */
 .reserve { background: var(--bg-3); padding: clamp(100px, 16vh, 180px) 0 0; text-align: center; }
 .reserve-logo { width: min(340px, 70vw); margin: 0 auto; }
 /* Amendment 2: h2.reserve-line must not be constrained by h2's max-width: 16em */
-.reserve-line { margin-top: 30px; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: clamp(20px, 2.6vw, 27px); line-height: 1.4; letter-spacing: 0.01em; text-transform: none; color: var(--clay-deep); max-width: none; margin-left: auto; margin-right: auto; }
+.reserve-line { margin-top: 30px; font-family: var(--display); font-size: clamp(14px, 1.8vw, 19px); line-height: 1.6; letter-spacing: 0.2em; text-indent: 0.2em; text-transform: uppercase; color: var(--clay-deep); max-width: none; margin-left: auto; margin-right: auto; }
 .reserve-meta { margin-top: 34px; font-style: normal; font-size: 14px; color: var(--ink-soft); }
 .reserve-meta a { text-decoration: underline; text-underline-offset: 3px; }
 .reserve-meta a:hover { color: var(--clay-deep); }
@@ -801,8 +801,8 @@ html.tmodal-open { overflow: hidden; }
 }
 .article-cta-line {
   width: 100%;
-  font-family: var(--serif); font-style: italic; font-weight: 500;
-  font-size: 20px; color: var(--ink-soft);
+  font-family: var(--display); text-transform: uppercase; letter-spacing: 0.16em;
+  font-size: 14px; color: var(--ink-soft);
 }
 .article-cta .cta { margin-top: 0; padding: 13px 30px; }
 
@@ -894,7 +894,7 @@ html.tmodal-open { overflow: hidden; }
 }
 .shop-initial {
   position: relative;
-  font-family: var(--serif); font-style: italic; font-weight: 500;
+  font-family: var(--display);
   font-size: clamp(72px, 8.5vw, 110px); line-height: 1;
   color: var(--clay-deep); opacity: 0.32; /* decorative, aria-hidden */
   user-select: none; -webkit-user-select: none;
