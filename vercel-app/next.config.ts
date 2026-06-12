@@ -6,6 +6,13 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // The letterhead PDF (src/lib/assistant/letterhead-pdf.ts) reads its
+  // embedded Cyrillic-capable TTFs with fs at runtime — static tracing can't
+  // see that, so include them in the serverless bundle explicitly for the
+  // route that renders PDFs (Vassili's Telegram webhook).
+  outputFileTracingIncludes: {
+    "/api/telegram/webhook": ["./src/assets/fonts/*.ttf"],
+  },
 };
 
 export default nextConfig;

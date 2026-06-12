@@ -4,11 +4,19 @@
  *
  * Verified against api.cal.eu/v2 (cal-api-version 2024-08-13):
  * - GET  /bookings?status=upcoming,unconfirmed   → list (comma-joined filters work)
+ * - GET  /bookings?afterStart=…&beforeEnd=…&take=…
+ *   → list across ALL statuses (incl. past) inside a time window
  * - POST /bookings/{uid}/confirm                 → accept a pending booking
  * - POST /bookings/{uid}/decline  {reason}       → reject; reason reaches the
  *   attendee via Cal's rejection email
  * - POST /bookings/{uid}/reschedule {start, reschedulingReason}
  *   → REBOOKS the booking to the new start time immediately
+ * - GET/POST /me/ooo, DELETE /me/ooo/{id}        → out-of-office entries.
+ *   NOTE (verified empirically on this account): Cal normalizes OOO entries
+ *   to WHOLE DAYS (00:00:00Z → 23:59:59Z) regardless of the supplied times,
+ *   and while an entry exists GET /v2/slots returns NO slots for those days
+ *   (so they cannot be booked). Deleting the entry restores the slots after
+ *   a short Cal-side cache lag (~20 s).
  */
 
 const CAL_API_VERSION = "2024-08-13";
@@ -74,6 +82,37 @@ export async function listOwnerBookings(): Promise<CalBooking[]> {
   );
 }
 
+/**
+ * All bookings (any status, including past/cancelled) whose start falls in
+ * [afterStartIso, beforeEndIso], sorted by start time. Used by Vassili's
+ * stats_summary and client_history tools.
+ */
+export async function listBookingsInRange(
+  afterStartIso: string,
+  beforeEndIso: string,
+  take = 250
+): Promise<CalBooking[]> {
+  const { apiUrl, apiKey } = getCalEnv();
+  const params = new URLSearchParams({
+    afterStart: afterStartIso,
+    beforeEnd: beforeEndIso,
+    take: String(take),
+  });
+  const res = await fetch(`${apiUrl}/bookings?${params}`, {
+    headers: calHeaders(apiKey),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Cal.com range list failed (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { status: string; data: CalBooking[] };
+  const bookings = Array.isArray(json.data) ? json.data : [];
+  return bookings.sort(
+    (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
+  );
+}
+
 export interface CalActionResult {
   ok: boolean;
   status: number;
@@ -123,4 +162,78 @@ export function rescheduleBooking(
     start: startIsoUtc,
     ...(reschedulingReason ? { reschedulingReason } : {}),
   });
+}
+
+// --- Out-of-office (calendar blocking) ----------------------------------------
+
+export interface CalOutOfOffice {
+  id: number;
+  uuid?: string;
+  start: string;
+  end: string;
+  notes?: string | null;
+  reason?: string | null;
+}
+
+/**
+ * Block whole calendar days with an out-of-office entry (see module docs:
+ * Cal normalizes to full days and removes ALL bookable slots for them).
+ * `startDate`/`endDate` are YYYY-MM-DD, inclusive.
+ */
+export async function createOutOfOffice(
+  startDate: string,
+  endDate: string,
+  notes?: string
+): Promise<CalActionResult> {
+  const { apiUrl, apiKey } = getCalEnv();
+  const res = await fetch(`${apiUrl}/me/ooo`, {
+    method: "POST",
+    headers: calHeaders(apiKey),
+    body: JSON.stringify({
+      start: `${startDate}T00:00:00.000Z`,
+      end: `${endDate}T23:59:59.999Z`,
+      reason: "unspecified",
+      ...(notes ? { notes } : {}),
+    }),
+  });
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+  return { ok: res.ok, status: res.status, body: parsed };
+}
+
+/** All current out-of-office entries for the API-key user. */
+export async function listOutOfOffice(): Promise<CalOutOfOffice[]> {
+  const { apiUrl, apiKey } = getCalEnv();
+  const res = await fetch(`${apiUrl}/me/ooo`, {
+    headers: calHeaders(apiKey),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`Cal.com OOO list failed (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const json = (await res.json()) as { status: string; data: CalOutOfOffice[] };
+  return Array.isArray(json.data) ? json.data : [];
+}
+
+/** Remove an out-of-office entry (re-opens the blocked days for booking). */
+export async function deleteOutOfOffice(id: number): Promise<CalActionResult> {
+  const { apiUrl, apiKey } = getCalEnv();
+  const res = await fetch(`${apiUrl}/me/ooo/${encodeURIComponent(String(id))}`, {
+    method: "DELETE",
+    headers: calHeaders(apiKey),
+  });
+  const text = await res.text();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    parsed = text;
+  }
+  return { ok: res.ok, status: res.status, body: parsed };
 }

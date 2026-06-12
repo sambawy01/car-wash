@@ -1,17 +1,22 @@
 import {
   confirmBooking,
+  createOutOfOffice,
   declineBooking,
+  listBookingsInRange,
   listOwnerBookings,
   rescheduleBooking,
   type CalBooking,
 } from "../admin/cal";
 import {
   effectiveSoldOut,
+  generateSlug,
   getCatalog,
   saveCatalog,
   restoreQuantities,
+  type Product,
 } from "../catalog";
 import {
+  getOrder,
   listOrders,
   updateOrderStatus,
   isValidOrderNumber,
@@ -29,13 +34,18 @@ import { sendDocument } from "../telegram";
  * Vassili's tool belt.
  *
  * Two classes of tools:
- * - READ-ONLY (bookings_*, orders_list, catalog_list, daily_brief,
- *   document_create) execute immediately inside the agent loop.
+ * - READ-ONLY (bookings_*, orders_list, order_lookup, catalog_list,
+ *   stats_summary, client_history, daily_brief, document_create) execute
+ *   immediately inside the agent loop.
  * - MUTATING (booking_confirm/decline/move, order_set_status,
- *   product_update, email_send to non-owner recipients) are NEVER executed
- *   by the model directly. The agent loop intercepts them, stores a pending
- *   action on Blob, and Victoria gets a [Confirm | Cancel] inline keyboard.
- *   Only the callback handler calls `executeTool` for these.
+ *   product_update/add/remove, block_time, email_send to non-owner
+ *   recipients) are NEVER executed by the model directly. The agent loop
+ *   intercepts them, stores a pending action on Blob, and Victoria gets a
+ *   [Confirm | Cancel] inline keyboard. Only the callback handler calls
+ *   `executeTool` for these. Every confirmation summary spells out the
+ *   third-party side effects (client emails, public-site changes, calendar
+ *   blocking) — see `describeMutation`, which builds the summary
+ *   structurally so disclosure cannot depend on the model's mood.
  *
  * `document_create` sends the PDF straight to the owner chat — it creates
  * nothing outside Telegram, so it counts as read-only.
@@ -181,7 +191,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "document_create",
-    "Create a PDF document on the company letterhead and send it to Victoria in this chat. Body supports light markdown: '# Heading' lines and '- bullet' lines. Latin text only (built-in fonts).",
+    "Create a PDF document on the company letterhead and send it to Victoria in this chat. Body supports light markdown: '# Heading' lines and '- bullet' lines. English and Russian both render (embedded Cyrillic-capable fonts).",
     {
       title: { type: "string", description: "Document title" },
       body: { type: "string", description: "Document body (markdownish)" },
@@ -191,6 +201,85 @@ export const TOOLS: OllamaTool[] = [
       },
     },
     ["title", "body"]
+  ),
+  tool(
+    "product_add",
+    "Add a NEW product to the shop catalog. It goes live on the public site immediately after Victoria confirms. MUTATING — requires Victoria's button confirmation.",
+    {
+      nameEn: { type: "string", description: "Product name in English" },
+      nameRu: { type: "string", description: "Product name in Russian" },
+      priceEgp: { type: "number", description: "Price in EGP (required)" },
+      priceRub: { type: "number", description: "Price in RUB (optional)" },
+      descEn: { type: "string", description: "Description in English (optional)" },
+      descRu: { type: "string", description: "Description in Russian (optional)" },
+      usageEn: {
+        type: "string",
+        description: "Usage/application directions in English (optional)",
+      },
+      usageRu: {
+        type: "string",
+        description: "Usage/application directions in Russian (optional)",
+      },
+      imageUrl: { type: "string", description: "Product photo URL (optional)" },
+      quantity: {
+        type: "number",
+        description: "Initial stock quantity (omit = stock not tracked)",
+      },
+    },
+    ["nameEn", "nameRu", "priceEgp"]
+  ),
+  tool(
+    "product_remove",
+    "Remove a product from the shop: it is HIDDEN from the public site (soft remove, reversible) — never hard-deleted. MUTATING — requires Victoria's button confirmation. Get the slug via catalog_list first.",
+    { slug: { type: "string", description: "Product slug from catalog_list" } },
+    ["slug"]
+  ),
+  tool(
+    "block_time",
+    "Block whole DAYS on Victoria's Cal.com calendar so clients cannot book them (out-of-office). Cal.com only supports full days on this account — if Victoria asks to block part of a day, tell her only whole days are possible. MUTATING — requires Victoria's button confirmation.",
+    {
+      startDate: { type: "string", description: "First blocked day, YYYY-MM-DD" },
+      endDate: {
+        type: "string",
+        description: "Last blocked day inclusive, YYYY-MM-DD (omit = one day)",
+      },
+      note: { type: "string", description: "Optional note, e.g. 'vacation'" },
+    },
+    ["startDate"]
+  ),
+  tool(
+    "stats_summary",
+    "Business stats for a period: confirmed bookings count (Cal.com) plus shop orders — count, revenue in EGP by status, cancellations.",
+    {
+      period: {
+        type: "string",
+        enum: ["week", "month", "custom"],
+        description:
+          "week = current Mon–Sun, month = current calendar month, custom = use from/to",
+      },
+      from: { type: "string", description: "Custom range start, YYYY-MM-DD" },
+      to: { type: "string", description: "Custom range end, YYYY-MM-DD" },
+    },
+    ["period"]
+  ),
+  tool(
+    "client_history",
+    "A client's past and upcoming bookings, matched by name or email substring (case-insensitive). Looks one year back and one year ahead.",
+    {
+      query: {
+        type: "string",
+        description: "Part of the client's name or email, e.g. 'hany' or '@mail.ru'",
+      },
+    },
+    ["query"]
+  ),
+  tool(
+    "order_lookup",
+    "Full detail of ONE shop order by its VV-number: items, totals, address, contact, and complete status history with reasons.",
+    {
+      orderNumber: { type: "string", description: "e.g. VV-AB12CD" },
+    },
+    ["orderNumber"]
   ),
 ];
 
@@ -202,6 +291,9 @@ const MUTATING_TOOLS = new Set([
   "booking_move",
   "order_set_status",
   "product_update",
+  "product_add",
+  "product_remove",
+  "block_time",
   "email_send",
 ]);
 
@@ -228,7 +320,15 @@ export function requiresConfirmation(
   return true;
 }
 
-/** One-line human summary of a mutating call, shown above [Confirm|Cancel]. */
+/**
+ * Human summary of a mutating call, shown above [Confirm | Cancel].
+ *
+ * STRUCTURAL DISCLOSURE: every summary must spell out the third-party side
+ * effects of confirming (emails the client will receive, public-site
+ * changes, calendar blocking) on a trailing "→" line. This lives here — in
+ * the gate's summary builder — so disclosure is guaranteed by code, never
+ * dependent on the model choosing to mention it.
+ */
 export function describeMutation(
   name: string,
   args: Record<string, unknown>
@@ -236,15 +336,31 @@ export function describeMutation(
   const s = (k: string) => (typeof args[k] === "string" ? String(args[k]) : "");
   switch (name) {
     case "booking_confirm":
-      return `Confirm booking ${s("uid")}`;
+      return (
+        `Confirm booking ${s("uid")}\n` +
+        `→ The client will receive a booking-confirmation email from Cal.com.`
+      );
     case "booking_decline":
-      return `Decline booking ${s("uid")} — reason: ${s("reason") || "(none)"}`;
+      return (
+        `Decline booking ${s("uid")} — reason: ${s("reason") || "(none)"}\n` +
+        `→ The client will be EMAILED this reason (Cal.com rejection email).`
+      );
     case "booking_move":
-      return `Move booking ${s("uid")} to ${s("newStartISO")}`;
-    case "order_set_status":
-      return `Set order ${s("orderNumber")} to "${s("status")}"${
-        s("reason") ? ` — reason: ${s("reason")}` : ""
-      }`;
+      return (
+        `Move booking ${s("uid")} to ${s("newStartISO")}\n` +
+        `→ The booking is rebooked immediately and the client is emailed the new time.`
+      );
+    case "order_set_status": {
+      const cancelling = s("status") === "cancelled";
+      return (
+        `Set order ${s("orderNumber")} to "${s("status")}"${
+          s("reason") ? ` — reason: ${s("reason")}` : ""
+        }\n` +
+        (cancelling
+          ? `→ The client will receive a cancellation email INCLUDING this reason.`
+          : `→ The client will receive a status email ("${s("status")}").`)
+      );
+    }
     case "product_update": {
       const changes: string[] = [];
       if (typeof args.priceEgp === "number")
@@ -255,10 +371,48 @@ export function describeMutation(
         changes.push(`quantity ${args.quantity}`);
       if (typeof args.soldOut === "boolean")
         changes.push(`soldOut ${args.soldOut}`);
-      return `Update product ${s("slug")}: ${changes.join(", ") || "(no changes)"}`;
+      return (
+        `Update product ${s("slug")}: ${changes.join(", ") || "(no changes)"}\n` +
+        `→ The change goes LIVE on the public site immediately.`
+      );
+    }
+    case "product_add": {
+      const qty =
+        typeof args.quantity === "number"
+          ? `, qty ${args.quantity}`
+          : ", stock untracked";
+      const rub =
+        typeof args.priceRub === "number" ? ` / ${args.priceRub} RUB` : "";
+      return (
+        `Add product "${s("nameEn")}" (${s("nameRu")}) — ${
+          typeof args.priceEgp === "number" ? args.priceEgp : "?"
+        } EGP${rub}${qty}\n` +
+        `→ The product goes LIVE on the public site immediately.`
+      );
+    }
+    case "product_remove":
+      return (
+        `Remove product ${s("slug")}\n` +
+        `→ It disappears from the public site immediately (soft remove — kept in the catalog, reversible).`
+      );
+    case "block_time": {
+      const start = s("startDate");
+      const end = s("endDate") || start;
+      const range = end === start ? start : `${start} – ${end}`;
+      return (
+        `Block calendar: ${range}${s("note") ? ` — ${s("note")}` : ""}\n` +
+        `→ The WHOLE day(s) become unbookable on Cal.com — clients see no available slots there.`
+      );
     }
     case "email_send":
-      return `Send email to ${s("to")} — "${s("subject")}"`;
+      return (
+        `Send email to ${s("to")}\n` +
+        `Subject: "${s("subject")}"\n` +
+        `——— full message ———\n` +
+        `${s("body")}\n` +
+        `——————————————\n` +
+        `→ This exact email goes to ${s("to")} from bookings@victoriaholisticbeauty.com.`
+      );
     default:
       return `${name}(${JSON.stringify(args)})`;
   }
@@ -482,6 +636,263 @@ async function execProductUpdate(
   }`;
 }
 
+async function execProductAdd(args: Record<string, unknown>): Promise<string> {
+  const str = (k: string) =>
+    typeof args[k] === "string" ? (args[k] as string).trim() : "";
+  const nameEn = str("nameEn").slice(0, 120);
+  const nameRu = str("nameRu").slice(0, 120);
+  if (!nameEn || !nameRu)
+    return "Both names are required (nameEn and nameRu).";
+  if (typeof args.priceEgp !== "number" || args.priceEgp <= 0)
+    return "A positive priceEgp is required.";
+  const priceEgp = Math.round(args.priceEgp);
+  const priceRub =
+    typeof args.priceRub === "number" && args.priceRub >= 0
+      ? Math.round(args.priceRub)
+      : 0;
+  const quantity =
+    typeof args.quantity === "number" && args.quantity >= 0
+      ? Math.round(args.quantity)
+      : null;
+  const usageEn = str("usageEn").slice(0, 2000);
+  const usageRu = str("usageRu").slice(0, 2000);
+
+  const catalog = await getCatalog();
+  const slug = generateSlug(nameEn, new Set(catalog.map((p) => p.slug)));
+  const now = new Date().toISOString();
+  const product: Product = {
+    slug,
+    en: { name: nameEn, sub: "", desc: str("descEn").slice(0, 2000) },
+    ru: { name: nameRu, sub: "", desc: str("descRu").slice(0, 2000) },
+    priceEgp,
+    priceRub,
+    photo: str("imageUrl").slice(0, 500),
+    alt: { en: nameEn, ru: nameRu },
+    ...(usageEn || usageRu
+      ? { usage: { en: usageEn, ru: usageRu } }
+      : {}),
+    quantity,
+    soldOut: false,
+    active: true,
+    createdAt: now,
+    updatedAt: now,
+  };
+  catalog.push(product);
+  await saveCatalog(catalog);
+  return `Added "${nameEn}" (slug: ${slug}) — ${priceEgp} EGP / ${priceRub} RUB, ${
+    quantity === null ? "stock untracked" : `qty ${quantity}`
+  }. It is LIVE on the site now.${
+    product.photo ? "" : " No photo yet — add one in /admin when ready."
+  }`;
+}
+
+async function execProductRemove(
+  args: Record<string, unknown>
+): Promise<string> {
+  const slug = String(args.slug ?? "").trim();
+  const catalog = await getCatalog();
+  const product = catalog.find((p) => p.slug === slug);
+  if (!product) return `Product "${slug}" not found — check catalog_list.`;
+  if (!product.active)
+    return `Product "${slug}" is already hidden from the site — nothing to do.`;
+  product.active = false;
+  product.updatedAt = new Date().toISOString();
+  await saveCatalog(catalog);
+  return `Product "${slug}" removed from the public site (soft remove: it stays in the catalog with active=false, so this is reversible from /admin or by re-activating it).`;
+}
+
+const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+function isRealDateKey(key: string): boolean {
+  if (!DATE_KEY_RE.test(key)) return false;
+  const d = new Date(`${key}T00:00:00Z`);
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === key;
+}
+
+async function execBlockTime(args: Record<string, unknown>): Promise<string> {
+  const startDate = String(args.startDate ?? "").trim();
+  const endDate = String(args.endDate ?? "").trim() || startDate;
+  const note =
+    typeof args.note === "string" ? args.note.trim().slice(0, 200) : "";
+  if (!isRealDateKey(startDate) || !isRealDateKey(endDate)) {
+    return "Dates must be real days in YYYY-MM-DD form.";
+  }
+  if (endDate < startDate) return "endDate must not be before startDate.";
+  const todayCairo = cairoDateKey(new Date());
+  if (endDate < todayCairo) {
+    return `That range is in the past (today in Cairo is ${todayCairo}) — nothing to block.`;
+  }
+
+  const result = await createOutOfOffice(startDate, endDate, note || undefined);
+  if (!result.ok) {
+    const detail =
+      typeof result.body === "object" && result.body !== null
+        ? JSON.stringify(result.body).slice(0, 300)
+        : String(result.body).slice(0, 300);
+    return `Blocking FAILED (Cal.com ${result.status}): ${detail}`;
+  }
+  const id = (result.body as { data?: { id?: number } } | null)?.data?.id;
+  const range = endDate === startDate ? startDate : `${startDate} – ${endDate}`;
+  return `Calendar blocked: ${range} — the whole day(s) are now unbookable (Cal.com out-of-office${
+    typeof id === "number" ? ` #${id}` : ""
+  }). Note: Cal.com only supports FULL-day blocks on this account — partial-day windows are not possible. To unblock, remove the entry in Cal.com → Availability → Out of office.`;
+}
+
+/** Shift a YYYY-MM-DD key by whole days (UTC arithmetic). */
+function shiftDateKey(key: string, days: number): string {
+  const d = new Date(`${key}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+async function execStatsSummary(
+  args: Record<string, unknown>
+): Promise<string> {
+  const period = String(args.period ?? "week");
+  const todayKey = cairoDateKey(new Date());
+  let fromKey: string;
+  let toKey: string;
+  let label: string;
+
+  if (period === "custom") {
+    fromKey = String(args.from ?? "").trim();
+    toKey = String(args.to ?? "").trim();
+    if (!isRealDateKey(fromKey) || !isRealDateKey(toKey)) {
+      return "Custom period needs both from and to as real YYYY-MM-DD dates.";
+    }
+    if (toKey < fromKey) [fromKey, toKey] = [toKey, fromKey];
+    label = `${fromKey} – ${toKey}`;
+  } else if (period === "month") {
+    fromKey = `${todayKey.slice(0, 7)}-01`;
+    const [y, m] = todayKey.split("-").map(Number);
+    toKey = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+    label = `this month (${fromKey} – ${toKey})`;
+  } else {
+    // week: current Monday–Sunday (Cairo)
+    const dow = new Date(`${todayKey}T00:00:00Z`).getUTCDay(); // 0 = Sun
+    fromKey = shiftDateKey(todayKey, -((dow + 6) % 7));
+    toKey = shiftDateKey(fromKey, 6);
+    label = `this week (${fromKey} – ${toKey})`;
+  }
+
+  const [bookings, allOrders] = await Promise.all([
+    listBookingsInRange(`${fromKey}T00:00:00.000Z`, `${toKey}T23:59:59.999Z`),
+    listOrders({ limit: 200 }),
+  ]);
+
+  const byStatus = (s: string) =>
+    bookings.filter((b) => (b.status || "").toLowerCase() === s).length;
+  const confirmedBookings = byStatus("accepted");
+  const pendingBookings = byStatus("pending");
+  const cancelledBookings =
+    byStatus("cancelled") + byStatus("rejected");
+
+  const orders = allOrders.filter((o) => {
+    const k = (o.createdAt || "").slice(0, 10);
+    return k >= fromKey && k <= toKey;
+  });
+  const orderAgg = new Map<string, { count: number; egp: number }>();
+  for (const o of orders) {
+    const agg = orderAgg.get(o.status) ?? { count: 0, egp: 0 };
+    agg.count += 1;
+    agg.egp += o.totals?.egp ?? 0;
+    orderAgg.set(o.status, agg);
+  }
+  const cancelledOrders = orderAgg.get("cancelled")?.count ?? 0;
+  const activeRevenue = orders
+    .filter((o) => o.status !== "cancelled")
+    .reduce((sum, o) => sum + (o.totals?.egp ?? 0), 0);
+
+  const lines = [
+    `Stats for ${label}:`,
+    `Bookings — ${confirmedBookings} confirmed` +
+      (pendingBookings ? `, ${pendingBookings} pending` : "") +
+      (cancelledBookings ? `, ${cancelledBookings} cancelled/rejected` : ""),
+    `Orders — ${orders.length} total, ${activeRevenue} EGP revenue (excl. cancelled)`,
+  ];
+  for (const [status, agg] of orderAgg) {
+    lines.push(`  · ${status}: ${agg.count} order(s), ${agg.egp} EGP`);
+  }
+  if (cancelledOrders === 0) lines.push(`  · cancelled: 0`);
+  return lines.join("\n");
+}
+
+async function execClientHistory(
+  args: Record<string, unknown>
+): Promise<string> {
+  const query = String(args.query ?? "").trim().toLowerCase();
+  if (query.length < 2) {
+    return "Give me at least 2 characters of the client's name or email.";
+  }
+  const now = Date.now();
+  const bookings = await listBookingsInRange(
+    new Date(now - 365 * 86_400_000).toISOString(),
+    new Date(now + 365 * 86_400_000).toISOString()
+  );
+  const matches = bookings.filter((b) =>
+    (b.attendees ?? []).some(
+      (a) =>
+        (a.name || "").toLowerCase().includes(query) ||
+        (a.email || "").toLowerCase().includes(query)
+    )
+  );
+  if (matches.length === 0) {
+    return `No bookings match "${query}" (searched one year back and ahead).`;
+  }
+  const line = (b: CalBooking) => {
+    const a = b.attendees?.[0];
+    return `${cairoDayClock(b.start)} · ${serviceTitle(b)} · ${b.status} · ${
+      a?.name || "Unknown"
+    }${a?.email ? ` (${a.email})` : ""}`;
+  };
+  const nowIso = new Date(now).toISOString();
+  const upcoming = matches.filter((b) => b.start >= nowIso).slice(0, 15);
+  const past = matches
+    .filter((b) => b.start < nowIso)
+    .reverse()
+    .slice(0, 15);
+  const parts = [`Client history for "${query}" — ${matches.length} booking(s):`];
+  if (upcoming.length > 0)
+    parts.push("Upcoming:", ...upcoming.map(line));
+  if (past.length > 0) parts.push("Past (newest first):", ...past.map(line));
+  return parts.join("\n");
+}
+
+async function execOrderLookup(
+  args: Record<string, unknown>
+): Promise<string> {
+  const orderNumber = String(args.orderNumber ?? "").trim().toUpperCase();
+  if (!isValidOrderNumber(orderNumber)) {
+    return `Invalid order number "${orderNumber}" (expected VV-XXXXXX).`;
+  }
+  const order = await getOrder(orderNumber);
+  if (!order) return `Order ${orderNumber} not found.`;
+
+  const lines = [
+    `${order.orderNumber} — ${order.status.toUpperCase()}`,
+    `Placed: ${cairoDayClock(order.createdAt)}`,
+    `Client: ${order.name} · ${order.phone}${order.email ? ` · ${order.email}` : ""}`,
+    `Address: ${order.address || "(none)"}`,
+  ];
+  if (order.note) lines.push(`Note: ${order.note}`);
+  lines.push("Items:");
+  for (const i of order.items) {
+    lines.push(`— ${i.qty}× ${i.names.en} — ${i.lineTotals.egp} EGP`);
+  }
+  lines.push(
+    `Total: ${order.totals.egp} EGP / ${order.totals.rub} RUB`,
+    `Client language: ${order.lang}`,
+    "Status history:"
+  );
+  for (const h of Array.isArray(order.statusHistory) ? order.statusHistory : []) {
+    const reason = h.reason
+      ? ` · reason: ${h.reason.code}${h.reason.note ? ` (${h.reason.note})` : ""}`
+      : "";
+    lines.push(`— ${h.status} · ${cairoDayClock(h.at)}${reason}`);
+  }
+  return lines.join("\n");
+}
+
 async function execDailyBrief(): Promise<string> {
   const data = await gatherDailyBriefData();
   const brief = buildDailyBriefEmail(data);
@@ -566,7 +977,7 @@ async function execDocumentCreate(
   if (!sent.ok) return "PDF was generated but sending to Telegram failed.";
   return `PDF "${title}" sent to the chat.${
     unsupportedCharsStripped
-      ? " Note: some non-Latin characters could not be rendered and were removed."
+      ? " Note: some characters (e.g. emoji) could not be rendered and were removed."
       : ""
   }`;
 }
@@ -596,8 +1007,14 @@ const EXECUTORS: Record<string, Executor> = {
     ),
   orders_list: (args) => execOrdersList(args),
   order_set_status: (args) => execOrderSetStatus(args),
+  order_lookup: (args) => execOrderLookup(args),
   catalog_list: () => execCatalogList(),
   product_update: (args) => execProductUpdate(args),
+  product_add: (args) => execProductAdd(args),
+  product_remove: (args) => execProductRemove(args),
+  block_time: (args) => execBlockTime(args),
+  stats_summary: (args) => execStatsSummary(args),
+  client_history: (args) => execClientHistory(args),
   daily_brief: () => execDailyBrief(),
   email_send: (args) => execEmailSend(args),
   document_create: (args, ctx) => execDocumentCreate(args, ctx),

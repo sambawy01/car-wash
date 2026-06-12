@@ -3,16 +3,20 @@
  *
  * Run from vercel-app/:   npx tsx scripts/verify-vassili.mts
  *
- * What is REAL: Vercel Blob (state/catalog), Cal.com READS, the Ollama model
- * (local ollama → Ollama Cloud). What is MOCKED at the fetch boundary:
- * - api.telegram.org   → captured (no bot exists yet)
- * - Cal.com MUTATIONS  → captured (never confirm/decline/move real bookings)
- * - api.resend.com     → captured (never send real emails; RESEND_API_KEY is
- *   also blanked for belt-and-braces)
+ * What is REAL: Vercel Blob (state/catalog — including product_add/remove,
+ * hard-cleaned to byte-identical afterwards), Cal.com READS, Cal.com
+ * OUT-OF-OFFICE create+delete (far-future day, removed immediately — the
+ * empirical block_time verification), and the Ollama model (local ollama →
+ * Ollama Cloud). What is MOCKED at the fetch boundary:
+ * - api.telegram.org      → captured (no bot exists yet)
+ * - Cal.com BOOKING mutations (confirm/decline/reschedule) → captured
+ *   (never touch real bookings)
+ * - api.resend.com        → captured (never send real emails; RESEND_API_KEY
+ *   is also blanked for belt-and-braces)
  *
  * The script drives the real webhook route handler with synthetic Telegram
  * updates and asserts on the captured outbound calls. It restores any state
- * it changes (catalog quantity, telegram/* blobs).
+ * it changes (catalog, Cal OOO entries, telegram/* blobs).
  */
 
 import { readFileSync, writeFileSync } from "node:fs";
@@ -109,6 +113,11 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 const { POST: webhookPOST } = await import("../src/app/api/telegram/webhook/route");
 const { getOwnerChatId } = await import("../src/lib/assistant/state");
 const { getCatalog, saveCatalog } = await import("../src/lib/catalog");
+const { executeTool, describeMutation } = await import("../src/lib/assistant/tools");
+const { listOrders } = await import("../src/lib/orders");
+const { listOutOfOffice, deleteOutOfOffice, listOwnerBookings } = await import(
+  "../src/lib/admin/cal"
+);
 const { del, get } = await import("@vercel/blob");
 
 // --- helpers ---------------------------------------------------------------------------
@@ -423,19 +432,40 @@ console.log("\n=== 3. \"what's my day?\" (real brief data via real Ollama+Cal+Bl
   );
 }
 
-console.log("\n=== 4. Confirm-booking flow (xhani) — Cal mutation stubbed ===");
-{
+// Sections 4–5 act on whatever booking is PENDING on Cal right now (the
+// harness never hardcodes uids — live data changes between runs).
+const pendingNow = (await listOwnerBookings()).filter(
+  (b) => (b.status || "").toLowerCase() === "pending"
+);
+const flowTarget = pendingNow[0];
+const flowClient = flowTarget?.attendees?.[0]?.name ?? "";
+const flowService = (flowTarget?.title || "Booking").split(" between ")[0];
+
+console.log(
+  `\n=== 4. Confirm-booking flow (live pending: ${flowClient || "NONE"}) — Cal mutation stubbed ===`
+);
+if (!flowTarget) {
+  check("confirm flow (skipped — no pending bookings on Cal right now)", true);
+} else {
   telegramCalls.length = 0;
   calMutations.length = 0;
-  await sendText(OWNER_CHAT, "please confirm the booking request from xhani");
+  await sendText(
+    OWNER_CHAT,
+    `please confirm ${flowClient}'s pending "${flowService}" booking request`
+  );
   const confirmMsg = lastTelegramText();
   const pendingId = lastKeyboardPendingId();
   console.log("--- confirm prompt ---\n" + confirmMsg + "\npendingId: " + pendingId);
   check("agent asked for confirmation with keyboard", pendingId !== null);
   check(
-    "summary references xhani's real uid",
-    confirmMsg.includes("8oVE8ZQ8mTnZEytEaVdpR2"),
+    `summary references the real uid (${flowTarget.uid})`,
+    confirmMsg.includes(flowTarget.uid),
     confirmMsg.slice(0, 160)
+  );
+  check(
+    "confirm summary disclosure: client gets a confirmation email",
+    /client will receive a booking-confirmation email/i.test(confirmMsg),
+    confirmMsg.slice(0, 220)
   );
   check("no Cal mutation before Confirm tap", calMutations.length === 0);
 
@@ -444,7 +474,7 @@ console.log("\n=== 4. Confirm-booking flow (xhani) — Cal mutation stubbed ==="
     await tapButton(OWNER_CHAT, `confirm:${pendingId}`);
     check(
       "Confirm tap → confirmBooking called with the right uid",
-      calMutations.some((c) => c.url.includes("/bookings/8oVE8ZQ8mTnZEytEaVdpR2/confirm")),
+      calMutations.some((c) => c.url.includes(`/bookings/${flowTarget.uid}/confirm`)),
       calMutations.map((c) => c.url).join(", ")
     );
     const edited = telegramCalls.find((c) => c.url.includes("editMessageText"));
@@ -461,12 +491,22 @@ console.log("\n=== 4. Confirm-booking flow (xhani) — Cal mutation stubbed ==="
 }
 
 console.log("\n=== 5. Cancel path ===");
-{
+if (!flowTarget) {
+  check("cancel path (skipped — no pending bookings on Cal right now)", true);
+} else {
   telegramCalls.length = 0;
   calMutations.length = 0;
-  await sendText(OWNER_CHAT, "decline Hany's facial massage request, reason: schedule conflict");
+  await sendText(
+    OWNER_CHAT,
+    `decline ${flowClient}'s "${flowService}" booking request, reason: schedule conflict`
+  );
   const pendingId = lastKeyboardPendingId();
   check("decline parked behind keyboard", pendingId !== null, lastTelegramText().slice(0, 140));
+  check(
+    "decline summary disclosure: reason is emailed to the client",
+    /EMAILED this reason/.test(lastTelegramText()),
+    lastTelegramText().slice(0, 220)
+  );
   if (pendingId) {
     telegramCalls.length = 0;
     await tapButton(OWNER_CHAT, `cancel:${pendingId}`);
@@ -565,6 +605,317 @@ console.log("\n=== 8. Daily-brief cron pushes to Telegram ===");
     "brief text pushed to owner chat",
     Boolean(pushed && /Good morning/.test(String((pushed.body as { text?: string })?.text)))
   );
+}
+
+console.log("\n=== 9. Read-only tools: stats_summary / client_history / order_lookup ===");
+{
+  const ctx = { chatId: OWNER_CHAT };
+
+  const stats = await executeTool("stats_summary", { period: "month" }, ctx);
+  console.log("--- stats_summary(month) ---\n" + stats);
+  check(
+    "stats_summary returns real aggregates",
+    /Stats for this month/.test(stats) &&
+      /Bookings — \d+ confirmed/.test(stats) &&
+      /Orders — \d+ total, \d+ EGP revenue/.test(stats)
+  );
+
+  const hist = await executeTool("client_history", { query: "hany" }, ctx);
+  console.log("--- client_history(hany) ---\n" + hist.slice(0, 500));
+  check(
+    "client_history matches by name substring",
+    /hany/i.test(hist) && /booking\(s\)/.test(hist)
+  );
+
+  const someOrder = (await listOrders({ limit: 1 }))[0];
+  if (someOrder) {
+    const lookup = await executeTool(
+      "order_lookup",
+      { orderNumber: someOrder.orderNumber },
+      ctx
+    );
+    console.log("--- order_lookup ---\n" + lookup);
+    check(
+      "order_lookup gives full detail (items, totals, address, history)",
+      lookup.includes(someOrder.orderNumber) &&
+        /Items:/.test(lookup) &&
+        /Address:/.test(lookup) &&
+        /Total: \d+ EGP/.test(lookup) &&
+        /Status history:/.test(lookup)
+    );
+  } else {
+    check("order_lookup full detail (skipped — no orders in store)", true);
+  }
+
+  // Via the agent these are read-only: instant answer, NO confirm keyboard.
+  telegramCalls.length = 0;
+  await sendText(OWNER_CHAT, "how is this month going? give me the stats summary");
+  check(
+    "stats via agent → instant reply, no keyboard",
+    lastKeyboardPendingId() === null && lastTelegramText().length > 10,
+    lastTelegramText().slice(0, 140)
+  );
+}
+
+console.log("\n=== 10. product_add → live → product_remove → byte-identical restore ===");
+{
+  // Raw catalog bytes BEFORE — the test must leave the blob byte-identical.
+  const beforeBlob = await get("catalog/products.json", {
+    access: "private",
+    useCache: false,
+  });
+  const beforeText =
+    beforeBlob && beforeBlob.statusCode === 200
+      ? await new Response(beforeBlob.stream).text()
+      : null;
+  check("catalog blob exists for byte-identical comparison", beforeText !== null);
+
+  telegramCalls.length = 0;
+  await sendText(
+    OWNER_CHAT,
+    'add a new product to the shop: English name "Test Harness Balm", Russian name "Тестовый бальзам", price 999 EGP, quantity 3'
+  );
+  const addId = lastKeyboardPendingId();
+  const addPrompt = lastTelegramText();
+  console.log("--- add prompt ---\n" + addPrompt);
+  check("product_add parked behind keyboard", addId !== null, addPrompt.slice(0, 200));
+  check(
+    "add summary disclosure: product goes LIVE on the site",
+    /LIVE on the public site/i.test(addPrompt),
+    addPrompt.slice(0, 220)
+  );
+  check(
+    "catalog unchanged before Confirm",
+    !(await getCatalog()).some(
+      (p) => p.en.name === "Test Harness Balm" || p.slug.startsWith("test-harness")
+    )
+  );
+
+  let slug = "";
+  if (addId) {
+    telegramCalls.length = 0;
+    await tapButton(OWNER_CHAT, `confirm:${addId}`);
+    const after = await getCatalog();
+    const added = after.find(
+      (p) => p.en.name === "Test Harness Balm" || p.slug.startsWith("test-harness")
+    );
+    slug = added?.slug ?? "";
+    check(
+      "REAL catalog gained the product (active, 999 EGP, qty 3)",
+      Boolean(
+        added &&
+          added.active &&
+          added.priceEgp === 999 &&
+          added.quantity === 3 &&
+          !added.soldOut
+      ),
+      JSON.stringify(added).slice(0, 200)
+    );
+  }
+
+  if (slug) {
+    telegramCalls.length = 0;
+    await sendText(OWNER_CHAT, `now remove the product ${slug} from the shop`);
+    const rmId = lastKeyboardPendingId();
+    const rmPrompt = lastTelegramText();
+    console.log("--- remove prompt ---\n" + rmPrompt);
+    check("product_remove parked behind keyboard", rmId !== null, rmPrompt.slice(0, 160));
+    check(
+      "remove summary disclosure: hidden from site, reversible",
+      /disappears from the public site/i.test(rmPrompt) && /reversible/i.test(rmPrompt),
+      rmPrompt.slice(0, 220)
+    );
+    if (rmId) {
+      await tapButton(OWNER_CHAT, `confirm:${rmId}`);
+      const after = await getCatalog();
+      const p = after.find((x) => x.slug === slug);
+      check(
+        "soft-removed: active=false but still in catalog",
+        Boolean(p && p.active === false),
+        JSON.stringify(p).slice(0, 160)
+      );
+    }
+    // Hard cleanup: drop the test product entirely.
+    const cleaned = (await getCatalog()).filter((p) => p.slug !== slug);
+    await saveCatalog(cleaned);
+  }
+
+  const afterBlob = await get("catalog/products.json", {
+    access: "private",
+    useCache: false,
+  });
+  const afterText =
+    afterBlob && afterBlob.statusCode === 200
+      ? await new Response(afterBlob.stream).text()
+      : null;
+  check(
+    "catalog byte-identical after hard cleanup",
+    beforeText !== null && afterText === beforeText,
+    `len ${beforeText?.length} → ${afterText?.length}`
+  );
+}
+
+console.log("\n=== 11. block_time: REAL far-future Cal OOO create + cleanup ===");
+{
+  telegramCalls.length = 0;
+  await sendText(
+    OWNER_CHAT,
+    "block my calendar for 5 March 2027 (the whole day), note: harness test"
+  );
+  const blockId = lastKeyboardPendingId();
+  const blockPrompt = lastTelegramText();
+  console.log("--- block prompt ---\n" + blockPrompt);
+  check("block_time parked behind keyboard", blockId !== null, blockPrompt.slice(0, 200));
+  check(
+    "block summary disclosure: WHOLE days become unbookable",
+    /WHOLE day/i.test(blockPrompt) && /unbookable/i.test(blockPrompt),
+    blockPrompt.slice(0, 220)
+  );
+  if (blockId) {
+    telegramCalls.length = 0;
+    await tapButton(OWNER_CHAT, `confirm:${blockId}`);
+    const edited = telegramCalls.find((c) => c.url.includes("editMessageText"));
+    console.log(
+      "block result:",
+      String((edited?.body as { text?: string })?.text).slice(0, 220)
+    );
+    const entries = await listOutOfOffice();
+    const mine = entries.filter((e) => (e.start || "").startsWith("2027-03-05"));
+    check(
+      "REAL Cal OOO entry created for 2027-03-05",
+      mine.length === 1,
+      JSON.stringify(entries).slice(0, 300)
+    );
+    for (const e of mine) await deleteOutOfOffice(e.id);
+    const left = (await listOutOfOffice()).filter((e) =>
+      (e.start || "").startsWith("2027-03-05")
+    );
+    check("OOO entry cleaned up (calendar unblocked)", left.length === 0);
+  }
+}
+
+console.log("\n=== 12. Russian PDF via agent (embedded Cyrillic fonts) ===");
+{
+  telegramCalls.length = 0;
+  lastPdf = null;
+  await sendText(
+    OWNER_CHAT,
+    "сделай PDF-документ: коммерческое предложение для спа-отеля, два-три предложения на русском"
+  );
+  const ruPdf = lastPdf as Buffer | null;
+  check(
+    "RU PDF generated",
+    Boolean(ruPdf && ruPdf.subarray(0, 5).toString().startsWith("%PDF")),
+    `size=${ruPdf?.length}`
+  );
+  check(
+    "embedded PT fonts present in the PDF (no built-in Latin-only fonts)",
+    Boolean(
+      ruPdf &&
+        (ruPdf.includes("PTSerif-Regular") || ruPdf.includes("PTSans-Regular")) &&
+        !ruPdf.includes("/BaseFont /Helvetica")
+    )
+  );
+  if (ruPdf) {
+    writeFileSync("/tmp/vassili-ru-agent-sample.pdf", ruPdf);
+    console.log("RU PDF saved for visual inspection: /tmp/vassili-ru-agent-sample.pdf");
+  }
+  console.log("final agent text:", lastTelegramText().slice(0, 200));
+}
+
+console.log("\n=== 13. Disclosure: order status email & outsider email preview ===");
+{
+  // Structural guarantees first — disclosure lives in describeMutation, so
+  // these hold no matter what live data exists.
+  check(
+    "describeMutation(order_set_status→shipped) discloses the status email",
+    /client will receive a status email/i.test(
+      describeMutation("order_set_status", { orderNumber: "VV-TEST00", status: "shipped" })
+    )
+  );
+  check(
+    "describeMutation(order_set_status→cancelled) discloses reason email",
+    /cancellation email INCLUDING this reason/i.test(
+      describeMutation("order_set_status", {
+        orderNumber: "VV-TEST00",
+        status: "cancelled",
+        reason: "out of stock",
+      })
+    )
+  );
+  check(
+    "describeMutation(booking_decline) discloses reason email",
+    /EMAILED this reason/.test(
+      describeMutation("booking_decline", { uid: "x", reason: "y" })
+    )
+  );
+  check(
+    "describeMutation(email_send) shows recipient + subject + full body",
+    (() => {
+      const d = describeMutation("email_send", {
+        to: "a@b.com",
+        subject: "S",
+        body: "full body text here",
+      });
+      return (
+        d.includes("a@b.com") &&
+        d.includes('Subject: "S"') &&
+        d.includes("full body text here")
+      );
+    })()
+  );
+
+  // order_set_status: park → assert disclosure → CANCEL (no real change).
+  const mutable = (await listOrders({ limit: 30 })).find(
+    (o) => o.status === "ordered" || o.status === "confirmed"
+  );
+  if (mutable) {
+    const next = mutable.status === "ordered" ? "confirmed" : "shipped";
+    telegramCalls.length = 0;
+    await sendText(OWNER_CHAT, `set order ${mutable.orderNumber} to ${next}`);
+    const id = lastKeyboardPendingId();
+    const prompt = lastTelegramText();
+    console.log("--- status prompt ---\n" + prompt);
+    check("order_set_status parked behind keyboard", id !== null, prompt.slice(0, 160));
+    check(
+      "status summary disclosure: client receives a status email",
+      /client will receive a (status|cancellation) email/i.test(prompt),
+      prompt.slice(0, 220)
+    );
+    if (id) await tapButton(OWNER_CHAT, `cancel:${id}`);
+    const fresh = (await listOrders({ limit: 30 })).find(
+      (o) => o.orderNumber === mutable.orderNumber
+    );
+    check(
+      "order untouched after Cancel",
+      fresh?.status === mutable.status,
+      `status=${fresh?.status}`
+    );
+  } else {
+    check("order_set_status disclosure (skipped — no mutable order)", true);
+  }
+
+  // email_send to an outsider: summary must show recipient + subject + FULL body.
+  telegramCalls.length = 0;
+  resendCalls.length = 0;
+  await sendText(
+    OWNER_CHAT,
+    'send an email to partner@example.com with subject "Samples" and exactly this body: "Hello! The Onmacabim samples ship on Monday. Warm regards, Victoria"'
+  );
+  const mailId = lastKeyboardPendingId();
+  const mailPrompt = lastTelegramText();
+  console.log("--- email prompt ---\n" + mailPrompt);
+  check("outsider email parked behind keyboard", mailId !== null);
+  check(
+    "email summary shows recipient + subject + full body preview",
+    mailPrompt.includes("partner@example.com") &&
+      /Subject:/.test(mailPrompt) &&
+      /full message/.test(mailPrompt) &&
+      /samples/i.test(mailPrompt),
+    mailPrompt.slice(0, 300)
+  );
+  check("no email sent before confirm", resendCalls.length === 0);
+  if (mailId) await tapButton(OWNER_CHAT, `cancel:${mailId}`);
 }
 
 console.log("\n=== cleanup: remove test telegram/* state from Blob ===");

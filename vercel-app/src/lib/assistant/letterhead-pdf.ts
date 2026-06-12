@@ -10,17 +10,21 @@ import PDFDocument from "pdfkit";
  *   (fetched from the live site, falling back to public/logo-white.png,
  *   falling back to a typeset wordmark).
  * - "Earthen Calm" palette: #3A332C ink, #847866 muted, #E5DCCB hairlines.
- * - Headings in letter-spaced uppercase Helvetica (the closest built-in to
- *   the site's Tenor Sans — standard 14 fonts only, no font embedding).
- * - Footer hairline with contacts.
+ * - EMBEDDED fonts (src/assets/fonts, OFL-licensed ParaType faces, full
+ *   Latin + Cyrillic coverage — Russian renders natively):
+ *   · PT Sans (regular/bold) for the letter-spaced uppercase headings and
+ *     captions (clean sans in the spirit of the site's Tenor Sans),
+ *   · PT Serif for body text (the elegant serif voice of the brand).
+ *   The PDFDocument is created with `font: null` so pdfkit never touches
+ *   its built-in AFM fonts — only the embedded TTFs ship to serverless
+ *   (see outputFileTracingIncludes in next.config.ts).
  *
  * Body text is "markdownish": blank lines split paragraphs, `# `/`## ` lines
  * become headings, `- `/`* ` lines become bullets. Everything else renders
  * as body paragraphs.
  *
- * Limitation (deliberate): the built-in fonts are WinAnsi-encoded, so only
- * Latin text renders. `unsupportedCharsStripped` flags when non-Latin
- * characters (e.g. Cyrillic) had to be removed so the tool can warn.
+ * `unsupportedCharsStripped` flags when characters OUTSIDE the embedded
+ * fonts' repertoire (emoji, CJK, …) had to be removed so the tool can warn.
  */
 
 const LOGO_URL = "https://victoriaholisticbeauty.com/assets/logo-white.png";
@@ -48,30 +52,57 @@ export interface LetterheadDocumentInput {
 
 export interface LetterheadDocumentResult {
   pdf: Buffer;
-  /** True when non-WinAnsi characters were stripped from the text. */
+  /** True when characters outside the embedded fonts' coverage were stripped. */
   unsupportedCharsStripped: boolean;
 }
 
 /**
- * Keep WinAnsi-safe characters only (built-in fonts cannot encode the rest).
- * `onStrip` fires when characters had to be dropped — per-render closure, no
- * shared module state.
+ * Keep characters the embedded PT fonts can render: Latin (ASCII, Latin-1,
+ * Latin Extended-A), full Cyrillic, and the typographic punctuation the
+ * fonts cover (dashes, curly quotes, «guillemets», №, ₽, €, ellipsis, ·).
+ * Anything else (emoji, CJK, …) is dropped and flagged via `onStrip` —
+ * per-render closure, no shared module state.
  */
 function makeSanitizer(onStrip: () => void): (text: string) => string {
   return (text: string): string => {
     const safe = text
-      .replace(/[‘’ʼ]/g, "'")
-      .replace(/[“”]/g, '"')
-      .replace(/…/g, "...")
-      .replace(/[–—]/g, "-")
-      .replace(/ /g, " ")
-      // WinAnsi is roughly Latin-1; drop anything outside it.
-      .replace(/[^\x20-\x7E¡-ÿ\n\t]/g, "");
+      .replace(/[\u00a0\u202f]/g, " ") // NBSP / narrow NBSP → plain space
+      .replace(/[\u2019\u02bc]/g, "\u2019") // apostrophe variants → right single quote
+      // Outside the embedded fonts' repertoire → drop (and flag below).
+      .replace(
+        /[^\x20-\x7E\n\t\u00a1-\u00ff\u0100-\u017f\u0400-\u04ff\u2013\u2014\u2018\u2019\u201a\u201c\u201d\u201e\u00ab\u00bb\u2026\u00b7\u2116\u20ac\u20bd]/g,
+        ""
+      );
     if (safe.replace(/\s/g, "").length < text.replace(/\s/g, "").length) {
       onStrip();
     }
     return safe;
   };
+}
+
+// --- Embedded fonts -----------------------------------------------------------
+
+const FONT_DIR = join(process.cwd(), "src", "assets", "fonts");
+const FONT_FILES = {
+  Sans: "PT_Sans-Web-Regular.ttf",
+  "Sans-Bold": "PT_Sans-Web-Bold.ttf",
+  Serif: "PT_Serif-Web-Regular.ttf",
+} as const;
+type FontName = keyof typeof FONT_FILES;
+
+/** Font bytes survive across warm invocations — read once per process. */
+let fontCache: Record<FontName, Buffer> | null = null;
+
+async function loadFonts(): Promise<Record<FontName, Buffer>> {
+  if (fontCache) return fontCache;
+  const entries = await Promise.all(
+    (Object.keys(FONT_FILES) as FontName[]).map(async (name) => {
+      const buf = await readFile(join(FONT_DIR, FONT_FILES[name]));
+      return [name, buf] as const;
+    })
+  );
+  fontCache = Object.fromEntries(entries) as Record<FontName, Buffer>;
+  return fontCache;
 }
 
 async function loadLogo(): Promise<Buffer | null> {
@@ -96,7 +127,7 @@ export async function renderLetterheadPdf(
     strippedChars = true;
   });
 
-  const logo = await loadLogo();
+  const [logo, fonts] = await Promise.all([loadLogo(), loadFonts()]);
   const now = input.now ?? new Date();
   const dateLine = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Africa/Cairo",
@@ -113,8 +144,15 @@ export async function renderLetterheadPdf(
       left: PAGE_MARGIN,
       right: PAGE_MARGIN,
     },
+    // `null` skips pdfkit's built-in Helvetica (AFM) entirely — we only ever
+    // use the embedded TTFs registered below. (Types say string; runtime
+    // accepts null by design: initFonts(defaultFont) no-ops on falsy.)
+    font: null as unknown as string,
     info: { Title: input.title, Author: "Victoria Vasilyeva Holistic Beauty" },
   });
+  doc.registerFont("Sans", fonts.Sans);
+  doc.registerFont("Sans-Bold", fonts["Sans-Bold"]);
+  doc.registerFont("Serif", fonts.Serif);
 
   const chunks: Buffer[] = [];
   doc.on("data", (c: Buffer) => chunks.push(c));
@@ -148,7 +186,7 @@ export async function renderLetterheadPdf(
       });
     } else {
       doc
-        .font("Helvetica")
+        .font("Sans")
         .fontSize(13)
         .fillColor("#FFFDF9")
         .text(BRAND_NAME, PAGE_MARGIN, BAND_HEIGHT / 2 - 8, {
@@ -166,7 +204,7 @@ export async function renderLetterheadPdf(
       .strokeColor(HAIRLINE)
       .stroke();
     doc
-      .font("Helvetica")
+      .font("Sans")
       .fontSize(9)
       .fillColor(MUTED)
       .text(FOOTER_TEXT, PAGE_MARGIN, footerY + 12, {
@@ -186,7 +224,7 @@ export async function renderLetterheadPdf(
 
   // --- Letter head matter -------------------------------------------------
   doc
-    .font("Helvetica")
+    .font("Sans")
     .fontSize(9)
     .fillColor(MUTED)
     .text(sanitize(BRAND_NAME), PAGE_MARGIN, BAND_HEIGHT + 40, {
@@ -195,7 +233,7 @@ export async function renderLetterheadPdf(
     });
   doc.moveDown(0.6);
   doc
-    .font("Helvetica")
+    .font("Sans")
     .fontSize(20)
     .fillColor(INK)
     .text(sanitize(input.title).toUpperCase(), {
@@ -204,7 +242,7 @@ export async function renderLetterheadPdf(
       lineGap: 4,
     });
   doc.moveDown(0.5);
-  doc.font("Helvetica").fontSize(10).fillColor(MUTED);
+  doc.font("Sans").fontSize(10).fillColor(MUTED);
   doc.text(sanitize(dateLine), { width: contentWidth });
   if (input.recipient) {
     doc.text(sanitize(`To: ${input.recipient}`), { width: contentWidth });
@@ -230,7 +268,7 @@ export async function renderLetterheadPdf(
       if (heading) {
         doc.moveDown(0.6);
         doc
-          .font("Helvetica-Bold")
+          .font("Sans-Bold")
           .fontSize(12)
           .fillColor(INK)
           .text(heading[1].toUpperCase(), {
@@ -241,7 +279,7 @@ export async function renderLetterheadPdf(
         doc.moveDown(0.2);
       } else if (bullet) {
         doc
-          .font("Times-Roman")
+          .font("Serif")
           .fontSize(11.5)
           .fillColor(INK)
           .text(`·  ${bullet[1]}`, {
@@ -251,7 +289,7 @@ export async function renderLetterheadPdf(
           });
       } else {
         doc
-          .font("Times-Roman")
+          .font("Serif")
           .fontSize(11.5)
           .fillColor(INK)
           .text(trimmed, { width: contentWidth, lineGap: 5 });
@@ -263,13 +301,13 @@ export async function renderLetterheadPdf(
   // --- Signature ---------------------------------------------------------------
   doc.moveDown(0.6);
   doc
-    .font("Times-Roman")
+    .font("Serif")
     .fontSize(11.5)
     .fillColor(INK)
     .text("Warmly,", { width: contentWidth });
   doc.moveDown(0.2);
   doc
-    .font("Helvetica")
+    .font("Sans")
     .fontSize(10)
     .fillColor(MUTED)
     .text("VICTORIA VASILYEVA", { width: contentWidth, characterSpacing: 1.8 });
