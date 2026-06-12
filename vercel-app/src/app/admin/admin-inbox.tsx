@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CalBooking } from "@/lib/admin/cal";
 import { COMBINED_SESSION, SERVICES } from "@/lib/services";
@@ -22,47 +22,64 @@ function formatCairo(iso: string): string {
   }).format(new Date(iso));
 }
 
-/** UTC offset (ms) of `tz` at the given UTC instant. */
-function tzOffsetMs(utcMs: number, tz: string): number {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-US", {
-      timeZone: tz,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: false,
-    })
-      .formatToParts(new Date(utcMs))
-      .map((p) => [p.type, p.value])
-  );
-  const asIfUtc = Date.UTC(
-    Number(parts.year),
-    Number(parts.month) - 1,
-    Number(parts.day),
-    Number(parts.hour === "24" ? "0" : parts.hour),
-    Number(parts.minute),
-    Number(parts.second)
-  );
-  return asIfUtc - utcMs;
+/** Calendar date ("YYYY-MM-DD") of an ISO instant in Cairo time. */
+function cairoDateOf(iso: string | Date): string {
+  // en-CA formats as YYYY-MM-DD.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: CAIRO_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(typeof iso === "string" ? new Date(iso) : iso);
 }
 
-/** Interpret a datetime-local value ("YYYY-MM-DDTHH:mm") as Cairo wall time → UTC ISO. */
-function cairoWallTimeToUtcIso(local: string): string | null {
-  const m = local.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
-  if (!m) return null;
-  const [, y, mo, d, h, mi] = m.slice(0).map(Number);
-  const naiveUtc = Date.UTC(y, mo - 1, d, h, mi);
-  // Two-pass to handle DST transitions.
-  let utc = naiveUtc - tzOffsetMs(naiveUtc, CAIRO_TZ);
-  utc = naiveUtc - tzOffsetMs(utc, CAIRO_TZ);
-  return new Date(utc).toISOString();
+/** Wall-clock time ("HH:mm") of an ISO instant in Cairo time. */
+function formatCairoTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: CAIRO_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(iso));
+}
+
+/** Shift a "YYYY-MM-DD" date by whole days (calendar arithmetic, UTC-safe). */
+function shiftDate(date: string, days: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+/**
+ * Cal rejects reschedules to anything that isn't a genuinely free slot
+ * ("User either already has booking at this time or is not available").
+ * The move UI only offers fetched slots, so a residual rejection means the
+ * slot was taken between fetch and submit — translate it for Victoria.
+ */
+function mapMoveError(message: string): string {
+  return /already has booking|not available|no longer available|no_available/i.test(
+    message
+  )
+    ? "That time was just taken or is no longer available — pick another slot."
+    : message;
 }
 
 function serviceForBooking(booking: CalBooking) {
   return SERVICES.find((s) => s.eventTypeId === booking.eventTypeId);
+}
+
+/**
+ * Multi-duration event types need an explicit `duration` on the slots query
+ * (same rule the public /book page applies via session-builder). Unknown
+ * event types (not in SERVICES, not the combined session) also send the
+ * booking's duration — required if they happen to be multi-duration,
+ * harmless for single-duration ones.
+ */
+function needsExplicitDuration(booking: CalBooking): boolean {
+  if (booking.eventTypeId === COMBINED_SESSION.eventTypeId) return true;
+  const service = serviceForBooking(booking);
+  if (!service) return true;
+  return service.durations.length > 1;
 }
 
 function bookingLink(booking: CalBooking): string {
@@ -140,16 +157,29 @@ function PendingCard({
 }) {
   const [mode, setMode] = useState<Mode>(null);
   const [note, setNote] = useState("");
-  const [moveStart, setMoveStart] = useState("");
+  const [moveDate, setMoveDate] = useState(""); // "YYYY-MM-DD" (Cairo day)
+  const [moveSlots, setMoveSlots] = useState<string[]>([]); // ISO starts
+  const [moveSlot, setMoveSlot] = useState(""); // selected ISO start
+  const [slotsLoading, setSlotsLoading] = useState(false);
+  const [slotsError, setSlotsError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /**
+   * Monotonic id for slot fetches. Two quick date changes race: without this
+   * guard the slower (older) response lands last and silently fills the
+   * dropdown with the WRONG day's slots (options show time only). Each
+   * loadSlots call takes a fresh id and bails before every setState if a
+   * newer call has started since.
+   */
+  const slotsReqId = useRef(0);
 
   async function callAction(
     action: "confirm" | "decline" | "reschedule",
     body?: Record<string, unknown>,
-    doneLabel?: string
-  ) {
+    doneLabel?: string,
+    mapError?: (message: string) => string
+  ): Promise<boolean> {
     setBusy(true);
     setError(null);
     try {
@@ -166,15 +196,81 @@ function PendingCard({
         const message =
           (payload && (payload.error?.message || payload.error)) ||
           `Request failed (${res.status})`;
-        setError(typeof message === "string" ? message : `Request failed (${res.status})`);
-        return;
+        const raw =
+          typeof message === "string" ? message : `Request failed (${res.status})`;
+        setError(mapError ? mapError(raw) : raw);
+        return false;
       }
       setDone(doneLabel ?? "Done");
       onChanged();
+      return true;
     } catch {
       setError("Network error — please try again.");
+      return false;
     } finally {
       setBusy(false);
+    }
+  }
+
+  /** Free Cal slots for this booking's event type on a Cairo calendar day. */
+  async function loadSlots(date: string) {
+    const reqId = ++slotsReqId.current;
+    setSlotsLoading(true);
+    setSlotsError(null);
+    setMoveSlots([]);
+    setMoveSlot("");
+    try {
+      // Fetch a ±1-day window — Cal buckets slots by UTC-ish dates, so the
+      // Cairo day can spill into neighbouring buckets. Filter to the exact
+      // Cairo day afterwards (same approach as the public /book page).
+      const params = new URLSearchParams({
+        eventTypeId: String(booking.eventTypeId),
+        dateFrom: shiftDate(date, -1),
+        dateTo: shiftDate(date, 1),
+      });
+      if (needsExplicitDuration(booking)) {
+        params.set("duration", String(booking.duration));
+      }
+      const res = await fetch(`/api/admin/slots?${params}`, {
+        headers: { "x-admin-key": adminKey },
+      });
+      if (reqId !== slotsReqId.current) return; // superseded by a newer call
+      if (!res.ok) {
+        setSlotsError("Couldn't load available times — please try again.");
+        return;
+      }
+      const data = (await res.json()) as Record<string, { start: string }[]>;
+      if (reqId !== slotsReqId.current) return; // superseded by a newer call
+      const starts =
+        data && typeof data === "object"
+          ? Object.values(data)
+              .flat()
+              .map((slot) => slot.start)
+              .filter((startIso) => cairoDateOf(startIso) === date)
+              .sort((a, b) => new Date(a).getTime() - new Date(b).getTime())
+          : [];
+      setMoveSlots(starts);
+    } catch {
+      if (reqId !== slotsReqId.current) return; // superseded by a newer call
+      setSlotsError("Couldn't load available times — please try again.");
+    } finally {
+      // Only the newest request controls the loading indicator.
+      if (reqId === slotsReqId.current) setSlotsLoading(false);
+    }
+  }
+
+  async function submitMove() {
+    if (!moveSlot) return;
+    const ok = await callAction(
+      "reschedule",
+      { start: moveSlot, reason: "Moved by Victoria" },
+      "Booking moved to the new time.",
+      mapMoveError
+    );
+    if (!ok && moveDate) {
+      // The slot list is stale (likely just taken) — refresh it.
+      setMoveSlot("");
+      void loadSlots(moveDate);
     }
   }
 
@@ -183,6 +279,14 @@ function PendingCard({
     setMode(next);
     if (next === "suggest") setNote(suggestTemplate(booking));
     if (next === "decline") setNote("");
+    if (next === "move") {
+      slotsReqId.current++; // invalidate any in-flight slot fetch
+      setMoveDate("");
+      setMoveSlots([]);
+      setMoveSlot("");
+      setSlotsError(null);
+      setSlotsLoading(false);
+    }
   }
 
   const attendee = booking.attendees[0];
@@ -313,27 +417,58 @@ function PendingCard({
             client is notified by Cal.com, not asked.
           </p>
           <label className="block text-sm font-medium text-[#3A332C]">
-            New start time (Cairo time)
+            New date (Cairo time)
             <input
-              type="datetime-local"
-              value={moveStart}
-              onChange={(e) => setMoveStart(e.target.value)}
+              type="date"
+              value={moveDate}
+              min={cairoDateOf(new Date())}
+              disabled={busy}
+              onChange={(e) => {
+                const date = e.target.value;
+                setMoveDate(date);
+                if (date) void loadSlots(date);
+                else {
+                  slotsReqId.current++; // invalidate any in-flight slot fetch
+                  setMoveSlots([]);
+                  setMoveSlot("");
+                  setSlotsError(null);
+                  setSlotsLoading(false);
+                }
+              }}
               className="mt-2 w-full rounded-xl border border-[#3A332C]/20 bg-white px-3 py-2 text-sm text-[#3A332C] focus:border-[#8A5238] focus:outline-none"
             />
           </label>
+          {moveDate &&
+            (slotsLoading ? (
+              <p className="text-sm text-[#847866]">Loading available times…</p>
+            ) : slotsError ? (
+              <p className="text-sm text-[#B5483A]">{slotsError}</p>
+            ) : moveSlots.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-3 py-2 text-sm text-[#847866]">
+                No free times this day — try another date.
+              </p>
+            ) : (
+              <label className="block text-sm font-medium text-[#3A332C]">
+                New start time (Cairo time) — only free slots are listed
+                <select
+                  value={moveSlot}
+                  onChange={(e) => setMoveSlot(e.target.value)}
+                  className="mt-2 w-full rounded-xl border border-[#3A332C]/20 bg-white px-3 py-2 text-sm text-[#3A332C] focus:border-[#8A5238] focus:outline-none"
+                >
+                  <option value="">Select a time…</option>
+                  {moveSlots.map((iso) => (
+                    <option key={iso} value={iso}>
+                      {formatCairoTime(iso)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              disabled={busy || !cairoWallTimeToUtcIso(moveStart)}
-              onClick={() => {
-                const startIso = cairoWallTimeToUtcIso(moveStart);
-                if (!startIso) return;
-                callAction(
-                  "reschedule",
-                  { start: startIso, reason: "Moved by Victoria" },
-                  "Booking moved to the new time."
-                );
-              }}
+              disabled={busy || !moveSlot}
+              onClick={() => void submitMove()}
               className={`${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`}
             >
               {busy ? "Working…" : "Move booking now"}
