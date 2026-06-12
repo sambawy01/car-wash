@@ -75,21 +75,23 @@ h2 {
   backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
   color: var(--ink);
 }
-/* Floating-over-hero state: transparent, light text over the photo scrim */
-.has-js .nav:not(.visible):not(.nav-solid) {
+/* Floating-over-hero state: transparent, light text over the photo scrim.
+   :not(.menu-open) — while the mobile menu is open the bar snaps solid so the
+   dropdown panel always sits on an opaque card surface (see nav.js section). */
+.has-js .nav:not(.visible):not(.nav-solid):not(.menu-open) {
   background: transparent;
   border-bottom-color: transparent;
   backdrop-filter: none; -webkit-backdrop-filter: none;
   color: var(--photo-ink);
   text-shadow: 0 1px 10px rgba(26, 21, 17, 0.7);
 }
-.has-js .nav:not(.visible):not(.nav-solid) .nav-logo {
+.has-js .nav:not(.visible):not(.nav-solid):not(.menu-open) .nav-logo {
   filter: drop-shadow(0 1px 6px rgba(26, 21, 17, 0.65)) drop-shadow(0 2px 16px rgba(26, 21, 17, 0.4));
 }
-.has-js .nav:not(.visible):not(.nav-solid) .nav-cta {
+.has-js .nav:not(.visible):not(.nav-solid):not(.menu-open) .nav-cta {
   border-color: rgba(233, 205, 175, 0.8); color: var(--photo-ink);
 }
-.has-js .nav:not(.visible):not(.nav-solid) .nav-cta:hover {
+.has-js .nav:not(.visible):not(.nav-solid):not(.menu-open) .nav-cta:hover {
   background: rgba(244, 239, 231, 0.14);
 }
 .nav-brand { font-family: var(--serif); font-style: italic; font-size: 22px; }
@@ -1228,4 +1230,119 @@ html.order-open .chat-card { display: none; }
 }
 @media (max-width: 390px) {
   .nav-links a:nth-child(4) { display: none; } /* Shop */
+}
+
+/* ===== Mobile menu (nav.js) ==================================================
+   Everything below is gated behind html.has-navjs, which nav.js adds on load.
+   Without JS none of it applies and the progressive-hiding rules above keep
+   the original phone behavior. nav.js restructures the bar into:
+     .nav > .nav-brand + .nav-right > (.nav-links · .nav-cta · .nav-toggle)
+   On desktop the .nav-right wrapper reproduces the original inline layout;
+   ≤700px the links become a card dropdown behind the hamburger toggle. */
+
+/* -- Desktop: invisible restructuring. .nav-right carries the same typography
+      the CTA used to inherit from .nav-links. */
+html.has-navjs .nav-right {
+  display: flex; align-items: center; gap: 28px;
+  font-size: 12px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+}
+html.has-navjs .nav-right a { white-space: nowrap; }
+.nav-toggle { display: none; } /* hamburger exists only ≤700px */
+
+@media (max-width: 480px) {
+  html.has-navjs .nav-right { gap: 12px; font-size: 11px; }
+}
+
+@media (max-width: 700px) {
+  /* -- Bar: logo + CTA + hamburger. Re-show every link inside the panel,
+        overriding the no-JS progressive-hiding rules above (display:none). */
+  html.has-navjs .nav-right { gap: 10px; }
+
+  /* -- Hamburger toggle: two gold-clay lines, right-aligned and unequal —
+        they even up and morph into an ✕ when the menu opens. 44px target. */
+  html.has-navjs .nav-toggle {
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-end;
+    gap: 7px; width: 44px; height: 44px; padding: 0 9px;
+    margin: -4px -9px -4px -2px; /* visual right edge aligns with the bar padding */
+    background: none; border: 0; border-radius: 8px; cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  html.has-navjs .nav-toggle:focus-visible {
+    outline: 2px solid currentColor; outline-offset: 2px;
+  }
+  html.has-navjs .nav-toggle-line {
+    display: block; height: 2px; border-radius: 2px;
+    background: linear-gradient(90deg, var(--clay), var(--clay-deep));
+    transition: transform 0.35s var(--ease), width 0.35s var(--ease),
+                background-color 0.3s, box-shadow 0.3s;
+  }
+  html.has-navjs .nav-toggle-line:nth-child(1) { width: 26px; }
+  html.has-navjs .nav-toggle-line:nth-child(2) { width: 17px; }
+  /* Over-hero transparent bar: lines go photo-ink with a legibility shadow,
+     matching the logo and CTA treatment. */
+  .has-js .nav:not(.visible):not(.nav-solid):not(.menu-open) .nav-toggle-line {
+    background: var(--photo-ink);
+    box-shadow: 0 1px 6px rgba(26, 21, 17, 0.65), 0 2px 14px rgba(26, 21, 17, 0.4);
+  }
+  /* Open: both lines 22px, pivoting around the icon centre into an ✕ */
+  html.has-navjs .nav.menu-open .nav-toggle-line:nth-child(1) {
+    width: 22px; transform: translateY(4.5px) rotate(45deg);
+  }
+  html.has-navjs .nav.menu-open .nav-toggle-line:nth-child(2) {
+    width: 22px; transform: translateY(-4.5px) rotate(-45deg);
+  }
+
+  /* -- Panel: full-width card dropdown under the bar, gold hairline on top */
+  html.has-navjs .nav-links {
+    position: absolute; top: 100%; left: 0; right: 0;
+    display: block; padding: 10px 0 18px;
+    background: var(--card); color: var(--ink); text-shadow: none;
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 28px 48px -22px rgba(33, 27, 22, 0.35);
+    visibility: hidden; opacity: 0; transform: translateY(-8px);
+    transition: opacity 0.3s var(--ease), transform 0.3s var(--ease), visibility 0s 0.3s;
+  }
+  html.has-navjs .nav-links::before { /* gold hairline — same gilt family as the frames */
+    content: ""; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, rgba(201, 164, 92, 0) 0%, #C9A45C 22%, #B8924C 78%, rgba(184, 146, 76, 0) 100%);
+  }
+  html.has-navjs .nav.menu-open .nav-links {
+    visibility: visible; opacity: 1; transform: none;
+    transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), visibility 0s;
+  }
+
+  /* -- Links: generous serif list; overrides the no-JS display:none hiding */
+  html.has-navjs .nav-links a {
+    display: block; padding: 13px 28px;
+    font-family: var(--serif); font-weight: 500; font-size: 22px; line-height: 1.25;
+    letter-spacing: 0.015em; text-transform: none; color: var(--ink);
+    opacity: 0; transform: translateY(10px);
+    transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
+  }
+  html.has-navjs .nav-links a + a { border-top: 1px solid rgba(58, 51, 44, 0.07); }
+  html.has-navjs .nav-links a:focus-visible {
+    outline: 2px solid var(--clay-deep); outline-offset: -2px;
+  }
+  /* Language switcher: quiet letterspaced Manrope, clay accent */
+  html.has-navjs .nav-links a[hreflang] {
+    font-family: var(--sans); font-weight: 600; font-size: 12px;
+    letter-spacing: 0.24em; text-transform: uppercase; color: var(--clay-deep);
+    padding-top: 17px; padding-bottom: 17px;
+  }
+  /* Staggered entrance */
+  html.has-navjs .nav.menu-open .nav-links a { opacity: 1; transform: none; }
+  html.has-navjs .nav.menu-open .nav-links a:nth-child(1) { transition-delay: 0.04s; }
+  html.has-navjs .nav.menu-open .nav-links a:nth-child(2) { transition-delay: 0.08s; }
+  html.has-navjs .nav.menu-open .nav-links a:nth-child(3) { transition-delay: 0.12s; }
+  html.has-navjs .nav.menu-open .nav-links a:nth-child(4) { transition-delay: 0.16s; }
+  html.has-navjs .nav.menu-open .nav-links a:nth-child(5) { transition-delay: 0.20s; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.has-navjs .nav-links,
+  html.has-navjs .nav.menu-open .nav-links,
+  html.has-navjs .nav-links a,
+  html.has-navjs .nav-toggle-line {
+    transition: none !important; transition-delay: 0s !important;
+  }
 }
