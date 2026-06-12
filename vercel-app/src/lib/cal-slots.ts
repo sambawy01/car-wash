@@ -18,7 +18,23 @@ export type CalSlotsByDate = Record<string, CalSlot[]>;
 
 export type CalSlotsResult =
   | { ok: true; data: CalSlotsByDate }
-  | { ok: false; status: number; error: string; details?: unknown };
+  | {
+      ok: false;
+      /**
+       * Error provenance — callers branch on this, never on `error` text:
+       * - "upstream": Cal.com answered the slots request with a non-2xx HTTP
+       *   status (`status` is Cal's status; the public route echoes it in the
+       *   body).
+       * - "config": CALCOM_API_URL / CALCOM_API_KEY missing — nothing was
+       *   fetched.
+       * - "internal": network/runtime failure or an unexpected Cal payload
+       *   (HTTP 2xx but non-success envelope).
+       */
+      kind: "upstream" | "config" | "internal";
+      status: number;
+      error: string;
+      details?: unknown;
+    };
 
 export async function fetchCalSlots(params: {
   eventTypeId: string;
@@ -32,7 +48,12 @@ export async function fetchCalSlots(params: {
   const { eventTypeId, dateFrom, dateTo, duration } = params;
 
   if (!process.env.CALCOM_API_KEY || !process.env.CALCOM_API_URL) {
-    return { ok: false, status: 500, error: "Cal.com API key not configured" };
+    return {
+      ok: false,
+      kind: "config",
+      status: 500,
+      error: "Cal.com API not configured (CALCOM_API_URL / CALCOM_API_KEY)",
+    };
   }
 
   try {
@@ -68,6 +89,7 @@ export async function fetchCalSlots(params: {
       });
       return {
         ok: false,
+        kind: "upstream",
         status: response.status,
         error: "Failed to fetch available slots from Cal.com",
         details: errorData,
@@ -81,8 +103,11 @@ export async function fetchCalSlots(params: {
       return { ok: true, data: responseData.data as CalSlotsByDate };
     }
     console.error("Cal.com v2 API returned non-success status:", responseData);
+    // HTTP 2xx but a non-success envelope: tagged "internal" (not "upstream")
+    // because there is no upstream HTTP status worth echoing to callers.
     return {
       ok: false,
+      kind: "internal",
       status: 500,
       error: "Cal.com API returned error status",
       details: responseData,
@@ -91,6 +116,7 @@ export async function fetchCalSlots(params: {
     console.error("Error fetching Cal.com slots:", error);
     return {
       ok: false,
+      kind: "internal",
       status: 500,
       error: "Internal server error",
       details: error instanceof Error ? error.message : "Unknown error",

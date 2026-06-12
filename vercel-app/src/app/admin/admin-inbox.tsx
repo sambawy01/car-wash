@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { CalBooking } from "@/lib/admin/cal";
 import { COMBINED_SESSION, SERVICES } from "@/lib/services";
@@ -70,11 +70,16 @@ function serviceForBooking(booking: CalBooking) {
 
 /**
  * Multi-duration event types need an explicit `duration` on the slots query
- * (same rule the public /book page applies via session-builder).
+ * (same rule the public /book page applies via session-builder). Unknown
+ * event types (not in SERVICES, not the combined session) also send the
+ * booking's duration — required if they happen to be multi-duration,
+ * harmless for single-duration ones.
  */
-function isMultiDurationEvent(booking: CalBooking): boolean {
+function needsExplicitDuration(booking: CalBooking): boolean {
   if (booking.eventTypeId === COMBINED_SESSION.eventTypeId) return true;
-  return (serviceForBooking(booking)?.durations.length ?? 0) > 1;
+  const service = serviceForBooking(booking);
+  if (!service) return true;
+  return service.durations.length > 1;
 }
 
 function bookingLink(booking: CalBooking): string {
@@ -160,6 +165,14 @@ function PendingCard({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
+  /**
+   * Monotonic id for slot fetches. Two quick date changes race: without this
+   * guard the slower (older) response lands last and silently fills the
+   * dropdown with the WRONG day's slots (options show time only). Each
+   * loadSlots call takes a fresh id and bails before every setState if a
+   * newer call has started since.
+   */
+  const slotsReqId = useRef(0);
 
   async function callAction(
     action: "confirm" | "decline" | "reschedule",
@@ -201,6 +214,7 @@ function PendingCard({
 
   /** Free Cal slots for this booking's event type on a Cairo calendar day. */
   async function loadSlots(date: string) {
+    const reqId = ++slotsReqId.current;
     setSlotsLoading(true);
     setSlotsError(null);
     setMoveSlots([]);
@@ -214,17 +228,19 @@ function PendingCard({
         dateFrom: shiftDate(date, -1),
         dateTo: shiftDate(date, 1),
       });
-      if (isMultiDurationEvent(booking)) {
+      if (needsExplicitDuration(booking)) {
         params.set("duration", String(booking.duration));
       }
       const res = await fetch(`/api/admin/slots?${params}`, {
         headers: { "x-admin-key": adminKey },
       });
+      if (reqId !== slotsReqId.current) return; // superseded by a newer call
       if (!res.ok) {
         setSlotsError("Couldn't load available times — please try again.");
         return;
       }
       const data = (await res.json()) as Record<string, { start: string }[]>;
+      if (reqId !== slotsReqId.current) return; // superseded by a newer call
       const starts =
         data && typeof data === "object"
           ? Object.values(data)
@@ -235,9 +251,11 @@ function PendingCard({
           : [];
       setMoveSlots(starts);
     } catch {
+      if (reqId !== slotsReqId.current) return; // superseded by a newer call
       setSlotsError("Couldn't load available times — please try again.");
     } finally {
-      setSlotsLoading(false);
+      // Only the newest request controls the loading indicator.
+      if (reqId === slotsReqId.current) setSlotsLoading(false);
     }
   }
 
@@ -262,10 +280,12 @@ function PendingCard({
     if (next === "suggest") setNote(suggestTemplate(booking));
     if (next === "decline") setNote("");
     if (next === "move") {
+      slotsReqId.current++; // invalidate any in-flight slot fetch
       setMoveDate("");
       setMoveSlots([]);
       setMoveSlot("");
       setSlotsError(null);
+      setSlotsLoading(false);
     }
   }
 
@@ -402,14 +422,17 @@ function PendingCard({
               type="date"
               value={moveDate}
               min={cairoDateOf(new Date())}
+              disabled={busy}
               onChange={(e) => {
                 const date = e.target.value;
                 setMoveDate(date);
                 if (date) void loadSlots(date);
                 else {
+                  slotsReqId.current++; // invalidate any in-flight slot fetch
                   setMoveSlots([]);
                   setMoveSlot("");
                   setSlotsError(null);
+                  setSlotsLoading(false);
                 }
               }}
               className="mt-2 w-full rounded-xl border border-[#3A332C]/20 bg-white px-3 py-2 text-sm text-[#3A332C] focus:border-[#8A5238] focus:outline-none"
