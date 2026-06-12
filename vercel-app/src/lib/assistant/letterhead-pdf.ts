@@ -40,6 +40,32 @@ const BAND = "#100D0B";
 const PAGE_MARGIN = 64;
 const BAND_HEIGHT = 110;
 
+/**
+ * Disable OpenType ligatures on EVERY `.text()` call.
+ *
+ * WHY (empirically proven): pdfkit/fontkit ALWAYS plans the `liga`/`clig`
+ * features for embedded TTFs, so words like "profit" and "confirmed" come out
+ * with an "fi" glyph substituted for the "f"+"i" pair — which the PT fonts
+ * render as a single ligature glyph that screen-readers / copy-paste mangle
+ * and that visually drops the dotted i. Passing `features: []` does NOT help:
+ * the array form is an ADD list, not a disable list. The OBJECT form below
+ * explicitly turns the ligature features OFF.
+ *
+ * We disable ONLY the ligature families (liga/clig/dlig/hlig). kern/ccmp/
+ * mark/mkmk are deliberately left on — Cyrillic shaping and mark positioning
+ * need them, and they never produce the fi-ligature artifact.
+ */
+// fontkit accepts an OBJECT map of feature→boolean at runtime (PDFKit forwards
+// `features` straight to `font.layout(text, features)`), but @types/pdfkit only
+// types the ADD-array form — hence the cast. The object form is the ONLY one
+// that disables a default-on feature; the array form can only add features.
+const NO_LIGATURES = {
+  liga: false,
+  clig: false,
+  dlig: false,
+  hlig: false,
+} as unknown as PDFKit.Mixins.TextOptions["features"];
+
 export interface LetterheadDocumentInput {
   title: string;
   /** Markdownish body (see module docs). */
@@ -193,6 +219,7 @@ export async function renderLetterheadPdf(
           width: contentWidth,
           align: "center",
           characterSpacing: 2,
+          features: NO_LIGATURES,
         });
     }
     // Footer hairline + contacts.
@@ -211,6 +238,7 @@ export async function renderLetterheadPdf(
         width: contentWidth,
         align: "center",
         characterSpacing: 0.5,
+        features: NO_LIGATURES,
       });
     doc.restore();
 
@@ -230,6 +258,7 @@ export async function renderLetterheadPdf(
     .text(sanitize(BRAND_NAME), PAGE_MARGIN, BAND_HEIGHT + 40, {
       width: contentWidth,
       characterSpacing: 2.2,
+      features: NO_LIGATURES,
     });
   doc.moveDown(0.6);
   doc
@@ -240,12 +269,16 @@ export async function renderLetterheadPdf(
       width: contentWidth,
       characterSpacing: 1.6,
       lineGap: 4,
+      features: NO_LIGATURES,
     });
   doc.moveDown(0.5);
   doc.font("Sans").fontSize(10).fillColor(MUTED);
-  doc.text(sanitize(dateLine), { width: contentWidth });
+  doc.text(sanitize(dateLine), { width: contentWidth, features: NO_LIGATURES });
   if (input.recipient) {
-    doc.text(sanitize(`To: ${input.recipient}`), { width: contentWidth });
+    doc.text(sanitize(`To: ${input.recipient}`), {
+      width: contentWidth,
+      features: NO_LIGATURES,
+    });
   }
   doc.moveDown(0.4);
   const ruleY = doc.y;
@@ -275,6 +308,7 @@ export async function renderLetterheadPdf(
             width: contentWidth,
             characterSpacing: 1.4,
             lineGap: 3,
+            features: NO_LIGATURES,
           });
         doc.moveDown(0.2);
       } else if (bullet) {
@@ -286,13 +320,18 @@ export async function renderLetterheadPdf(
             width: contentWidth - 14,
             indent: 14,
             lineGap: 4,
+            features: NO_LIGATURES,
           });
       } else {
         doc
           .font("Serif")
           .fontSize(11.5)
           .fillColor(INK)
-          .text(trimmed, { width: contentWidth, lineGap: 5 });
+          .text(trimmed, {
+            width: contentWidth,
+            lineGap: 5,
+            features: NO_LIGATURES,
+          });
       }
     }
     doc.moveDown(0.8);
@@ -304,13 +343,17 @@ export async function renderLetterheadPdf(
     .font("Serif")
     .fontSize(11.5)
     .fillColor(INK)
-    .text("Warmly,", { width: contentWidth });
+    .text("Warmly,", { width: contentWidth, features: NO_LIGATURES });
   doc.moveDown(0.2);
   doc
     .font("Sans")
     .fontSize(10)
     .fillColor(MUTED)
-    .text("VICTORIA VASILYEVA", { width: contentWidth, characterSpacing: 1.8 });
+    .text("VICTORIA VASILYEVA", {
+      width: contentWidth,
+      characterSpacing: 1.8,
+      features: NO_LIGATURES,
+    });
 
   doc.end();
   const pdf = await done;
