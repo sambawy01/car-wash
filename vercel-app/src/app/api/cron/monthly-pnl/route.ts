@@ -5,6 +5,7 @@ import {
   cronAuthError,
   isForced,
   pushOwnerTelegram,
+  releaseDailySend,
   sendReportEmail,
 } from "@/lib/reports/shared";
 import {
@@ -161,8 +162,19 @@ export async function GET(request: NextRequest) {
   }
 
   // Delivered on NO channel → loud 500 (the workflow's jq filter surfaces
-  // `error` and the run goes red). The day marker stands either way.
+  // `error` and the run goes red). On TOTAL failure we RELEASE the day marker
+  // we claimed so a workflow_dispatch / the other DST firing can re-drive the
+  // same day — a burned marker over a total failure would otherwise suppress
+  // the month's P&L entirely. (Partial success below keeps the marker.) Forced
+  // runs never claimed a marker, so there is nothing to release.
   if (email.sentCount === 0 && !telegram.sent && !documentSent) {
+    let markerReleased = false;
+    if (!force) {
+      markerReleased = await releaseDailySend(
+        "monthly-pnl",
+        cairoDateKey(new Date())
+      );
+    }
     return NextResponse.json(
       {
         ok: false,
@@ -172,8 +184,9 @@ export async function GET(request: NextRequest) {
         period: period.label,
         email,
         telegram,
+        markerReleased,
         error:
-          "monthly P&L delivered on NO channel (email and telegram both failed); day marker stands — no automatic retry",
+          "monthly P&L delivered on NO channel (email and telegram both failed); day marker released — retry via workflow_dispatch or the next DST firing",
       },
       { status: 500 }
     );

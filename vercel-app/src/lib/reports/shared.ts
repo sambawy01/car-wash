@@ -1,5 +1,5 @@
 import { createHash, timingSafeEqual } from "node:crypto";
-import { put } from "@vercel/blob";
+import { del, put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { getOwnerChatId } from "../assistant/state";
 import { sendMessage, telegramConfigured } from "../telegram";
@@ -133,6 +133,38 @@ export async function claimDailySend(
       error
     );
     return "error";
+  }
+}
+
+/**
+ * Release (delete) a previously-claimed day marker.
+ *
+ * Used by a job that claimed the marker but then delivered on NO channel —
+ * deleting the marker lets the SAME day be re-driven (a workflow_dispatch
+ * retry, or the other DST firing in the same window) instead of the burned
+ * marker permanently suppressing the day. Only the TOTAL-failure path should
+ * call this; a partial success keeps the marker so the job is not re-sent.
+ *
+ * Best-effort: a delete failure is logged, not thrown (the caller is already
+ * on its error path). Returns true when the marker was deleted.
+ */
+export async function releaseDailySend(
+  job: string,
+  cairoDateKey: string
+): Promise<boolean> {
+  if (!/^[a-z0-9-]+$/.test(job) || !/^\d{4}-\d{2}-\d{2}$/.test(cairoDateKey)) {
+    console.error(`[reports] Invalid day-marker key (release): ${job}/${cairoDateKey}`);
+    return false;
+  }
+  try {
+    await del(`reports/sent/${job}/${cairoDateKey}.json`);
+    return true;
+  } catch (error) {
+    console.error(
+      `[reports] Day-marker release failed for ${job}/${cairoDateKey}:`,
+      error
+    );
+    return false;
   }
 }
 
