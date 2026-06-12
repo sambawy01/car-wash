@@ -1,13 +1,25 @@
-import { get, put } from "@vercel/blob";
+import { del, get, list, put } from "@vercel/blob";
 
 /**
  * Manual finance ledger on Vercel Blob (private store `vv-orders`),
- * mirroring the shop catalog in @/lib/catalog.
+ * mirroring the SHOP ORDERS model in @/lib/orders.
  *
- * Layout: ONE JSON document at `finance/ledger.json` holding the full array
- * of ledger entries. The studio's volume is tiny (a handful of entries a
- * week), so a single read-modify-write document is simpler and safer than
- * per-entry blobs — exactly like the catalog and treatments stores.
+ * Layout: ONE BLOB PER ENTRY at `finance/entries/<id>.json`. This is the
+ * orders model, chosen deliberately over a single read-modify-write document:
+ * because money is the wrong risk class for last-write-wins, two near-
+ * simultaneous adds must NEVER drop an entry. With one document, concurrent
+ * adds each read the array, append, and overwrite — the slower writer clobbers
+ * the faster writer's entry. With one blob per entry, each add writes its OWN
+ * blob (distinct id) so no add can ever lose another.
+ *
+ * MIGRATION / dual-layout tolerance: a LEGACY single-document layout existed
+ * at `finance/ledger.json` (an array of entries). This is NOT deployed to prod
+ * yet, so a clean cutover is acceptable — but `listLedger` stays tolerant of
+ * BOTH layouts so any stray legacy document is never silently lost: it merges
+ * the per-entry blobs under `finance/entries/` with a legacy `ledger.json`
+ * array if one exists (the per-entry layout wins on id conflict). add/update/
+ * remove operate on the single entry blob; update/remove fall back to the
+ * legacy array only when the id is found there (so legacy rows stay editable).
  *
  * SCOPE — the ledger holds MANUAL entries ONLY: expenses, off-platform/cash
  * income, and adjustments. Platform income (shop orders, treatment bookings)
@@ -15,12 +27,16 @@ import { get, put } from "@vercel/blob";
  * and booking data (see @/lib/finance-report). That deliberately avoids the
  * reconciliation bugs a double-entry mirror would create.
  *
- * Lifecycle (mirrors catalog.ts read-error semantics EXACTLY):
- * - A missing blob (fresh store) yields []. The blob is written lazily on the
- *   first `addLedgerEntry`, so a fresh deployment works with zero setup.
- * - Any OTHER read failure THROWS so a transient error is never mistaken for
- *   "empty ledger" by a writer — a subsequent save must never clobber real
- *   entries with an empty array.
+ * Read-error semantics (preserved EXACTLY across the layout change):
+ * - A fresh store (no entry blobs, no legacy doc) yields []. Blobs are written
+ *   lazily on the first `addLedgerEntry`, so a fresh deployment needs no setup.
+ * - Any TRANSIENT read failure (the list call, an entry read, or the legacy
+ *   read) THROWS so a transient error is never mistaken for "empty ledger" by
+ *   a writer — a subsequent save must never clobber real entries.
+ * - A listed entry blob that reads as ABSENT (null — e.g. raced delete between
+ *   list and read) is skipped, not fatal.
+ * - A malformed/corrupt entry (bad JSON or failed shape check) THROWS — same
+ *   loud-corruption policy as the orders/treatments stores.
  *
  * TESTABILITY: all Blob I/O goes through an injectable `LedgerStore`
  * (defaults to @vercel/blob). `__setLedgerStore` swaps in an in-memory mock
@@ -30,7 +46,16 @@ import { get, put } from "@vercel/blob";
 
 // --- Domain model -------------------------------------------------------------
 
-export const LEDGER_PATHNAME = "finance/ledger.json";
+/** Per-entry blob prefix (the orders model). */
+export const ENTRIES_PREFIX = "finance/entries/";
+
+/** Legacy single-document path (pre-cutover) — still merged by listLedger. */
+export const LEGACY_LEDGER_PATHNAME = "finance/ledger.json";
+
+/** Blob path for one entry. */
+function entryPathname(id: string): string {
+  return `${ENTRIES_PREFIX}${id}.json`;
+}
 
 export const EXPENSE_CATEGORIES = [
   "rent",
@@ -82,12 +107,17 @@ export function categoriesFor(direction: LedgerDirection): readonly string[] {
 // --- Injectable storage -------------------------------------------------------
 
 /**
- * The narrow Blob surface the ledger needs. `read` returns the document text,
- * or null ONLY for a true 404 (fresh store); ANY other failure throws.
+ * The narrow Blob surface the ledger needs.
+ * - `read` returns the blob text, or null ONLY for a true 404 (absent blob);
+ *   ANY other failure throws (so a transient error is never read as "empty").
+ * - `list` returns the pathnames under a prefix; a transient failure throws.
+ * - `write` / `remove` mutate a single blob.
  */
 export interface LedgerStore {
   read(pathname: string): Promise<string | null>;
   write(pathname: string, body: string): Promise<void>;
+  list(prefix: string): Promise<string[]>;
+  remove(pathname: string): Promise<void>;
 }
 
 const blobStore: LedgerStore = {
@@ -105,6 +135,14 @@ const blobStore: LedgerStore = {
       addRandomSuffix: false,
       allowOverwrite: true,
     });
+  },
+  async list(prefix) {
+    // Transient/auth failures propagate (throw) — never read as "empty".
+    const { blobs } = await list({ prefix });
+    return blobs.map((b) => b.pathname);
+  },
+  async remove(pathname) {
+    await del(pathname);
   },
 };
 
@@ -155,33 +193,78 @@ function isValidEntry(value: unknown): value is LedgerEntry {
 
 // --- Persistence --------------------------------------------------------------
 
+/** Sort key: by calendar date, then by createdAt (stable, deterministic). */
+function byDateThenCreated(a: LedgerEntry, b: LedgerEntry): number {
+  return a.date.localeCompare(b.date) || a.createdAt.localeCompare(b.createdAt);
+}
+
 /**
- * Read the full ledger. A missing blob (fresh store) yields []; any other
- * failure throws (a transient read must never read as "empty" to a writer).
- * Per-entry shape validation throws on ANY malformed entry — same policy as
- * the treatments store: corruption surfaces loudly rather than flowing
- * through as a partial/garbled ledger.
+ * Read ONE legacy `finance/ledger.json` array if present. Returns [] when the
+ * legacy document is absent (the normal post-cutover state). Throws on a
+ * transient read failure or on corruption (loud, like the orders store).
  */
-export async function listLedger(): Promise<LedgerEntry[]> {
-  const text = await store.read(LEDGER_PATHNAME);
+async function readLegacyLedger(): Promise<LedgerEntry[]> {
+  const text = await store.read(LEGACY_LEDGER_PATHNAME);
   if (text === null) return [];
   const data = JSON.parse(text) as unknown;
   if (!Array.isArray(data)) {
-    throw new Error("Ledger blob is corrupt (not an array)");
+    throw new Error("Legacy ledger blob is corrupt (not an array)");
   }
   for (const entry of data) {
     if (!isValidEntry(entry)) {
       throw new Error(
-        `Ledger blob is corrupt (malformed entry: ${JSON.stringify(entry).slice(0, 200)})`
+        `Legacy ledger blob is corrupt (malformed entry: ${JSON.stringify(entry).slice(0, 200)})`
       );
     }
   }
   return data as LedgerEntry[];
 }
 
-/** Overwrite the ledger document (also the lazy first write). */
-async function saveLedger(entries: LedgerEntry[]): Promise<void> {
-  await store.write(LEDGER_PATHNAME, JSON.stringify(entries, null, 2));
+/** Read+validate ONE entry blob; null when the listed blob raced a delete. */
+async function readEntryBlob(id: string): Promise<LedgerEntry | null> {
+  const text = await store.read(entryPathname(id));
+  if (text === null) return null;
+  const data = JSON.parse(text) as unknown;
+  if (!isValidEntry(data)) {
+    throw new Error(
+      `Ledger entry blob is corrupt (${entryPathname(id)}: ${JSON.stringify(data).slice(0, 200)})`
+    );
+  }
+  return data;
+}
+
+/**
+ * Read the full ledger. Merges the per-entry blobs under `finance/entries/`
+ * with a legacy `finance/ledger.json` array (the per-entry layout wins on id
+ * conflict), returning the union sorted by date then createdAt.
+ *
+ * A fresh store (no entry blobs, no legacy doc) yields []. Any TRANSIENT
+ * failure (the list call, an entry read, or the legacy read) throws so a
+ * transient error is never mistaken for "empty" by a writer. A listed entry
+ * that reads as ABSENT (raced delete) is skipped, not fatal. A malformed entry
+ * THROWS — corruption surfaces loudly rather than flowing through garbled.
+ */
+export async function listLedger(): Promise<LedgerEntry[]> {
+  // 1. Per-entry blobs (the orders model). The list call throws on transient
+  //    failure; one corrupt blob still throws (loud-corruption policy).
+  const pathnames = await store.list(ENTRIES_PREFIX);
+  const ids = pathnames.map((p) =>
+    p.slice(ENTRIES_PREFIX.length).replace(/\.json$/, "")
+  );
+  const read = await Promise.all(ids.map((id) => readEntryBlob(id)));
+
+  const byId = new Map<string, LedgerEntry>();
+  for (const entry of read) {
+    if (entry) byId.set(entry.id, entry);
+  }
+
+  // 2. Merge any legacy single-document entries the cutover left behind. The
+  //    per-entry layout is authoritative, so legacy rows fill gaps only.
+  for (const entry of await readLegacyLedger()) {
+    if (!byId.has(entry.id)) byId.set(entry.id, entry);
+  }
+
+  return [...byId.values()].sort(byDateThenCreated);
 }
 
 export interface NewLedgerEntry {
@@ -195,14 +278,14 @@ export interface NewLedgerEntry {
 }
 
 /**
- * Append a manual entry (read-modify-write). Returns the stored entry with
- * its generated id/createdAt. Races at this volume are acceptable, exactly as
- * the catalog/treatments stores document.
+ * Append a manual entry by writing its OWN blob (`finance/entries/<id>.json`).
+ * Returns the stored entry with its generated id/createdAt. Because each add
+ * writes a distinct blob, two near-simultaneous adds can NEVER drop an entry
+ * (the lost-update bug the old single-document read-modify-write had).
  */
 export async function addLedgerEntry(
   input: NewLedgerEntry
 ): Promise<LedgerEntry> {
-  const ledger = await listLedger();
   const now = new Date().toISOString();
   const entry: LedgerEntry = {
     id: crypto.randomUUID(),
@@ -216,8 +299,7 @@ export async function addLedgerEntry(
     createdAt: now,
     source: "manual",
   };
-  ledger.push(entry);
-  await saveLedger(ledger);
+  await store.write(entryPathname(entry.id), JSON.stringify(entry, null, 2));
   return entry;
 }
 
@@ -229,33 +311,52 @@ export type LedgerPatch = Partial<
 >;
 
 /**
- * Patch an entry by id (read-modify-write). Returns the updated entry, or
- * null when the id is unknown.
+ * Patch an entry by id. Operates on the single entry blob; an update touches
+ * ONLY that entry's blob, so it can never disturb a concurrent add/update of
+ * a different entry. Falls back to rewriting the legacy array when (and only
+ * when) the id lives there. Returns the updated entry, or null for an unknown
+ * id. id/createdAt/source are immutable (the patch type cannot reach them).
  */
 export async function updateLedgerEntry(
   id: string,
   patch: LedgerPatch
 ): Promise<LedgerEntry | null> {
-  const ledger = await listLedger();
-  const index = ledger.findIndex((e) => e.id === id);
+  const existing = await readEntryBlob(id);
+  if (existing) {
+    const updated: LedgerEntry = { ...existing, ...patch };
+    await store.write(entryPathname(id), JSON.stringify(updated, null, 2));
+    return updated;
+  }
+
+  // Legacy fallback: the row may still live in finance/ledger.json.
+  const legacy = await readLegacyLedger();
+  const index = legacy.findIndex((e) => e.id === id);
   if (index === -1) return null;
-  const updated: LedgerEntry = { ...ledger[index], ...patch };
-  ledger[index] = updated;
-  await saveLedger(ledger);
+  const updated: LedgerEntry = { ...legacy[index], ...patch };
+  legacy[index] = updated;
+  await store.write(LEGACY_LEDGER_PATHNAME, JSON.stringify(legacy, null, 2));
   return updated;
 }
 
 /**
- * Hard-delete an entry by id (read-modify-write). Ledger entries are
- * user-owned records, so a hard delete is correct — there is no public-facing
- * artifact to soft-hide (the deletion is still gated behind a confirm in the
- * admin UI and the assistant). Returns true when something was removed.
+ * Hard-delete an entry by id. Ledger entries are user-owned records, so a hard
+ * delete is correct — there is no public-facing artifact to soft-hide (the
+ * deletion is still gated behind a confirm in the admin UI and the assistant).
+ * Deletes the single entry blob; falls back to rewriting the legacy array when
+ * the id lives there. Returns true when something was removed.
  */
 export async function removeLedgerEntry(id: string): Promise<boolean> {
-  const ledger = await listLedger();
-  const remaining = ledger.filter((e) => e.id !== id);
-  if (remaining.length === ledger.length) return false;
-  await saveLedger(remaining);
+  const existing = await readEntryBlob(id);
+  if (existing) {
+    await store.remove(entryPathname(id));
+    return true;
+  }
+
+  // Legacy fallback: the row may still live in finance/ledger.json.
+  const legacy = await readLegacyLedger();
+  const remaining = legacy.filter((e) => e.id !== id);
+  if (remaining.length === legacy.length) return false;
+  await store.write(LEGACY_LEDGER_PATHNAME, JSON.stringify(remaining, null, 2));
   return true;
 }
 
