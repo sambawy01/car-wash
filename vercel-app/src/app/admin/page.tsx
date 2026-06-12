@@ -4,9 +4,12 @@ import { isValidAdminKey, isValidBasicAuth } from "@/lib/admin/auth";
 import { listOwnerBookings, type CalBooking } from "@/lib/admin/cal";
 import { listOrders, type StoredOrder } from "@/lib/orders";
 import { getCatalog, type Product } from "@/lib/catalog";
+import { getTreatmentsCatalog, type Treatment } from "@/lib/treatments";
 import AdminInbox from "./admin-inbox";
+import AdminTabs from "./admin-tabs";
 import OrdersSection from "./orders-section";
 import ProductsSection from "./products-section";
+import TreatmentsSection from "./treatments-section";
 
 export const dynamic = "force-dynamic";
 
@@ -41,13 +44,16 @@ export default async function AdminPage({
   let ordersError: string | null = null;
   let products: Product[] = [];
   let productsError: string | null = null;
-  // Bookings (Cal.com), shop orders and the catalog (Vercel Blob) load
+  let treatments: Treatment[] = [];
+  let treatmentsError: string | null = null;
+  // Bookings (Cal.com), shop orders and the two catalogs (Vercel Blob) load
   // independently — one backend being down must not blank the others.
-  const [bookingsResult, ordersResult, catalogResult] =
+  const [bookingsResult, ordersResult, catalogResult, treatmentsResult] =
     await Promise.allSettled([
       listOwnerBookings(),
       listOrders({ limit: 100 }),
       getCatalog(),
+      getTreatmentsCatalog(),
     ]);
   if (bookingsResult.status === "fulfilled") {
     bookings = bookingsResult.value;
@@ -67,6 +73,12 @@ export default async function AdminPage({
     console.error("Admin catalog load error:", catalogResult.reason);
     productsError = "Couldn't load the product catalog. Pull down to refresh or try again shortly.";
   }
+  if (treatmentsResult.status === "fulfilled") {
+    treatments = treatmentsResult.value;
+  } else {
+    console.error("Admin treatments load error:", treatmentsResult.reason);
+    treatmentsError = "Couldn't load the treatments. Pull down to refresh or try again shortly.";
+  }
 
   const now = Date.now();
   const pending = bookings.filter((b) => b.status === "pending");
@@ -80,35 +92,49 @@ export default async function AdminPage({
         <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#847866]">
           Victoria Vasilyeva Holistic Beauty
         </p>
-        <h1 className="mt-2 font-serif text-4xl text-[#3A332C]">Booking inbox</h1>
+        <h1 className="mt-2 font-serif text-4xl text-[#3A332C]">Studio admin</h1>
         <p className="mt-2 text-sm text-[#847866]">
           Times shown in Cairo time (Africa/Cairo).
         </p>
       </header>
 
-      {loadError ? (
-        <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
-          {loadError}
-        </div>
-      ) : (
-        <AdminInbox pending={pending} confirmed={confirmed} adminKey={clientKey} />
-      )}
-
-      <div className="mt-10">
-        <OrdersSection
-          orders={orders}
-          adminKey={clientKey}
-          loadError={ordersError}
-        />
-      </div>
-
-      <div className="mt-10">
-        <ProductsSection
-          initialProducts={products}
-          adminKey={clientKey}
-          loadError={productsError}
-        />
-      </div>
+      <AdminTabs
+        pendingBookings={pending.length}
+        bookings={
+          loadError ? (
+            <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
+              {loadError}
+            </div>
+          ) : (
+            <AdminInbox
+              pending={pending}
+              confirmed={confirmed}
+              adminKey={clientKey}
+            />
+          )
+        }
+        orders={
+          <OrdersSection
+            orders={orders}
+            adminKey={clientKey}
+            loadError={ordersError}
+          />
+        }
+        products={
+          <ProductsSection
+            initialProducts={products}
+            adminKey={clientKey}
+            loadError={productsError}
+          />
+        }
+        treatments={
+          <TreatmentsSection
+            initialTreatments={treatments}
+            adminKey={clientKey}
+            loadError={treatmentsError}
+          />
+        }
+      />
     </main>
   );
 }
