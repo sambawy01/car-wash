@@ -20,8 +20,16 @@ const OWNER_PATH = "telegram/owner.json";
 const HISTORY_PATH = "telegram/history.json";
 const AUDIT_PATH = "telegram/audit.jsonl";
 
-/** 15-minute confirmation window for pending mutations. */
+/** Default 15-minute confirmation window for chat-initiated mutations. */
 export const PENDING_TTL_MS = 15 * 60 * 1000;
+
+/**
+ * Long TTL for actions parked behind PUSHED notification buttons (new
+ * booking request / new order / low stock). Those buttons sit in Victoria's
+ * chat unprompted — she may tap hours or days later, so the 15-minute chat
+ * default would render every pushed button dead on arrival.
+ */
+export const NOTIFY_PENDING_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Conversation memory: keep the last 12 turns (24 messages). */
 const HISTORY_MAX_MESSAGES = 24;
@@ -236,6 +244,19 @@ export interface PendingAction {
   args: Record<string, unknown>;
   summary: string;
   createdAt: string;
+  /**
+   * Per-action confirmation TTL in ms. Absent/invalid = PENDING_TTL_MS
+   * (the chat default). Pushed notifications use NOTIFY_PENDING_TTL_MS.
+   */
+  ttlMs?: number;
+}
+
+/** The effective TTL for one pending action (fail safe to the chat default). */
+function actionTtlMs(action: Pick<PendingAction, "ttlMs"> | null): number {
+  const ttl = action?.ttlMs;
+  return typeof ttl === "number" && Number.isFinite(ttl) && ttl > 0
+    ? ttl
+    : PENDING_TTL_MS;
 }
 
 const PENDING_ID_RE =
@@ -279,17 +300,44 @@ async function claimPending(id: string): Promise<boolean> {
 }
 
 /**
- * Drop claim markers (and orphaned pending blobs) older than twice the
- * confirmation TTL. Best effort — claims are tiny, this just keeps the
- * prefix bounded over time. Runs piggybacked on createPendingAction.
+ * Drop stale claim markers and orphaned pending blobs. Best effort — claims
+ * are tiny, this just keeps the prefixes bounded over time. Runs piggybacked
+ * on createPendingAction.
+ *
+ * Pending actions are judged against 2× their OWN TTL (pushed-notification
+ * buttons live for days, not minutes) — a fixed default cutoff here would
+ * silently delete a 7-day pushed button half an hour after it was sent.
  */
 async function sweepStalePendingState(): Promise<void> {
   try {
-    const cutoff = Date.now() - 2 * PENDING_TTL_MS;
-    for (const prefix of [CLAIMS_PREFIX, "telegram/pending/"]) {
-      const { blobs } = await list({ prefix });
+    const now = Date.now();
+    const defaultCutoff = now - 2 * PENDING_TTL_MS;
+
+    // Claim markers only matter while their pending blob still exists (the
+    // pending is deleted moments after a claim wins), so the short default
+    // cutoff is safe here regardless of any action's own TTL.
+    {
+      const { blobs } = await list({ prefix: CLAIMS_PREFIX });
       for (const blob of blobs) {
-        if (new Date(blob.uploadedAt).getTime() < cutoff) {
+        if (new Date(blob.uploadedAt).getTime() < defaultCutoff) {
+          await del(blob.pathname);
+        }
+      }
+    }
+
+    // Pending blobs younger than the default cutoff cannot be stale under
+    // ANY ttl ≥ the default — skip the content read for those. Older ones
+    // are read to learn their per-action TTL; unreadable/corrupt blobs fall
+    // back to the default TTL and the blob's uploadedAt.
+    {
+      const { blobs } = await list({ prefix: "telegram/pending/" });
+      for (const blob of blobs) {
+        const uploadedAt = new Date(blob.uploadedAt).getTime();
+        if (uploadedAt >= defaultCutoff) continue;
+        const action = await readJson<PendingAction>(blob.pathname);
+        const createdAt = action ? new Date(action.createdAt).getTime() : NaN;
+        const base = Number.isFinite(createdAt) ? createdAt : uploadedAt;
+        if (now - base > 2 * actionTtlMs(action)) {
           await del(blob.pathname);
         }
       }
@@ -342,7 +390,7 @@ export async function takePendingAction(
   }
 
   const age = Date.now() - new Date(action.createdAt).getTime();
-  if (!Number.isFinite(age) || age > PENDING_TTL_MS) {
+  if (!Number.isFinite(age) || age > actionTtlMs(action)) {
     return { ok: false, reason: "expired" };
   }
   return { ok: true, action };

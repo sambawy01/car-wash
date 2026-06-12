@@ -12,6 +12,11 @@ import {
   buildOwnerOrderEmail,
   type OrderEmailInput,
 } from "@/lib/order-emails";
+import {
+  notifyNewOrder,
+  notifyStockChanges,
+  type StockChange,
+} from "@/lib/assistant/notify";
 
 export const runtime = "nodejs";
 
@@ -481,10 +486,27 @@ export async function POST(request: NextRequest) {
   // Decrement tracked stock now that the order is accepted. Read-modify-write
   // with tolerable races at this volume; a failure here must never fail the
   // order — Victoria reconciles stock from the admin panel if it ever drifts.
+  // Pre/post quantities are derived from the catalog already read above
+  // (mirroring decrementQuantities' floor-at-0 arithmetic) so the low-stock
+  // push below needs no second catalog read.
+  const stockChanges: StockChange[] = result.order.lines.flatMap((l) =>
+    typeof l.product.quantity === "number"
+      ? [
+          {
+            slug: l.product.slug,
+            name: l.product.en.name,
+            before: l.product.quantity,
+            after: Math.max(0, l.product.quantity - l.qty),
+          },
+        ]
+      : []
+  );
+  let stockDecremented = false;
   try {
     await decrementQuantities(
       result.order.lines.map((l) => ({ slug: l.product.slug, qty: l.qty }))
     );
+    stockDecremented = true;
   } catch (error) {
     console.error(`[order] Stock decrement failed for ${orderNumber}:`, error);
   }
@@ -492,28 +514,28 @@ export async function POST(request: NextRequest) {
   // Persist to Vercel Blob FIRST so the admin inbox sees the order even if
   // both mailers fail. A Blob failure must never fail the order either —
   // Victoria still gets the notification email with all details.
+  const createdAt = new Date().toISOString();
+  const record: StoredOrder = {
+    orderNumber,
+    createdAt,
+    status: "ordered",
+    items: result.order.lines.map((l) => ({
+      slug: l.product.slug,
+      qty: l.qty,
+      names: { en: l.product.en.name, ru: l.product.ru.name },
+      lineTotals: { egp: l.lineEgp, rub: l.lineRub },
+    })),
+    totals: { egp: result.order.totalEgp, rub: result.order.totalRub },
+    name: result.order.name,
+    phone: result.order.phone,
+    email: result.order.email,
+    address: result.order.address,
+    note: result.order.note,
+    lang: result.order.lang,
+    statusHistory: [{ status: "ordered", at: createdAt }],
+  };
   let stored = false;
   try {
-    const createdAt = new Date().toISOString();
-    const record: StoredOrder = {
-      orderNumber,
-      createdAt,
-      status: "ordered",
-      items: result.order.lines.map((l) => ({
-        slug: l.product.slug,
-        qty: l.qty,
-        names: { en: l.product.en.name, ru: l.product.ru.name },
-        lineTotals: { egp: l.lineEgp, rub: l.lineRub },
-      })),
-      totals: { egp: result.order.totalEgp, rub: result.order.totalRub },
-      name: result.order.name,
-      phone: result.order.phone,
-      email: result.order.email,
-      address: result.order.address,
-      note: result.order.note,
-      lang: result.order.lang,
-      statusHistory: [{ status: "ordered", at: createdAt }],
-    };
     await saveOrder(record);
     stored = true;
   } catch (error) {
@@ -528,6 +550,17 @@ export async function POST(request: NextRequest) {
     result.order,
     orderNumber
   );
+
+  // Instant Telegram pushes to Victoria (best effort by contract — see
+  // @/lib/assistant/notify; a Telegram failure can never fail the order,
+  // and both silently no-op without a bot token / bound owner). The order
+  // push is sent even when Blob persistence failed — Victoria should still
+  // hear about the order; a tapped button on an unstored order just answers
+  // "Order not found". Stock alerts only fire when the decrement really ran.
+  await notifyNewOrder(record);
+  if (stockDecremented) {
+    await notifyStockChanges(stockChanges);
+  }
 
   return NextResponse.json(
     {

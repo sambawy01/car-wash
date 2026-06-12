@@ -7,6 +7,10 @@ import {
   type AttendeeEmailKind,
   type BookingDetails,
 } from "@/lib/booking-emails";
+import {
+  notifyBookingCancelled,
+  notifyBookingRequest,
+} from "@/lib/assistant/notify";
 
 /**
  * Cal.com webhook receiver.
@@ -323,6 +327,18 @@ export async function POST(request: NextRequest) {
     ownerSent = (await sendOwnerNotificationEmail(details)).sent;
   }
   const attendeeResult = await sendAttendeeEmail(attendeeKind, details);
+
+  // Instant Telegram push to Victoria (best effort by contract — see
+  // @/lib/assistant/notify): a new request gets one-tap Confirm/Decline
+  // buttons; a cancellation is informational. Never affects the response,
+  // silently skipped when no bot token / no bound owner. BOOKING_CANCELLED
+  // fires for any canceller (client or host) — pushing both is acceptable:
+  // a host-side cancel just echoes what Victoria already did.
+  if (isRequested) {
+    await notifyBookingRequest(details);
+  } else if (attendeeKind === "cancelled") {
+    await notifyBookingCancelled(details);
+  }
 
   return NextResponse.json({
     received: true,

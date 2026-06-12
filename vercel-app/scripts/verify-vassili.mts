@@ -29,6 +29,7 @@
  *   in cleanup.
  */
 
+import { createHmac } from "node:crypto";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -43,6 +44,10 @@ for (const line of readFileSync(join(__dirname, "..", ".env.local"), "utf8").spl
 process.env.RESEND_API_KEY = ""; // never send real emails from this harness
 process.env.TELEGRAM_BOT_TOKEN = "TEST:fake-token";
 process.env.TELEGRAM_WEBHOOK_SECRET = "test-webhook-secret";
+// Harness-controlled Cal webhook secret: synthetic BOOKING_* payloads are
+// HMAC-signed with this so the route takes the trusted-payload path (a
+// synthetic uid would fail the canonical Cal API lookup fallback).
+process.env.CAL_WEBHOOK_SECRET = "test-cal-secret";
 
 // .env.local pulls ADMIN_PASS as empty — use a harness-controlled value (the
 // route only ever compares against the env var, so this tests the mechanism).
@@ -152,8 +157,11 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
 // --- app imports (after env + fetch patch) ----------------------------------------
 const { POST: webhookPOST } = await import("../src/app/api/telegram/webhook/route");
+const { POST: calWebhookPOST } = await import("../src/app/api/cal/webhook/route");
+const { POST: orderPOST } = await import("../src/app/api/order/route");
 const {
   getOwnerChatId,
+  bindOwner,
   createPendingAction,
   takePendingAction,
   discardPendingAction,
@@ -162,7 +170,7 @@ const { getCatalog, saveCatalog } = await import("../src/lib/catalog");
 const { executeTool, describeMutation, validateMutationArgs } = await import(
   "../src/lib/assistant/tools"
 );
-const { listOrders } = await import("../src/lib/orders");
+const { listOrders, getOrder } = await import("../src/lib/orders");
 const { listOutOfOffice, deleteOutOfOffice, listOwnerBookings } = await import(
   "../src/lib/admin/cal"
 );
@@ -184,6 +192,47 @@ function tgRequest(update: unknown, secret = "test-webhook-secret"): Request {
     },
     body: JSON.stringify(update),
   });
+}
+
+/** Cal.com webhook request, HMAC-signed so the route trusts the payload. */
+function calRequest(body: unknown): Request {
+  const raw = JSON.stringify(body);
+  const signature = createHmac("sha256", process.env.CAL_WEBHOOK_SECRET!)
+    .update(raw)
+    .digest("hex");
+  return new Request("https://book.victoriaholisticbeauty.com/api/cal/webhook", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-cal-signature-256": signature,
+    },
+    body: raw,
+  });
+}
+
+/** Shop order POST (no Origin header — same-origin is allowed by CORS). */
+function orderRequest(body: unknown): Request {
+  return new Request("https://book.victoriaholisticbeauty.com/api/order", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+/** Pushed-button callback data must be a confirm-verb pending-action id. */
+const CONFIRM_BTN_RE =
+  /^confirm:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+type CapturedKeyboard = {
+  text?: string;
+  reply_markup?: {
+    inline_keyboard?: { text: string; callback_data: string }[][];
+  };
+};
+
+function keyboardRow(cap: Captured | undefined) {
+  return (cap?.body as CapturedKeyboard | undefined)?.reply_markup
+    ?.inline_keyboard?.[0] ?? [];
 }
 
 async function sendText(chatId: number, text: string) {
@@ -1357,6 +1406,382 @@ try {
         messagesTo(STRANGER2_CHAT, REFUSAL_RE).length === 1,
       JSON.stringify(secondJson)
     );
+  }
+  console.log("\n=== 17. Cal webhook → instant booking-request push (one-tap actions) ===");
+  {
+    // (a) Signed BOOKING_REQUESTED → owner push with [Confirm | Decline].
+    telegramCalls.length = 0;
+    calMutations.length = 0;
+    const requestPayload = (uid: string) => ({
+      triggerEvent: "BOOKING_REQUESTED",
+      payload: {
+        uid,
+        eventTitle: "Relaxing Massage",
+        title: "Relaxing Massage between Анна Тест and Victoria",
+        status: "PENDING",
+        startTime: "2027-04-10T12:00:00.000Z",
+        endTime: "2027-04-10T13:00:00.000Z",
+        attendees: [
+          {
+            name: "Анна Тест",
+            email: "anna@example.com",
+            timeZone: "Africa/Cairo",
+            phoneNumber: "+201001234567",
+          },
+        ],
+        metadata: { lang: "en" },
+      },
+    });
+    const res = await calWebhookPOST(calRequest(requestPayload("harness-push-uid-1")) as never);
+    check("BOOKING_REQUESTED webhook answers 200", res.status === 200);
+
+    const pushes = messagesTo(OWNER_CHAT, /New booking request/);
+    check("booking-request push captured", pushes.length === 1);
+    const pushText = String((pushes[0]?.body as { text?: string } | undefined)?.text ?? "");
+    console.log("--- booking push ---\n" + pushText);
+    check(
+      "push text carries name, treatment, Cairo datetime, phone",
+      pushText.includes("Анна Тест") &&
+        pushText.includes("Relaxing Massage") &&
+        /2027/.test(pushText) &&
+        pushText.includes("+201001234567"),
+      pushText.slice(0, 200)
+    );
+    const row = keyboardRow(pushes[0]);
+    check(
+      "two buttons (Confirm/Decline) with valid pending-action callback data",
+      row.length === 2 &&
+        /Confirm/.test(row[0]?.text ?? "") &&
+        /Decline/.test(row[1]?.text ?? "") &&
+        CONFIRM_BTN_RE.test(row[0]?.callback_data ?? "") &&
+        CONFIRM_BTN_RE.test(row[1]?.callback_data ?? ""),
+      JSON.stringify(row)
+    );
+    check("no Cal mutation before any tap", calMutations.length === 0);
+
+    // Pushed pendings carry the LONG ttl: the 15-min chat default would kill
+    // a notification button before Victoria even sees it.
+    const confirmId = (row[0]?.callback_data ?? "").replace(/^confirm:/, "");
+    const pendingRaw = confirmId
+      ? await readBlobText(`telegram/pending/${confirmId}.json`)
+      : null;
+    const pendingParsed = pendingRaw
+      ? (JSON.parse(pendingRaw) as {
+          tool?: string;
+          args?: { uid?: string };
+          ttlMs?: number;
+          summary?: string;
+        })
+      : null;
+    check(
+      "Confirm button parks booking_confirm(uid) with 7-day ttlMs + disclosure summary",
+      pendingParsed?.tool === "booking_confirm" &&
+        pendingParsed?.args?.uid === "harness-push-uid-1" &&
+        pendingParsed?.ttlMs === 7 * 24 * 60 * 60 * 1000 &&
+        /booking-confirmation email/i.test(pendingParsed?.summary ?? ""),
+      JSON.stringify(pendingParsed).slice(0, 240)
+    );
+
+    // (b) Tap Confirm → the EXISTING executor path runs booking_confirm.
+    telegramCalls.length = 0;
+    if (row[0]) await tapButton(OWNER_CHAT, row[0].callback_data);
+    check(
+      "Confirm tap → confirmBooking(harness-push-uid-1) via the existing executor",
+      calMutations.some((c) => c.url.includes("/bookings/harness-push-uid-1/confirm")),
+      calMutations.map((c) => c.url).join(", ")
+    );
+    const edited = telegramCalls.find((c) => c.url.includes("editMessageText"));
+    check(
+      "notification message edited with summary + result",
+      Boolean(edited && /done/.test(String((edited.body as { text?: string })?.text))),
+      String((edited?.body as { text?: string })?.text).slice(0, 160)
+    );
+
+    // (c) Decline button on a second request → declineBooking + canned reason.
+    telegramCalls.length = 0;
+    calMutations.length = 0;
+    await calWebhookPOST(calRequest(requestPayload("harness-push-uid-2")) as never);
+    const row2 = keyboardRow(messagesTo(OWNER_CHAT, /New booking request/)[0]);
+    telegramCalls.length = 0;
+    if (row2[1]) await tapButton(OWNER_CHAT, row2[1].callback_data);
+    const declineCall = calMutations.find((c) =>
+      c.url.includes("/bookings/harness-push-uid-2/decline")
+    );
+    check(
+      "Decline tap → declineBooking with the canned schedule-conflict reason",
+      Boolean(declineCall && /Schedule conflict/.test(JSON.stringify(declineCall.body))),
+      JSON.stringify(declineCall?.body ?? calMutations.map((c) => c.url)).slice(0, 200)
+    );
+
+    // (d) BOOKING_CANCELLED → informational push, NO buttons.
+    telegramCalls.length = 0;
+    await calWebhookPOST(
+      calRequest({
+        triggerEvent: "BOOKING_CANCELLED",
+        payload: {
+          ...requestPayload("harness-push-uid-3").payload,
+          status: "CANCELLED",
+          cancellationReason: "plans changed",
+        },
+      }) as never
+    );
+    const cancelledPush = messagesTo(OWNER_CHAT, /cancelled Relaxing Massage/)[0];
+    check(
+      "BOOKING_CANCELLED → informational push (name+date+reason), no buttons",
+      Boolean(cancelledPush) &&
+        /Анна Тест/.test(String((cancelledPush?.body as { text?: string })?.text)) &&
+        /plans changed/.test(String((cancelledPush?.body as { text?: string })?.text)) &&
+        (cancelledPush?.body as CapturedKeyboard)?.reply_markup === undefined,
+      JSON.stringify(cancelledPush?.body).slice(0, 220)
+    );
+
+    // (e) Per-action TTL honoured on the take path: a 1-hour-old pushed
+    // action (7-day ttl) is still claimable; a 1-hour-old default-ttl action
+    // is expired.
+    const hourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    const agedPending = (id: string, ttlMs?: number) =>
+      put(
+        `telegram/pending/${id}.json`,
+        JSON.stringify({
+          id,
+          chatId: OWNER_CHAT,
+          tool: "booking_confirm",
+          args: { uid: "aged-uid" },
+          summary: "aged harness pending",
+          createdAt: hourAgo,
+          ...(ttlMs ? { ttlMs } : {}),
+        }),
+        {
+          access: "private",
+          contentType: "application/json",
+          addRandomSuffix: false,
+          allowOverwrite: true,
+        }
+      );
+    const agedLongId = crypto.randomUUID();
+    await agedPending(agedLongId, 7 * 24 * 60 * 60 * 1000);
+    const tookLong = await takePendingAction(agedLongId);
+    check("1-hour-old pending with 7-day ttl → still claimable", tookLong.ok === true);
+    const agedDefaultId = crypto.randomUUID();
+    await agedPending(agedDefaultId);
+    const tookDefault = await takePendingAction(agedDefaultId);
+    check(
+      "1-hour-old pending with default ttl → expired",
+      !tookDefault.ok && tookDefault.reason === "expired",
+      JSON.stringify(tookDefault)
+    );
+  }
+
+  console.log("\n=== 18. Order route → order push + low-stock alert (REAL blob, byte-restored) ===");
+  {
+    const catalogBytes = await readBlobText("catalog/products.json");
+    check("catalog blob present for byte restore", catalogBytes !== null);
+    const testOrderNumbers: string[] = [];
+    try {
+      // Craft stock so a 1-unit order CROSSES the low-stock threshold: 4 → 3.
+      const crafted = await getCatalog();
+      const tohar = crafted.find((p) => p.slug === "tohar-hamidbar-concentrate");
+      if (tohar) {
+        tohar.quantity = 4;
+        tohar.soldOut = false;
+      }
+      await saveCatalog(crafted);
+
+      telegramCalls.length = 0;
+      const res = await orderPOST(
+        orderRequest({
+          items: [{ slug: "tohar-hamidbar-concentrate", qty: 1 }],
+          name: "Push Harness",
+          phone: "+201001112233",
+          address: "1 Test Street, Hurghada",
+          lang: "en",
+        }) as never
+      );
+      const json = (await res.json()) as { received?: boolean; orderNumber?: string };
+      const orderNumber = json.orderNumber ?? "";
+      if (orderNumber) testOrderNumbers.push(orderNumber);
+      check(
+        "order accepted (received + orderNumber)",
+        res.status === 200 && json.received === true && orderNumber !== "",
+        JSON.stringify(json).slice(0, 160)
+      );
+
+      const orderPush = messagesTo(OWNER_CHAT, /New order/)[0];
+      const orderText = String((orderPush?.body as { text?: string } | undefined)?.text ?? "");
+      console.log("--- order push ---\n" + orderText);
+      check(
+        "order push carries number, name, total, item list, phone",
+        orderText.includes(orderNumber) &&
+          orderText.includes("Push Harness") &&
+          /\d+ EGP/.test(orderText) &&
+          /1× /.test(orderText) &&
+          orderText.includes("+201001112233"),
+        orderText.slice(0, 220)
+      );
+      const orderRow = keyboardRow(orderPush);
+      check(
+        "order buttons: Mark confirmed / Cancel order with valid pending ids",
+        orderRow.length === 2 &&
+          /confirmed/i.test(orderRow[0]?.text ?? "") &&
+          /Cancel/.test(orderRow[1]?.text ?? "") &&
+          CONFIRM_BTN_RE.test(orderRow[0]?.callback_data ?? "") &&
+          CONFIRM_BTN_RE.test(orderRow[1]?.callback_data ?? ""),
+        JSON.stringify(orderRow)
+      );
+
+      const lowPush = messagesTo(OWNER_CHAT, /down to 3 left/)[0];
+      const lowRow = keyboardRow(lowPush);
+      console.log("--- low-stock push ---\n" + String((lowPush?.body as { text?: string })?.text));
+      check(
+        "low-stock alert (4 → 3) with one-tap Mark-sold-out button",
+        Boolean(lowPush) &&
+          lowRow.length === 1 &&
+          /sold out/i.test(lowRow[0]?.text ?? "") &&
+          CONFIRM_BTN_RE.test(lowRow[0]?.callback_data ?? ""),
+        JSON.stringify(lowRow)
+      );
+
+      // Tap [Mark confirmed] → REAL order advances ordered → confirmed via
+      // the existing executor (status email no-ops: RESEND blank, no buyer email).
+      telegramCalls.length = 0;
+      if (orderRow[0]) await tapButton(OWNER_CHAT, orderRow[0].callback_data);
+      const confirmedOrder = orderNumber ? await getOrder(orderNumber) : null;
+      check(
+        "Mark-confirmed tap → REAL order status = confirmed",
+        confirmedOrder?.status === "confirmed",
+        `status=${confirmedOrder?.status}`
+      );
+
+      // Tap [Mark sold out] → REAL catalog flips soldOut: true.
+      telegramCalls.length = 0;
+      if (lowRow[0]) await tapButton(OWNER_CHAT, lowRow[0].callback_data);
+      const afterTap = await getCatalog();
+      check(
+        "sold-out tap → tohar soldOut=true in the REAL catalog",
+        afterTap.find((p) => p.slug === "tohar-hamidbar-concentrate")?.soldOut === true
+      );
+
+      // Quantity hitting 0 → informational push only (auto sold-out), no
+      // button, and no duplicate "down to N" alert (1 is not a crossing).
+      const crafted2 = await getCatalog();
+      const tohar2 = crafted2.find((p) => p.slug === "tohar-hamidbar-concentrate");
+      if (tohar2) {
+        tohar2.quantity = 1;
+        tohar2.soldOut = false;
+      }
+      await saveCatalog(crafted2);
+      telegramCalls.length = 0;
+      const zeroRes = await orderPOST(
+        orderRequest({
+          items: [{ slug: "tohar-hamidbar-concentrate", qty: 1 }],
+          name: "Push Harness Zero",
+          phone: "+201001112233",
+          address: "1 Test Street, Hurghada",
+          lang: "en",
+        }) as never
+      );
+      const zeroJson = (await zeroRes.json()) as { orderNumber?: string };
+      if (zeroJson.orderNumber) testOrderNumbers.push(zeroJson.orderNumber);
+      const zeroPush = messagesTo(OWNER_CHAT, /hit 0 in stock/)[0];
+      check(
+        "stock hitting 0 → informational auto-sold-out push without buttons",
+        Boolean(zeroPush) &&
+          (zeroPush?.body as CapturedKeyboard)?.reply_markup === undefined,
+        JSON.stringify(zeroPush?.body).slice(0, 200)
+      );
+      check(
+        "no low-stock button alert on the 1 → 0 order (not a threshold crossing)",
+        messagesTo(OWNER_CHAT, /down to \d+ left/).length === 0
+      );
+    } finally {
+      // DELETE the test order blobs and restore the catalog bytes.
+      for (const num of testOrderNumbers) {
+        try {
+          await del(`orders/${num}.json`);
+          console.log("deleted test order", num);
+        } catch {
+          // best effort
+        }
+      }
+      if (catalogBytes !== null) {
+        await restoreBlobText("catalog/products.json", catalogBytes, "application/json");
+      }
+      check(
+        "catalog byte-identical after section 18",
+        (await readBlobText("catalog/products.json")) === catalogBytes,
+        `len ${catalogBytes?.length}`
+      );
+      check(
+        "test order blobs deleted",
+        (await listOrders({ limit: 50 })).every(
+          (o) => !testOrderNumbers.includes(o.orderNumber)
+        )
+      );
+    }
+  }
+
+  console.log("\n=== 19. No bound owner → zero pushes, flows still succeed ===");
+  {
+    const catalogBytes = await readBlobText("catalog/products.json");
+    await del("telegram/owner.json");
+    let orphanOrder = "";
+    try {
+      telegramCalls.length = 0;
+      const calRes = await calWebhookPOST(
+        calRequest({
+          triggerEvent: "BOOKING_REQUESTED",
+          payload: {
+            uid: "harness-push-uid-4",
+            eventTitle: "Relaxing Massage",
+            status: "PENDING",
+            startTime: "2027-04-11T12:00:00.000Z",
+            endTime: "2027-04-11T13:00:00.000Z",
+            attendees: [{ name: "Анна Тест", email: "anna@example.com" }],
+            metadata: { lang: "en" },
+          },
+        }) as never
+      );
+      check("booking webhook still 200 with no owner", calRes.status === 200);
+      const orderRes = await orderPOST(
+        orderRequest({
+          items: [{ slug: "tohar-hamidbar-concentrate", qty: 1 }],
+          name: "Push Harness NoOwner",
+          phone: "+201001112233",
+          address: "1 Test Street, Hurghada",
+          lang: "en",
+        }) as never
+      );
+      const orderJson = (await orderRes.json()) as {
+        received?: boolean;
+        orderNumber?: string;
+      };
+      orphanOrder = orderJson.orderNumber ?? "";
+      check(
+        "order still succeeds with no owner",
+        orderRes.status === 200 && orderJson.received === true,
+        JSON.stringify(orderJson).slice(0, 140)
+      );
+      check(
+        "zero Telegram calls with no owner bound",
+        telegramCalls.length === 0,
+        `calls=${telegramCalls.length}`
+      );
+    } finally {
+      if (orphanOrder) {
+        try {
+          await del(`orders/${orphanOrder}.json`);
+          console.log("deleted test order", orphanOrder);
+        } catch {
+          // best effort
+        }
+      }
+      if (catalogBytes !== null) {
+        await restoreBlobText("catalog/products.json", catalogBytes, "application/json");
+      }
+      // Re-bind the harness owner (final cleanup still restores the true
+      // pre-run snapshot; this just keeps any later sections coherent).
+      await bindOwner(OWNER_CHAT);
+    }
   }
 } catch (error) {
   crashed = error;
