@@ -38,6 +38,15 @@ export async function PUT(
       { status: 400 }
     );
   }
+  // Reject an oversized array BEFORE normalizing/deduping it — a client can
+  // only ever hold 50 tags, so anything beyond a sane bound is a bad request,
+  // not work to do (don't map+normalize thousands just to slice to 50).
+  if (raw.length > 200) {
+    return NextResponse.json(
+      { error: "Too many tags (max 200 in a request)." },
+      { status: 400 }
+    );
+  }
 
   try {
     const tags = await setTags(id, raw as string[]);

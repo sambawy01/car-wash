@@ -1,7 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import type { ClientProfile, ClientSummary, RebookingClient } from "@/lib/crm";
+import type {
+  ClientProfile,
+  ClientSummary,
+  RebookingClient,
+  UnlinkedOverlay,
+} from "@/lib/crm";
 
 /**
  * Clients manager — Victoria's private CRM inside /admin (the 6th tab).
@@ -78,6 +83,22 @@ const primaryBtn = `${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`;
 const subtleBtn = `${buttonBase} border border-[#3A332C]/15 bg-[#FFFDF9] text-[#3A332C] hover:bg-[#F4EFE7]`;
 const dangerBtn = `${buttonBase} border border-[#B5483A]/30 bg-[#FFFDF9] text-[#B5483A] hover:bg-[#B5483A]/5`;
 
+/**
+ * Small hint shown on phone-only profiles. Their identity rests on the last-9-
+ * digit phone fallback, which can merge family members / strangers who share a
+ * number — so we make that visible rather than implying a verified identity.
+ */
+function MatchedByPhoneHint() {
+  return (
+    <span
+      title="No email on file — grouped by phone number (last 9 digits). This can merge people who share a number."
+      className="inline-flex items-center gap-1 rounded-full bg-[#C08A2D]/12 px-2 py-0.5 text-[11px] font-medium text-[#8A6418]"
+    >
+      matched by phone
+    </span>
+  );
+}
+
 function TagPill({
   tag,
   onRemove,
@@ -109,11 +130,13 @@ function ProfileCard({
   adminKey,
   onClose,
   onOverlayChanged,
+  onDeleted,
 }: {
   clientId: string;
   adminKey: string;
   onClose: () => void;
   onOverlayChanged: () => void;
+  onDeleted: () => void;
 }) {
   const [profile, setProfile] = useState<ClientProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -234,12 +257,44 @@ function ProfileCard({
     void saveTags([...profile.tags, t]);
   }
 
+  async function deleteClientRecords() {
+    if (
+      !window.confirm(
+        "Delete ALL internal records for this client — every private note and tag? " +
+          "Booking and order history is kept (it lives with the scheduler/shop). " +
+          "This cannot be undone."
+      )
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch(
+        `/api/admin/clients/${encodeURIComponent(clientId)}`,
+        { method: "DELETE", headers: authHeaders(adminKey) }
+      );
+      if (!res.ok) {
+        setError(await readError(res));
+        return;
+      }
+      onDeleted();
+    } catch {
+      setError("Network error — please try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="rounded-2xl border border-[#8A5238]/25 bg-[#FFFDF9] px-5 py-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <h3 className="font-serif text-2xl text-[#3A332C]">
-          {profile?.displayName ?? "Client"}
-        </h3>
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="font-serif text-2xl text-[#3A332C]">
+            {profile?.displayName ?? "Client"}
+          </h3>
+          {profile?.matchedByPhone && <MatchedByPhoneHint />}
+        </div>
         <button type="button" onClick={onClose} className={subtleBtn}>
           Close
         </button>
@@ -407,6 +462,22 @@ function ProfileCard({
                 </p>
               ))}
             </div>
+          </div>
+
+          {/* danger zone — right to erasure */}
+          <div className="border-t border-[#3A332C]/10 pt-4">
+            <p className="mb-2 text-xs text-[#847866]">
+              Delete this client&apos;s internal records (private notes and
+              tags). Their booking and order history is kept.
+            </p>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void deleteClientRecords()}
+              className={dangerBtn}
+            >
+              Delete client records
+            </button>
           </div>
         </div>
       )}
@@ -592,20 +663,46 @@ function RadarView({
 export default function ClientsSection({
   initialClients,
   initialRebooking,
+  initialUnlinked,
   adminKey,
   loadError,
 }: {
   initialClients: ClientSummary[];
   initialRebooking: RebookingClient[];
+  initialUnlinked: UnlinkedOverlay[];
   adminKey: string;
   loadError: string | null;
 }) {
   const [view, setView] = useState<"directory" | "radar">("directory");
   const [clients, setClients] = useState<ClientSummary[]>(initialClients);
+  const [unlinked, setUnlinked] = useState<UnlinkedOverlay[]>(initialUnlinked);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(loadError);
   const [selected, setSelected] = useState<string | null>(null);
+
+  async function deleteUnlinked(clientId: string) {
+    if (
+      !window.confirm(
+        "Delete this orphaned note record (it matches no current client)? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+    try {
+      const res = await fetch(
+        `/api/admin/clients/${encodeURIComponent(clientId)}`,
+        { method: "DELETE", headers: authHeaders(adminKey) }
+      );
+      if (!res.ok) {
+        setError(await readError(res));
+        return;
+      }
+      setUnlinked((prev) => prev.filter((u) => u.clientId !== clientId));
+    } catch {
+      setError("Network error — please try again.");
+    }
+  }
 
   // Debounced search against the directory endpoint.
   useEffect(() => {
@@ -677,6 +774,43 @@ export default function ClientsSection({
         </div>
       )}
 
+      {unlinked.length > 0 && (
+        <div className="mb-4 rounded-2xl border border-[#C08A2D]/35 bg-[#FFFDF9] px-5 py-4">
+          <p className="text-sm font-medium text-[#8A6418]">
+            {unlinked.length} note record
+            {unlinked.length === 1 ? "" : "s"} not linked to any current client
+          </p>
+          <p className="mt-1 text-xs text-[#847866]">
+            These hold notes/tags whose client no longer resolves (e.g. a
+            phone-only client whose visits aged out). Nothing is lost — review,
+            then delete if no longer needed.
+          </p>
+          <div className="mt-3 space-y-2">
+            {unlinked.map((u) => (
+              <div
+                key={u.clientId}
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#3A332C]/10 bg-white px-3 py-2"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm text-[#3A332C]">
+                    {u.noteCount} note{u.noteCount === 1 ? "" : "s"}
+                    {u.tags.length ? ` · tags: ${u.tags.join(", ")}` : ""}
+                  </p>
+                  <p className="font-mono text-xs text-[#847866]">{u.clientId}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void deleteUnlinked(u.clientId)}
+                  className={dangerBtn}
+                >
+                  Delete records
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {view === "radar" ? (
         <RadarView
           adminKey={adminKey}
@@ -689,6 +823,10 @@ export default function ClientsSection({
           adminKey={adminKey}
           onClose={() => setSelected(null)}
           onOverlayChanged={() => void load(search)}
+          onDeleted={() => {
+            setSelected(null);
+            void load(search);
+          }}
         />
       ) : (
         <div className="space-y-4">
@@ -717,8 +855,11 @@ export default function ClientsSection({
                   className="block w-full rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#F4EFE7]"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-base font-medium text-[#3A332C]">
-                      {c.displayName}
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-base font-medium text-[#3A332C]">
+                        {c.displayName}
+                      </span>
+                      {c.matchedByPhone && <MatchedByPhoneHint />}
                     </span>
                     <span className="text-sm text-[#847866]">
                       {egp(c.totalSpendEgp)}

@@ -11,6 +11,7 @@ import {
   toClientSummary,
   type ClientSummary,
   type RebookingClient,
+  type UnlinkedOverlay,
 } from "@/lib/crm";
 import AdminInbox from "./admin-inbox";
 import AdminTabs from "./admin-tabs";
@@ -59,6 +60,7 @@ export default async function AdminPage({
   let financeError: string | null = null;
   let clientSummaries: ClientSummary[] = [];
   let rebooking: RebookingClient[] = [];
+  let unlinkedOverlays: UnlinkedOverlay[] = [];
   let clientsError: string | null = null;
   const monthPeriod = resolvePeriod({ period: "month" });
   // Bookings (Cal.com), shop orders, the two catalogs and the finance P&L
@@ -112,6 +114,7 @@ export default async function AdminPage({
   if (clientsResult.status === "fulfilled") {
     clientSummaries = clientsResult.value.profiles.map(toClientSummary);
     rebooking = clientsResult.value.rebooking;
+    unlinkedOverlays = clientsResult.value.unlinked;
   } else {
     console.error("Admin clients load error:", clientsResult.reason);
     clientsError = "Couldn't load clients. Pull down to refresh or try again shortly.";
@@ -183,6 +186,7 @@ export default async function AdminPage({
           <ClientsSection
             initialClients={clientSummaries}
             initialRebooking={rebooking}
+            initialUnlinked={unlinkedOverlays}
             adminKey={clientKey}
             loadError={clientsError}
           />
