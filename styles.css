@@ -388,7 +388,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   position: fixed; right: 24px; bottom: 24px; z-index: 80;
   width: 64px; height: 64px; border-radius: 50%;
   border: none; cursor: pointer;
-  background: radial-gradient(125% 125% at 30% 22%, var(--clay) 0%, var(--clay-deep) 58%, #6F4029 100%);
+  background: radial-gradient(circle at 50% 46%, #C18B62 0%, var(--clay) 32%, var(--clay-deep) 68%, #54311E 100%);
   display: grid; place-items: center;
   box-shadow: 0 10px 30px rgba(58, 51, 44, 0.35), inset 0 1px 0 rgba(255, 253, 249, 0.28);
   transition: transform 0.3s var(--ease), box-shadow 0.3s var(--ease);
@@ -399,6 +399,15 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 }
 .chat-launcher:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
 .chat-launcher svg { display: block; }
+
+.chat-launcher .v-flare { transform-origin: 46px 14.5px; animation: v-twinkle 3.4s ease-in-out infinite; }
+@keyframes v-twinkle {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(0.78) rotate(8deg); opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-launcher .v-flare { animation: none; }
+}
 
 /* Breathing pulse ring — draws the eye until the chat is opened once */
 .chat-launcher::before {

@@ -67,13 +67,35 @@
     return n;
   };
 
-  // Launcher: serif-italic "V" monogram with a clay-pale sparkle — Vassili's mark.
+  // Launcher: 3D gold serif-italic "V" with a flare glint — Vassili's mark.
+  // Depth = stacked offset copies (deep bronze base → gold gradient face →
+  // specular highlight stroke); the flare is a bright gold star on the V's tip.
   const launcher = el("button", "chat-launcher", { type: "button", "aria-label": T.open, "aria-expanded": "false" });
   launcher.innerHTML =
-    '<svg viewBox="0 0 64 64" width="38" height="38" aria-hidden="true" focusable="false">' +
-      '<text x="29" y="48" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="46" fill="#FFFDF9">V</text>' +
-      '<path d="M47 7.5c1.05 4.15 2.85 5.95 7 7-4.15 1.05-5.95 2.85-7 7-1.05-4.15-2.85-5.95-7-7 4.15-1.05 5.95-2.85 7-7z" fill="#E9CDAF"/>' +
-      '<circle cx="40.5" cy="20" r="1.4" fill="#E9CDAF" opacity="0.85"/>' +
+    '<svg viewBox="0 0 64 64" width="40" height="40" aria-hidden="true" focusable="false">' +
+      '<defs>' +
+        '<linearGradient id="vvGoldFace" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#FFF0C8"/>' +
+          '<stop offset="0.38" stop-color="#E8C474"/>' +
+          '<stop offset="0.62" stop-color="#C99C45"/>' +
+          '<stop offset="1" stop-color="#A87B2D"/>' +
+        '</linearGradient>' +
+        '<linearGradient id="vvGoldEdge" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#8A6420"/>' +
+          '<stop offset="1" stop-color="#5E430F"/>' +
+        '</linearGradient>' +
+      '</defs>' +
+      // extruded depth layers (deep bronze, offset down-right)
+      '<text x="31" y="50.5" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="46" fill="url(#vvGoldEdge)">V</text>' +
+      '<text x="30" y="49.2" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="46" fill="#6F4F14">V</text>' +
+      // gold face
+      '<text x="29" y="48" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="46" fill="url(#vvGoldFace)">V</text>' +
+      // specular sheen on the face
+      '<text x="29" y="48" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="46" fill="none" stroke="#FFF8E1" stroke-width="0.6" opacity="0.55">V</text>' +
+      // flare: bright gold star at the V tip + glint dot
+      '<path class="v-flare" d="M46 6.5c1.2 4.7 3.25 6.75 8 8-4.75 1.2-6.8 3.25-8 8-1.2-4.75-3.25-6.8-8-8 4.75-1.2 6.8-3.25 8-8z" fill="#FFE9A8"/>' +
+      '<path d="M46 10.2c0.75 2.9 2 4.15 4.9 4.9-2.9 0.75-4.15 2-4.9 4.9-0.75-2.9-2-4.15-4.9-4.9 2.9-0.75 4.15-2 4.9-4.9z" fill="#FFFDF9" opacity="0.9"/>' +
+      '<circle cx="39" cy="21" r="1.5" fill="#FFE9A8" opacity="0.9"/>' +
     '</svg>';
 
   const card = el("section", "chat-card", { role: "dialog", "aria-label": T.title, hidden: "" });
