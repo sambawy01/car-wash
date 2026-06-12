@@ -29,6 +29,19 @@ import {
  *     → attendee "your appointment is confirmed".
  * - BOOKING_REJECTED → attendee decline email (incl. Cal's rejectionReason).
  * - BOOKING_CANCELLED → attendee cancellation email (incl. cancellationReason).
+ * - BOOKING_RESCHEDULED → attendee "your appointment has been moved" email
+ *   with old time → new time.
+ *
+ * BOOKING_RESCHEDULED payload (verified in cal.com source, 2026-06:
+ * webhooks/lib/dto/types.ts BookingRescheduledDTO + factory/versioned/
+ * v2021-10-20/BookingPayloadBuilder.ts):
+ * - Top level carries the NEW booking (uid/startTime/endTime/title/attendees,
+ *   status forced "ACCEPTED").
+ * - Extras: rescheduleId, rescheduleUid (OLD booking uid),
+ *   rescheduleStartTime/rescheduleEndTime (OLD times, ISO), rescheduledBy.
+ *   All optional in the DTO, so we backfill when absent: GET /bookings/{uid}
+ *   (2024-08-13) on the NEW booking returns `rescheduledFromUid`, and the old
+ *   booking (now cancelled) still answers GET with its original start.
  *
  * Attendee language: `payload.metadata.lang` ("en"/"ru"), recorded by
  * /api/booking-calendar/book at creation time. The confirmation-time
@@ -64,6 +77,10 @@ interface WebhookPayload {
   metadata?: Record<string, unknown> | null;
   rejectionReason?: string;
   cancellationReason?: string;
+  /** BOOKING_RESCHEDULED extras: the OLD booking's uid and times. */
+  rescheduleUid?: string;
+  rescheduleStartTime?: string;
+  rescheduleEndTime?: string;
 }
 
 interface WebhookBody {
@@ -92,10 +109,13 @@ function minutesBetween(startIso: string, endIso: string): number | null {
   return Math.round((end - start) / 60_000);
 }
 
+/** BookingDetails plus Cal-only linkage used for reschedule backfill. */
+type CanonicalBooking = BookingDetails & { rescheduledFromUid: string | null };
+
 /** Canonical booking lookup — used for untrusted payloads and lang backfill. */
 async function fetchBookingFromCal(
   uid: string
-): Promise<BookingDetails | null> {
+): Promise<CanonicalBooking | null> {
   const apiUrl = process.env.CALCOM_API_URL;
   const apiKey = process.env.CALCOM_API_KEY;
   if (!apiUrl || !apiKey) return null;
@@ -121,6 +141,7 @@ async function fetchBookingFromCal(
         attendees?: WebhookAttendee[];
         bookingFieldsResponses?: Record<string, unknown>;
         metadata?: Record<string, unknown> | null;
+        rescheduledFromUid?: string;
       };
     };
     const b = json.data;
@@ -144,6 +165,9 @@ async function fetchBookingFromCal(
       notes: typeof rawNotes === "string" ? rawNotes : "",
       lang: parseBookingLang(b.metadata?.lang),
       reason: typeof b.cancellationReason === "string" ? b.cancellationReason : "",
+      oldStart: null,
+      rescheduledFromUid:
+        typeof b.rescheduledFromUid === "string" ? b.rescheduledFromUid : null,
     };
   } catch (error) {
     console.error("[cal-webhook] Cal API lookup failed:", error);
@@ -176,6 +200,10 @@ function detailsFromPayload(payload: WebhookPayload): BookingDetails {
     notes: typeof responseNotes === "string" ? responseNotes : "",
     lang: parseBookingLang(payload.metadata?.lang),
     reason: typeof reason === "string" ? reason : "",
+    oldStart:
+      typeof payload.rescheduleStartTime === "string"
+        ? payload.rescheduleStartTime
+        : null,
   };
 }
 
@@ -200,12 +228,19 @@ export async function POST(request: NextRequest) {
     : false;
 
   let details: BookingDetails | null = null;
+  // The OLD booking's uid for reschedules — from the signed payload's
+  // rescheduleUid, or from the canonical booking's rescheduledFromUid.
+  let oldBookingUid: string | null = null;
   if (signatureValid) {
     details = detailsFromPayload(payload);
+    oldBookingUid =
+      typeof payload.rescheduleUid === "string" ? payload.rescheduleUid : null;
   } else if (uid) {
     // Untrusted payload: only the uid is used; everything in the emails comes
     // from the canonical booking fetched from the Cal API.
-    details = await fetchBookingFromCal(uid);
+    const canonical = await fetchBookingFromCal(uid);
+    details = canonical;
+    oldBookingUid = canonical?.rescheduledFromUid ?? null;
     if (!details) {
       console.warn(
         `[cal-webhook] Unverified payload and booking uid not found on Cal — ignoring (trigger=${triggerEvent}, uid=${uid})`
@@ -235,6 +270,10 @@ export async function POST(request: NextRequest) {
     // Cal fires BOOKING_CREATED (status ACCEPTED) when the host confirms a
     // pending booking — and for event types booked without confirmation.
     attendeeKind = "confirmed";
+  } else if (triggerEvent === "BOOKING_RESCHEDULED") {
+    // Payload carries the NEW booking; rescheduleUid/rescheduleStartTime
+    // point at the old one (see header comment for the verified shape).
+    attendeeKind = "rescheduled";
   } else if (triggerEvent === "BOOKING_REJECTED") {
     attendeeKind = "rejected";
   } else if (triggerEvent === "BOOKING_CANCELLED") {
@@ -253,6 +292,27 @@ export async function POST(request: NextRequest) {
   if (details.lang === null && details.uid) {
     const canonical = await fetchBookingFromCal(details.uid);
     if (canonical?.lang) details.lang = canonical.lang;
+    if (!oldBookingUid) oldBookingUid = canonical?.rescheduledFromUid ?? null;
+  }
+
+  // Reschedules: recover the OLD start when the payload didn't carry
+  // rescheduleStartTime — the old (now cancelled) booking still answers GET
+  // with its original times. Missing old time degrades gracefully: the email
+  // simply omits the "Previous time" row.
+  if (attendeeKind === "rescheduled" && !details.oldStart) {
+    if (!oldBookingUid && details.uid) {
+      const canonical = await fetchBookingFromCal(details.uid);
+      oldBookingUid = canonical?.rescheduledFromUid ?? null;
+    }
+    if (oldBookingUid) {
+      const oldBooking = await fetchBookingFromCal(oldBookingUid);
+      if (oldBooking?.start) details.oldStart = oldBooking.start;
+    }
+    if (!details.oldStart) {
+      console.warn(
+        `[cal-webhook] BOOKING_RESCHEDULED uid=${details.uid} — old start unknown, sending without "Previous time" row`
+      );
+    }
   }
 
   // Victoria's notification only for new requests; attendee email for every

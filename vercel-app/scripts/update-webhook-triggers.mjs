@@ -13,10 +13,13 @@
  *   cancellation fires BOOKING_CANCELLED (with payload.cancellationReason).
  *
  * Desired triggers therefore:
- *   BOOKING_REQUESTED  → "request received" emails
- *   BOOKING_CREATED    → "request received" (pending) / "confirmed" (accepted)
- *   BOOKING_REJECTED   → decline email
- *   BOOKING_CANCELLED  → cancellation email
+ *   BOOKING_REQUESTED   → "request received" emails
+ *   BOOKING_CREATED     → "request received" (pending) / "confirmed" (accepted)
+ *   BOOKING_REJECTED    → decline email
+ *   BOOKING_CANCELLED   → cancellation email
+ *   BOOKING_RESCHEDULED → "appointment moved" email (payload carries the NEW
+ *     booking plus rescheduleUid / rescheduleStartTime / rescheduleEndTime
+ *     for the OLD one — see BookingRescheduledDTO in cal.com source)
  *
  * Usage:  node scripts/update-webhook-triggers.mjs   (run from vercel-app/)
  * Reads CALCOM_API_KEY / CALCOM_API_URL from the environment or .env.local.
@@ -35,6 +38,7 @@ const DESIRED_TRIGGERS = [
   "BOOKING_CREATED",
   "BOOKING_REJECTED",
   "BOOKING_CANCELLED",
+  "BOOKING_RESCHEDULED",
 ];
 
 // --- env -------------------------------------------------------------------

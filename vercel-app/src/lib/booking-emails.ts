@@ -7,10 +7,11 @@ import { brandedEmailHtml, escapeHtml } from "./branded-email";
  *    inbox link (English only; Victoria's working language for the inbox).
  * 2. Attendee lifecycle emails (the branded replacement for Cal.com's generic
  *    ones) — bilingual EN/RU from the booking's `metadata.lang`:
- *      - requested  → "We received your booking request"
- *      - confirmed  → "Your appointment is confirmed"
- *      - rejected   → "About your booking request" (decline + rebook invite)
- *      - cancelled  → "About your booking" (cancellation + rebook invite)
+ *      - requested   → "We received your booking request"
+ *      - confirmed   → "Your appointment is confirmed"
+ *      - rejected    → "About your booking request" (decline + rebook invite)
+ *      - cancelled   → "About your booking" (cancellation + rebook invite)
+ *      - rescheduled → "Your appointment has been moved" (old time → new time)
  *
  * Every HTML body goes through `brandedEmailHtml` (dark logo band header).
  * Text parts stay plain. Senders NEVER throw — the webhook must always 200.
@@ -31,7 +32,8 @@ export type AttendeeEmailKind =
   | "requested"
   | "confirmed"
   | "rejected"
-  | "cancelled";
+  | "cancelled"
+  | "rescheduled";
 
 export interface BookingDetails {
   uid: string;
@@ -49,6 +51,11 @@ export interface BookingDetails {
   lang: BookingLang | null;
   /** Cal's rejectionReason / cancellationReason when present. */
   reason: string;
+  /**
+   * Previous start time (ISO) for reschedules — payload.rescheduleStartTime,
+   * or backfilled from the old booking via rescheduledFromUid. null = unknown.
+   */
+  oldStart?: string | null;
 }
 
 export function parseBookingLang(value: unknown): BookingLang | null {
@@ -150,6 +157,8 @@ interface AttendeeCopy {
   timeLabel: string;
   durationLabel: string;
   durationUnit: string;
+  /** "Previous time" row label — only set for the rescheduled email. */
+  oldTimeLabel: string | null;
   paragraphs: string[];
   reasonLabel: string | null;
   footnote: string | null;
@@ -172,6 +181,7 @@ function attendeeCopy(
         timeLabel: "Дата и время",
         durationLabel: "Длительность",
         durationUnit: "мин",
+        oldTimeLabel: null,
         signoff: "С теплом,",
       }
     : {
@@ -180,8 +190,43 @@ function attendeeCopy(
         timeLabel: "Date & time",
         durationLabel: "Duration",
         durationUnit: "min",
+        oldTimeLabel: null,
         signoff: "Warmly,",
       };
+
+  if (kind === "rescheduled") {
+    return ru
+      ? {
+          ...base,
+          subject: `Ваша запись перенесена — ${details.service}`,
+          heading: "Ваша запись перенесена",
+          intro: "Время вашей записи изменилось. Новые детали:",
+          timeLabel: "Новое время",
+          oldTimeLabel: "Прежнее время",
+          paragraphs: [
+            "Если что-то изменится, наша команда свяжется с вами в WhatsApp.",
+          ],
+          reasonLabel: null,
+          footnote: null,
+          rebookLead: null,
+          rebookButton: null,
+        }
+      : {
+          ...base,
+          subject: `Your appointment has been moved — ${details.service}`,
+          heading: "Your appointment has been moved",
+          intro: "Your appointment time has changed. The new details:",
+          timeLabel: "New time",
+          oldTimeLabel: "Previous time",
+          paragraphs: [
+            "Our team will contact you via WhatsApp if anything changes.",
+          ],
+          reasonLabel: null,
+          footnote: null,
+          rebookLead: null,
+          rebookButton: null,
+        };
+  }
 
   if (kind === "requested") {
     return ru
@@ -318,6 +363,12 @@ export function buildAttendeeEmail(
       : null;
   const reason = details.reason.trim();
   const rebookUrl = ru ? `${BOOK_URL}?lang=ru` : BOOK_URL;
+  // Previous time row — rescheduled emails only, and only when the old start
+  // is actually known (payload field or Cal API backfill).
+  const oldCairoTime =
+    t.oldTimeLabel && details.oldStart
+      ? formatCairoTime(details.oldStart, lang)
+      : null;
 
   const text = [
     t.greeting,
@@ -325,6 +376,9 @@ export function buildAttendeeEmail(
     t.intro,
     "",
     `${t.serviceLabel}: ${details.service}`,
+    ...(t.oldTimeLabel && oldCairoTime
+      ? [`${t.oldTimeLabel}: ${oldCairoTime}${cairoSuffix}`]
+      : []),
     `${t.timeLabel}: ${cairoTime}${cairoSuffix}`,
     ...(duration ? [`${t.durationLabel}: ${duration}`] : []),
     ...(t.reasonLabel && reason ? ["", `${t.reasonLabel}: ${reason}`] : []),
@@ -338,6 +392,11 @@ export function buildAttendeeEmail(
 
   const contentHtml = `${paragraph(t.greeting)}${paragraph(t.intro)}<table style="border-collapse:collapse;width:100%;margin-bottom:8px;">
         ${detailRow(t.serviceLabel, details.service)}
+        ${
+          t.oldTimeLabel && oldCairoTime
+            ? `<tr><td style="padding:6px 16px 6px 0;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${escapeHtml(t.oldTimeLabel)}</td><td style="padding:6px 0;color:#847866;font-size:15px;text-decoration:line-through;">${escapeHtml(`${oldCairoTime}${cairoSuffix}`)}</td></tr>`
+            : ""
+        }
         ${detailRow(t.timeLabel, `${cairoTime}${cairoSuffix}`)}
         ${duration ? detailRow(t.durationLabel, duration) : ""}
         ${t.reasonLabel && reason ? detailRow(t.reasonLabel, reason) : ""}
