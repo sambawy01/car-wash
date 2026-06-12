@@ -14,8 +14,9 @@
   --photo-ink: #F4EFE7;   /* text over photo scrims */
   --line: rgba(58, 51, 44, 0.16);
   --scrim: 33, 27, 22;    /* warm near-black for photo washes */
-  --serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --serif: "Cormorant Garamond", "Playfair Display", Georgia, serif; /* italic accent only */
   --sans: "Manrope", "Jost", system-ui, sans-serif;
+  --display: "Tenor Sans", "Manrope", system-ui, sans-serif; /* fashion display — ALL CAPS, tracked */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --logo-ink: invert(0.82) sepia(0.5) saturate(2) brightness(0.85); /* white logo → deep warm brown */
 }
@@ -42,9 +43,13 @@ a { color: inherit; text-decoration: none; }
   color: var(--clay-deep); margin-bottom: 18px;
   font-family: var(--sans); font-weight: 600; max-width: none;
 }
+/* Display headings — fashion-editorial: Tenor Sans, ALL CAPS, generous tracking.
+   Caps + tracking widen lines ~30%, so sizes run smaller than the old serif scale
+   (critical for long RU headlines). */
 h2 {
-  font-family: var(--serif); font-weight: 500; font-size: clamp(32px, 4.6vw, 56px);
-  line-height: 1.1; letter-spacing: 0.005em; max-width: 16em; color: var(--ink);
+  font-family: var(--display); font-weight: 400; font-size: clamp(23px, 3.2vw, 38px);
+  line-height: 1.32; letter-spacing: 0.13em; text-transform: uppercase;
+  max-width: 18em; color: var(--ink);
 }
 .body-copy { font-size: 17px; line-height: 1.75; max-width: 34em; margin-top: 22px; color: var(--ink-soft); }
 
@@ -139,7 +144,7 @@ h2 {
 .nav-logo { height: 46px; width: auto; display: block; object-fit: contain; object-position: left center; }
 .nav-brand { min-width: 0; }
 .hero-sub { margin-top: 18px; font-size: 12px; font-weight: 500; letter-spacing: 0.5em; text-indent: 0.5em; color: var(--photo-ink); text-shadow: 0 1px 12px rgba(26, 21, 17, 0.6); }
-.hero-line { margin-top: 26px; font-family: var(--sans); font-weight: 500; font-size: clamp(12px, 1.4vw, 15px); letter-spacing: 0.32em; text-indent: 0.32em; text-transform: uppercase; color: var(--photo-ink); text-shadow: 0 1px 12px rgba(26, 21, 17, 0.6); }
+.hero-line { margin-top: 26px; font-family: var(--display); font-weight: 400; font-size: clamp(12px, 1.4vw, 15px); letter-spacing: 0.32em; text-indent: 0.32em; text-transform: uppercase; color: var(--photo-ink); text-shadow: 0 1px 12px rgba(26, 21, 17, 0.6); }
 .cta {
   display: inline-block; margin-top: 38px; padding: 16px 38px;
   border: 1px solid var(--clay); border-radius: 999px;
@@ -199,9 +204,10 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   color: var(--clay-deep);
 }
 .cred-title {
-  display: block; margin-top: 5px;
-  font-family: var(--serif); font-weight: 500;
-  font-size: 21px; line-height: 1.25; color: var(--ink);
+  display: block; margin-top: 7px;
+  font-family: var(--display); font-weight: 400;
+  font-size: 15px; line-height: 1.5; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ink);
 }
 .cred-detail {
   display: block; margin-top: 4px;
@@ -236,14 +242,18 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   position: relative;
   transition: background-color 0.3s var(--ease);
 }
-.t-name { font-family: var(--serif); font-weight: 500; font-size: clamp(19px, 2.4vw, 25px); }
+.t-name {
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(14px, 1.8vw, 17px); line-height: 1.6;
+  letter-spacing: 0.14em; text-transform: uppercase;
+}
 /* Stretched link: accessible name = treatment name; covers the whole row */
 .t-link { color: inherit; transition: color 0.3s; }
 .t-link::after { content: ""; position: absolute; inset: 0; }
 .t-link:focus-visible { outline: none; }
 .t-row:has(.t-link:focus-visible) { outline: 2px solid var(--clay-deep); outline-offset: 2px; }
 /* Amendment 4: targets .t-name .t-sub (HTML uses <span class="t-sub">) */
-.t-name .t-sub { font-family: var(--sans); font-weight: 400; font-size: 13px; color: var(--ink-soft); margin-left: 10px; letter-spacing: 0.04em; }
+.t-name .t-sub { font-family: var(--sans); font-weight: 400; font-size: 13px; color: var(--ink-soft); margin-left: 10px; letter-spacing: 0.04em; text-transform: none; }
 .t-price { flex: none; margin-left: auto; color: var(--clay-deep); font-size: 15px; letter-spacing: 0.05em; }
 .t-price small { color: var(--ink-soft); font-size: 12px; }
 /* Always-visible clickability cue (no hover needed on touch) */
@@ -274,14 +284,15 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 .setting-wash { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(var(--scrim), 0.6), rgba(var(--scrim), 0.68) 42%, rgba(var(--scrim), 0.94)); }
 .setting-content { position: relative; z-index: 2; padding-top: 16vh; padding-bottom: 11vh; }
 .setting .label { color: var(--photo-ink); }
-/* Headline — the philosophy in six words; the second half glows clay-pale italic */
+/* Headline — the philosophy in six words; the second half glows clay-pale */
 .setting-head {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(34px, 5vw, 58px); line-height: 1.12;
-  color: var(--photo-ink); max-width: 14em;
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(23px, 3.1vw, 38px); line-height: 1.4;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--photo-ink); max-width: 16em;
   text-shadow: 0 1px 14px rgba(26, 21, 17, 0.45);
 }
-.setting-head em { font-style: italic; color: var(--clay-pale); }
+.setting-head em { font-style: normal; color: var(--clay-pale); }
 /* Supporting line — the proof in one breath */
 .setting-line {
   margin-top: 22px;
@@ -319,8 +330,8 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 }
 .stat-cap {
   display: block; margin-top: 10px;
-  font-size: 12.5px; font-weight: 500; line-height: 1.6;
-  letter-spacing: 0.05em; color: var(--photo-ink);
+  font-size: 10.5px; font-weight: 600; line-height: 1.75;
+  letter-spacing: 0.14em; text-transform: uppercase; color: var(--photo-ink);
   text-shadow: 0 1px 10px rgba(26, 21, 17, 0.5);
 }
 /* Slim CTA — anchors to The Approach */
@@ -357,15 +368,16 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 .reserve { background: var(--bg-3); padding: clamp(100px, 16vh, 180px) 0 0; text-align: center; }
 .reserve-logo { width: min(340px, 70vw); margin: 0 auto; }
 /* Amendment 2: h2.reserve-line must not be constrained by h2's max-width: 16em */
-.reserve-line { margin-top: 30px; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: clamp(20px, 2.6vw, 27px); color: var(--clay-deep); max-width: none; margin-left: auto; margin-right: auto; }
+.reserve-line { margin-top: 30px; font-family: var(--serif); font-style: italic; font-weight: 500; font-size: clamp(20px, 2.6vw, 27px); line-height: 1.4; letter-spacing: 0.01em; text-transform: none; color: var(--clay-deep); max-width: none; margin-left: auto; margin-right: auto; }
 .reserve-meta { margin-top: 34px; font-style: normal; font-size: 14px; color: var(--ink-soft); }
 .reserve-meta a { text-decoration: underline; text-underline-offset: 3px; }
 .reserve-meta a:hover { color: var(--clay-deep); }
 :focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
 .footer {
   margin-top: clamp(70px, 10vh, 120px); padding: 22px 28px;
-  display: flex; justify-content: space-between;
-  font-size: 11px; color: var(--ink-soft);
+  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  font-size: 10px; font-weight: 500; letter-spacing: 0.16em; text-transform: uppercase;
+  color: var(--ink-soft);
   border-top: 1px solid var(--line);
 }
 
@@ -483,9 +495,10 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 }
 .chat-teaser-body:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 2px; }
 .chat-teaser-name {
-  display: block; font-family: var(--serif); font-weight: 600;
-  font-size: 19px; line-height: 1.25; color: var(--clay-deep);
-  margin-bottom: 4px;
+  display: block; font-family: var(--display); font-weight: 400;
+  font-size: 13px; line-height: 1.5; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--clay-deep);
+  margin-bottom: 6px;
 }
 .chat-teaser-line {
   display: block; font-family: var(--sans); font-weight: 400;
@@ -518,7 +531,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   padding: 14px 18px; border-bottom: 1px solid var(--line);
   background: var(--bg-2);
 }
-.chat-title { font-family: var(--serif); font-weight: 500; font-size: 19px; color: var(--clay-deep); }
+.chat-title { font-family: var(--display); font-weight: 400; font-size: 13.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--clay-deep); }
 .chat-close {
   background: none; border: none; cursor: pointer; padding: 6px;
   color: var(--ink-soft); display: grid; place-items: center;
@@ -633,8 +646,9 @@ html.tmodal-open { overflow: hidden; }
 }
 .tmodal-close:hover { color: var(--ink); background: var(--bg-2); }
 .tmodal-title {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(27px, 4vw, 34px); line-height: 1.15;
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(17px, 2.6vw, 21px); line-height: 1.55;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink); padding-right: 34px;
 }
 .tmodal-sub {
@@ -688,9 +702,9 @@ html.tmodal-open { overflow: hidden; }
 .journal-main { padding-top: clamp(110px, 16vh, 170px); }
 .journal-head { margin-bottom: clamp(44px, 7vh, 76px); }
 .journal-title {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(44px, 6.5vw, 76px); line-height: 1.05;
-  letter-spacing: 0.005em; color: var(--ink);
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(30px, 4.6vw, 54px); line-height: 1.18;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink);
 }
 .journal-desc { margin-top: 18px; font-size: 16px; line-height: 1.7; color: var(--ink-soft); max-width: 34em; }
 
@@ -740,8 +754,9 @@ html.tmodal-open { overflow: hidden; }
 }
 .post-title {
   margin-top: 12px;
-  font-family: var(--serif); font-weight: 500;
-  font-size: 24px; line-height: 1.22; color: var(--ink); max-width: none;
+  font-family: var(--display); font-weight: 400;
+  font-size: 15px; line-height: 1.65; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink); max-width: none;
 }
 .post-excerpt { margin-top: 12px; flex: 1; font-size: 14.5px; line-height: 1.65; color: var(--ink-soft); }
 .post-read {
@@ -766,16 +781,16 @@ html.tmodal-open { overflow: hidden; }
 .article-meta { margin-top: 32px; }
 .article-title {
   margin-top: 14px;
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(33px, 5vw, 48px); line-height: 1.12;
-  letter-spacing: 0.005em; color: var(--ink);
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(20px, 2.9vw, 29px); line-height: 1.45;
+  letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink);
 }
 .article-body { margin-top: 34px; max-width: 65ch; }
 .article-body p { font-size: 17px; line-height: 1.85; color: var(--ink); }
 .article-body p + p { margin-top: 1.35em; }
-.article-body h2 {
-  margin: 1.9em 0 0.85em;
-  font-size: clamp(25px, 3.2vw, 31px); line-height: 1.2; max-width: none;
+.article-body h2 { /* inherits the caps display system from the global h2 rule */
+  margin: 2.4em 0 1em;
+  font-size: 15px; line-height: 1.65; letter-spacing: 0.2em; max-width: none;
 }
 
 /* --- Quiet end-of-article CTA row --- */
@@ -899,8 +914,9 @@ html.tmodal-open { overflow: hidden; }
 
 .shop-body { display: flex; flex-direction: column; flex: 1; padding: 18px 20px 20px; }
 .shop-name {
-  font-family: var(--serif); font-weight: 500;
-  font-size: 22px; line-height: 1.18; color: var(--ink); max-width: none;
+  font-family: var(--display); font-weight: 400;
+  font-size: 14.5px; line-height: 1.6; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink); max-width: none;
 }
 .shop-sub {
   margin-top: 6px;
@@ -1058,8 +1074,9 @@ html.pmodal-open .chat-card { display: none; }
 }
 .pmodal-body { padding: 26px 34px 34px; }
 .pmodal-title {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(26px, 4vw, 32px); line-height: 1.15;
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(17px, 2.6vw, 21px); line-height: 1.55;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink); max-width: none;
 }
 .pmodal-sub {
@@ -1124,8 +1141,9 @@ html.order-open .chat-card { display: none; }
 }
 .order-close:hover { color: var(--ink); background: var(--bg-2); }
 .order-title {
-  font-family: var(--serif); font-weight: 500;
-  font-size: clamp(26px, 4vw, 32px); line-height: 1.15;
+  font-family: var(--display); font-weight: 400;
+  font-size: clamp(17px, 2.6vw, 21px); line-height: 1.55;
+  letter-spacing: 0.14em; text-transform: uppercase;
   color: var(--ink); padding-right: 34px; max-width: none;
 }
 .order-items { list-style: none; margin-top: 20px; border-top: 1px solid var(--line); }
@@ -1202,8 +1220,9 @@ html.order-open .chat-card { display: none; }
   font-size: 24px;
 }
 .order-success-title {
-  font-family: var(--serif); font-weight: 500;
-  font-size: 27px; line-height: 1.25; color: var(--ink); max-width: none;
+  font-family: var(--display); font-weight: 400;
+  font-size: 16px; line-height: 1.6; letter-spacing: 0.15em;
+  text-transform: uppercase; color: var(--ink); max-width: none;
 }
 .order-success-line { margin-top: 12px; font-size: 14.5px; line-height: 1.7; color: var(--ink-soft); }
 .order-success .order-submit { margin-top: 26px; }
@@ -1321,11 +1340,11 @@ html.has-navjs .nav-right a { white-space: nowrap; }
     transition: opacity 0.35s var(--ease), transform 0.35s var(--ease), visibility 0s;
   }
 
-  /* -- Links: generous serif list; overrides the no-JS display:none hiding */
+  /* -- Links: tracked-caps display list; overrides the no-JS display:none hiding */
   html.has-navjs .nav-links a {
-    display: block; padding: 13px 28px;
-    font-family: var(--serif); font-weight: 500; font-size: 22px; line-height: 1.25;
-    letter-spacing: 0.015em; text-transform: none; color: var(--ink);
+    display: block; padding: 16px 28px;
+    font-family: var(--display); font-weight: 400; font-size: 15px; line-height: 1.4;
+    letter-spacing: 0.24em; text-transform: uppercase; color: var(--ink);
     opacity: 0; transform: translateY(10px);
     transition: opacity 0.4s var(--ease), transform 0.4s var(--ease);
   }

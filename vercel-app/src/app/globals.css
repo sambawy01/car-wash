@@ -11,7 +11,9 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-manrope);
-  --font-serif: var(--font-cormorant);
+  /* "serif" token now carries the fashion display face (Tenor Sans) so every
+     font-serif heading across /book and /admin inherits the new system. */
+  --font-serif: var(--font-tenor);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -62,5 +64,16 @@
   }
   body {
     @apply bg-background text-foreground font-sans;
+  }
+  /* Fashion-editorial display system: headings set in the display face go
+     ALL CAPS with generous tracking. Non-heading font-serif text (labels,
+     inline names) stays sentence case for readability. */
+  h1.font-serif,
+  h2.font-serif,
+  h3.font-serif {
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    line-height: 1.3;
+    font-weight: 400;
   }
 }
