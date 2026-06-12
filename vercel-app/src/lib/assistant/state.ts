@@ -249,6 +249,15 @@ export interface PendingAction {
    * (the chat default). Pushed notifications use NOTIFY_PENDING_TTL_MS.
    */
   ttlMs?: number;
+  /**
+   * Paired pending action sharing the same pushed notification message
+   * (e.g. Confirm/Decline on one booking push). The two are INDEPENDENT
+   * pendings, so mutual exclusion cannot rest on editMessageText alone
+   * (unreliable for aged messages, and 7-day buttons make day-3 taps
+   * normal): after a winning claim the webhook executor best-effort
+   * discards the sibling so the other button can never execute later.
+   */
+  siblingId?: string;
 }
 
 /** The effective TTL for one pending action (fail safe to the chat default). */
@@ -263,13 +272,14 @@ const PENDING_ID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 
 export const CLAIMS_PREFIX = "telegram/claims/";
+export const PENDING_PREFIX = "telegram/pending/";
 
 function pendingPath(id: string): string {
   if (!PENDING_ID_RE.test(id)) {
     // Defense in depth: ids come back via callback_data from the network.
     throw new Error("Invalid pending action id");
   }
-  return `telegram/pending/${id}.json`;
+  return `${PENDING_PREFIX}${id}.json`;
 }
 
 function claimPath(id: string): string {
@@ -300,44 +310,42 @@ async function claimPending(id: string): Promise<boolean> {
 }
 
 /**
- * Drop stale claim markers and orphaned pending blobs. Best effort — claims
- * are tiny, this just keeps the prefixes bounded over time. Runs piggybacked
- * on createPendingAction.
+ * Retention horizon for the stale-state sweep: 2× the LONGEST pending TTL
+ * (the 7-day pushed-notification window), applied to BOTH prefixes.
  *
- * Pending actions are judged against 2× their OWN TTL (pushed-notification
- * buttons live for days, not minutes) — a fixed default cutoff here would
- * silently delete a 7-day pushed button half an hour after it was sent.
+ * One shared horizon is deliberate: a claim marker must outlive ANY pending
+ * action it could be guarding. If a winning claim's pending delete failed,
+ * sweeping the claim on a shorter clock than the pending would make the
+ * action re-claimable — i.e. RE-EXECUTABLE — for the rest of the pending's
+ * life. Claims are a few bytes each; 14-day retention is free.
  */
-async function sweepStalePendingState(): Promise<void> {
+export const STALE_SWEEP_RETENTION_MS = 2 * NOTIFY_PENDING_TTL_MS;
+
+/** Pure sweep cutoff rule — exported for the verification harness. */
+export function isSweepStale(uploadedAt: string | Date, now: number): boolean {
+  const t = new Date(uploadedAt).getTime();
+  return Number.isFinite(t) && now - t > STALE_SWEEP_RETENTION_MS;
+}
+
+/**
+ * Garbage-collect stale claim markers and pending blobs — judged purely by
+ * each blob's `uploadedAt` from list(), with NO content reads. This runs
+ * piggybacked on createPendingAction, which sits in the Cal-webhook and
+ * order hot paths: content-reading every aged pending there risked
+ * timeouts → webhook redelivery → duplicate client emails. Over-retention
+ * is harmless — an expired pending is refused by takePendingAction's own
+ * per-action TTL check regardless of when the sweep removes the blob.
+ *
+ * Best effort, never throws. Exported for the verification harness;
+ * production invokes it fire-and-forget (never awaited on a request path).
+ */
+export async function sweepStalePendingState(): Promise<void> {
   try {
     const now = Date.now();
-    const defaultCutoff = now - 2 * PENDING_TTL_MS;
-
-    // Claim markers only matter while their pending blob still exists (the
-    // pending is deleted moments after a claim wins), so the short default
-    // cutoff is safe here regardless of any action's own TTL.
-    {
-      const { blobs } = await list({ prefix: CLAIMS_PREFIX });
+    for (const prefix of [CLAIMS_PREFIX, PENDING_PREFIX]) {
+      const { blobs } = await list({ prefix });
       for (const blob of blobs) {
-        if (new Date(blob.uploadedAt).getTime() < defaultCutoff) {
-          await del(blob.pathname);
-        }
-      }
-    }
-
-    // Pending blobs younger than the default cutoff cannot be stale under
-    // ANY ttl ≥ the default — skip the content read for those. Older ones
-    // are read to learn their per-action TTL; unreadable/corrupt blobs fall
-    // back to the default TTL and the blob's uploadedAt.
-    {
-      const { blobs } = await list({ prefix: "telegram/pending/" });
-      for (const blob of blobs) {
-        const uploadedAt = new Date(blob.uploadedAt).getTime();
-        if (uploadedAt >= defaultCutoff) continue;
-        const action = await readJson<PendingAction>(blob.pathname);
-        const createdAt = action ? new Date(action.createdAt).getTime() : NaN;
-        const base = Number.isFinite(createdAt) ? createdAt : uploadedAt;
-        if (now - base > 2 * actionTtlMs(action)) {
+        if (isSweepStale(blob.uploadedAt, now)) {
           await del(blob.pathname);
         }
       }
@@ -348,15 +356,21 @@ async function sweepStalePendingState(): Promise<void> {
 }
 
 export async function createPendingAction(
-  action: Omit<PendingAction, "id" | "createdAt">
+  action: Omit<PendingAction, "id" | "createdAt"> & { id?: string }
 ): Promise<PendingAction> {
+  const id = action.id ?? crypto.randomUUID();
+  if (!PENDING_ID_RE.test(id)) throw new Error("Invalid pending action id");
   const pending: PendingAction = {
     ...action,
-    id: crypto.randomUUID(),
+    id,
     createdAt: new Date().toISOString(),
   };
   await writeJson(pendingPath(pending.id), pending);
-  await sweepStalePendingState();
+  // Fire-and-forget garbage collection: the sweep must never delay or fail
+  // the request path (a slow Cal-webhook response means Telegram/Cal
+  // redelivery and duplicate emails). It catches internally; if the
+  // serverless instance freezes before it finishes, the next create retries.
+  void sweepStalePendingState();
   return pending;
 }
 

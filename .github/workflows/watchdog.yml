@@ -16,13 +16,24 @@
 # marker that could itself fail and suppress a real alert.
 #
 # Secrets:
-#   RESEND_API_KEY      — required for email alerts (recipients hardcoded
-#                         below in NOTIFY_RECIPIENTS; they are the same
-#                         NOTIFY_EMAIL owner addresses the app emails).
+#   RESEND_API_KEY      — required for email alerts.
+#   WATCHDOG_EMAILS     — comma-separated alert recipients (the same owner
+#                         addresses as the app's NOTIFY_EMAIL). Kept out of
+#                         this PUBLIC file as a secret; email alerts are
+#                         skipped gracefully if unset. Set with:
+#                         gh secret set WATCHDOG_EMAILS --body "a@x.com,b@y.com"
 #   TELEGRAM_BOT_TOKEN  — optional; Telegram alert skipped gracefully if unset.
 #   OWNER_CHAT_ID       — optional; cannot exist until Victoria binds her
 #                         chat to the bot. Set later with:
 #                         gh secret set OWNER_CHAT_ID --body "<chat id>"
+#
+# MINUTES MATH: every-30-min × ~1 min/run ≈ 1,440 min/month. Free on this
+# PUBLIC repo (public repos get unlimited Actions minutes). If the repo ever
+# goes PRIVATE, this alone consumes ~72% of the 2,000-minute free tier —
+# stretch the schedule (e.g. hourly) before flipping visibility.
+#
+# NOTE: GitHub auto-disables scheduled workflows after 60 days without
+# repository activity — keepalive.yml re-enables them weekly (see there).
 name: watchdog
 
 on:
@@ -114,12 +125,17 @@ jobs:
         env:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           FAILURES: ${{ steps.checks.outputs.failures }}
-          # The owner notification addresses (same as the app's NOTIFY_EMAIL).
-          NOTIFY_RECIPIENTS: "victoriaholisticbeauty@outlook.com vasilyeva.v.m@mail.ru"
+          # Comma-separated owner addresses — a repo secret, never hardcoded
+          # in this public file (see the header for the gh secret command).
+          WATCHDOG_EMAILS: ${{ secrets.WATCHDOG_EMAILS }}
         run: |
           set -uo pipefail
           if [ -z "${RESEND_API_KEY}" ]; then
             echo "Email alert skipped (RESEND_API_KEY not set)"
+            exit 0
+          fi
+          if [ -z "${WATCHDOG_EMAILS}" ]; then
+            echo "Email alert skipped (WATCHDOG_EMAILS not set)"
             exit 0
           fi
           BODY="The site watchdog (GitHub Actions, every 30 min) found failing checks:
@@ -128,7 +144,7 @@ jobs:
 
           Checks: homepage, booking page (/book), treatments API.
           Alerts repeat every 30 minutes while the outage lasts."
-          for TO in ${NOTIFY_RECIPIENTS}; do
+          for TO in $(printf '%s' "${WATCHDOG_EMAILS}" | tr ',' ' '); do
             jq -n \
               --arg from "Victoria Holistic Beauty <bookings@victoriaholisticbeauty.com>" \
               --arg to "$TO" \
@@ -140,6 +156,6 @@ jobs:
                 -H 'Content-Type: application/json' \
                 -d @- \
                 "https://api.resend.com/emails" \
-            || echo "Email alert to ${TO} failed"
+            || echo "Email alert send failed for one recipient"
             echo
           done

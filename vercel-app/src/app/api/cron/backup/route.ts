@@ -85,6 +85,9 @@ export async function GET(request: NextRequest) {
     `Weekly business backup — ${dateKey}`,
     "",
     `Files captured: ${snapshot.files.length}`,
+    ...(snapshot.truncated
+      ? ["WARNING: orders listing hit its cap — snapshot is INCOMPLETE."]
+      : []),
     ...(snapshot.missing.length
       ? [`Missing/unreadable: ${snapshot.missing.join(", ")}`]
       : []),
@@ -97,6 +100,9 @@ export async function GET(request: NextRequest) {
 
   const contentHtml =
     `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">Files captured: <strong>${snapshot.files.length}</strong></p>` +
+    (snapshot.truncated
+      ? `<p style="margin:0 0 8px;color:#B3261E;font-size:15px;line-height:1.6;"><strong>WARNING:</strong> orders listing hit its cap — this snapshot is incomplete.</p>`
+      : "") +
     (snapshot.missing.length
       ? `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">Missing/unreadable: ${escapeHtml(snapshot.missing.join(", "))}</p>`
       : "") +
@@ -128,6 +134,7 @@ export async function GET(request: NextRequest) {
     forced: force,
     pathname,
     files: snapshot.files.length,
+    truncated: snapshot.truncated,
     missing: snapshot.missing,
     bytes: json.length,
     rotatedOut: deleted,

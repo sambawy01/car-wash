@@ -8,6 +8,13 @@
 # — same DST-proof pattern as the daily brief. Both firings land on Monday
 # in Cairo (00:00/01:00 UTC → 02:00–04:00 Cairo). Auth: Bearer CRON_SECRET,
 # fail closed.
+#
+# PUBLIC-LOG HYGIENE: this repo is public, so Actions logs are world-
+# readable. Only {ok, skipped, error} from the response is ever printed —
+# the full body carries business data (file lists, backup paths).
+#
+# NOTE: GitHub auto-disables scheduled workflows after 60 days without
+# repository activity — keepalive.yml re-enables them weekly (see there).
 name: cron-backup
 
 on:
@@ -36,5 +43,6 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "https://book.victoriaholisticbeauty.com/api/cron/backup")
           echo "HTTP ${code}"
-          cat /tmp/resp.json
+          # Public repo: never dump the full body (business data) into logs.
+          jq '{ok, skipped, error}' /tmp/resp.json || echo "(non-JSON response body suppressed)"
           test "${code}" = "200"

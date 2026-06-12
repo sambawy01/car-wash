@@ -13,6 +13,9 @@
  *   (never touch real bookings)
  * - api.resend.com        → captured (never send real emails; RESEND_API_KEY
  *   is also blanked for belt-and-braces)
+ * - Blob READS of telegram/owner.json → 404 (undici-dispatcher seam), ONLY
+ *   while section 19 runs — exercises the no-owner branch without ever
+ *   deleting the real binding
  *
  * The script drives the real webhook route handler with synthetic Telegram
  * updates and asserts on the captured outbound calls.
@@ -155,17 +158,58 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
   return realFetch(input as RequestInfo, init);
 }) as typeof fetch;
 
+// --- undici interception (the Blob SDK's HTTP boundary) ----------------------------
+// @vercel/blob performs ALL its HTTP through the `undici` package's fetch —
+// NOT globalThis.fetch — and undici's fetch consults its module-global
+// dispatcher at call time, so that is the seam. Two harness behaviours,
+// passthrough otherwise (MockAgent with net-connect enabled):
+// - blobOwner404Mock.activate(): GETs of telegram/owner.json answer 404
+//   (the SDK maps a true 404 to null = "no owner bound") so section 19 can
+//   exercise the no-owner branch WITHOUT deleting the real binding — a
+//   SIGKILL mid-section can no longer leave one-time owner binding
+//   reopened. Deactivated outside that section.
+// - blobUrlLog: when non-null, records {method, url} of every Blob SDK
+//   request — used to prove the stale-state sweep does NO content reads.
+const { MockAgent, setGlobalDispatcher } = await import("undici");
+let blobUrlLog: { method: string; url: string }[] | null = null;
+const blobOwner404Mock = new MockAgent();
+blobOwner404Mock.enableNetConnect(); // everything unmatched → real network
+blobOwner404Mock
+  .get((origin: string) => origin.includes("vercel-storage.com"))
+  .intercept({
+    path: (p: string) => p.includes("/telegram/owner.json"),
+    method: "GET",
+  })
+  .reply(404, "Not Found")
+  .persist();
+blobOwner404Mock.deactivate(); // mocking OFF by default — section 19 only
+setGlobalDispatcher(
+  blobOwner404Mock.compose((dispatch) => (opts, handler) => {
+    if (blobUrlLog) {
+      blobUrlLog.push({
+        method: String(opts.method),
+        url: `${String(opts.origin)}${String(opts.path)}`,
+      });
+    }
+    return dispatch(opts, handler);
+  })
+);
+
 // --- app imports (after env + fetch patch) ----------------------------------------
 const { POST: webhookPOST } = await import("../src/app/api/telegram/webhook/route");
 const { POST: calWebhookPOST } = await import("../src/app/api/cal/webhook/route");
 const { POST: orderPOST } = await import("../src/app/api/order/route");
 const {
   getOwnerChatId,
-  bindOwner,
   createPendingAction,
   takePendingAction,
   discardPendingAction,
+  sweepStalePendingState,
+  isSweepStale,
+  STALE_SWEEP_RETENTION_MS,
+  NOTIFY_PENDING_TTL_MS,
 } = await import("../src/lib/assistant/state");
+const { claimDailySend } = await import("../src/lib/reports/shared");
 const { getCatalog, saveCatalog } = await import("../src/lib/catalog");
 const { executeTool, describeMutation, validateMutationArgs } = await import(
   "../src/lib/assistant/tools"
@@ -1218,6 +1262,90 @@ try {
     check("Cancel on a never-existing pending id → false", ghostCancel === false);
   }
 
+  console.log("\n=== 14b. Stale-state sweep: uploadedAt-only, no content reads ===");
+  {
+    // The sweep runs fire-and-forget inside createPendingAction (it must
+    // never block the Cal-webhook/order hot paths); here it is called
+    // directly and its Blob traffic observed at the undici dispatcher.
+    //
+    // Cutoff rule first (pure — real stale blobs can't be faked because
+    // uploadedAt is server-assigned): one shared 14-day horizon for BOTH
+    // prefixes, so a claim marker always outlives any pending (incl. 7-day
+    // pushed buttons) it could be guarding.
+    check(
+      "sweep retention = 2× the LONGEST pending TTL (claims outlive 7-day pendings)",
+      STALE_SWEEP_RETENTION_MS === 2 * NOTIFY_PENDING_TTL_MS
+    );
+    const now = Date.now();
+    check(
+      "isSweepStale: beyond the horizon → stale; within → kept; garbage → kept",
+      isSweepStale(new Date(now - STALE_SWEEP_RETENTION_MS - 60_000), now) === true &&
+        isSweepStale(new Date(now - STALE_SWEEP_RETENTION_MS + 60_000), now) === false &&
+        isSweepStale("not-a-date", now) === false
+    );
+
+    // Live behaviour: park a pending + leave a claim marker (take a second
+    // one), then sweep and prove (a) no content reads, (b) both prefixes
+    // listed, (c) fresh state survives.
+    const keepMe = await createPendingAction({
+      chatId: OWNER_CHAT,
+      tool: "email_send",
+      args: { to: "x@example.com", subject: "s", body: "b" },
+      summary: "sweep survivor",
+    });
+    const claimed = await createPendingAction({
+      chatId: OWNER_CHAT,
+      tool: "email_send",
+      args: { to: "x@example.com", subject: "s", body: "b" },
+      summary: "sweep claim source",
+    });
+    await takePendingAction(claimed.id); // leaves telegram/claims/<id>.json
+
+    blobUrlLog = [];
+    await sweepStalePendingState();
+    const swept = blobUrlLog;
+    blobUrlLog = null;
+
+    // A content read is a GET whose URL PATH targets an individual blob
+    // under either prefix; list() carries the prefix in the QUERY string.
+    const contentReads = swept.filter((e) => {
+      if (e.method !== "GET") return false;
+      try {
+        const p = new URL(e.url).pathname;
+        return p.includes("/telegram/pending/") || p.includes("/telegram/claims/");
+      } catch {
+        return false;
+      }
+    });
+    check(
+      "sweep performs ZERO content reads (judges by list()'s uploadedAt only)",
+      contentReads.length === 0,
+      contentReads.map((e) => e.url).join(", ").slice(0, 200)
+    );
+    const decoded = swept.map((e) => {
+      try {
+        return `${e.method} ${decodeURIComponent(e.url)}`;
+      } catch {
+        return `${e.method} ${e.url}`;
+      }
+    });
+    check(
+      "sweep lists BOTH prefixes (claims AND pending)",
+      decoded.some((u) => u.startsWith("GET") && u.includes("prefix=telegram/claims/")) &&
+        decoded.some((u) => u.startsWith("GET") && u.includes("prefix=telegram/pending/")),
+      decoded.join(" | ").slice(0, 300)
+    );
+    check(
+      "fresh pending survives the sweep",
+      (await readBlobText(`telegram/pending/${keepMe.id}.json`)) !== null
+    );
+    check(
+      "fresh claim marker survives the sweep (still guards its pending)",
+      (await readBlobText(`telegram/claims/${claimed.id}.json`)) !== null
+    );
+    // keepMe/claim blobs are removed by the final cleanup's full sweep.
+  }
+
   console.log("\n=== 15. Mutation-arg validation (summary/executor parity) ===");
   {
     const arrayTo = validateMutationArgs("email_send", {
@@ -1460,8 +1588,10 @@ try {
     check("no Cal mutation before any tap", calMutations.length === 0);
 
     // Pushed pendings carry the LONG ttl: the 15-min chat default would kill
-    // a notification button before Victoria even sees it.
+    // a notification button before Victoria even sees it. They also cross-
+    // link as siblings so the first winning tap retires the other button.
     const confirmId = (row[0]?.callback_data ?? "").replace(/^confirm:/, "");
+    const declineId = (row[1]?.callback_data ?? "").replace(/^confirm:/, "");
     const pendingRaw = confirmId
       ? await readBlobText(`telegram/pending/${confirmId}.json`)
       : null;
@@ -1471,6 +1601,7 @@ try {
           args?: { uid?: string };
           ttlMs?: number;
           summary?: string;
+          siblingId?: string;
         })
       : null;
     check(
@@ -1480,6 +1611,11 @@ try {
         pendingParsed?.ttlMs === 7 * 24 * 60 * 60 * 1000 &&
         /booking-confirmation email/i.test(pendingParsed?.summary ?? ""),
       JSON.stringify(pendingParsed).slice(0, 240)
+    );
+    check(
+      "Confirm pending cross-links the Decline pending as its sibling",
+      Boolean(declineId) && pendingParsed?.siblingId === declineId,
+      `siblingId=${pendingParsed?.siblingId} declineId=${declineId}`
     );
 
     // (b) Tap Confirm → the EXISTING executor path runs booking_confirm.
@@ -1496,6 +1632,15 @@ try {
       Boolean(edited && /done/.test(String((edited.body as { text?: string })?.text))),
       String((edited?.body as { text?: string })?.text).slice(0, 160)
     );
+    // Sibling mutual exclusion: winning the Confirm claim discarded the
+    // Decline pending, so a later Decline tap can NEVER execute — even when
+    // the best-effort editMessageText above had failed.
+    const siblingTake = declineId ? await takePendingAction(declineId) : null;
+    check(
+      "winning Confirm discards the sibling Decline (take → not-found)",
+      siblingTake !== null && !siblingTake.ok && siblingTake.reason === "not-found",
+      JSON.stringify(siblingTake)
+    );
 
     // (c) Decline button on a second request → declineBooking + canned reason.
     telegramCalls.length = 0;
@@ -1511,6 +1656,14 @@ try {
       "Decline tap → declineBooking with the canned schedule-conflict reason",
       Boolean(declineCall && /Schedule conflict/.test(JSON.stringify(declineCall.body))),
       JSON.stringify(declineCall?.body ?? calMutations.map((c) => c.url)).slice(0, 200)
+    );
+    // …and symmetrically, the winning Decline discarded its Confirm sibling.
+    const confirm2Id = (row2[0]?.callback_data ?? "").replace(/^confirm:/, "");
+    const confirm2Take = confirm2Id ? await takePendingAction(confirm2Id) : null;
+    check(
+      "winning Decline discards the sibling Confirm (take → not-found)",
+      confirm2Take !== null && !confirm2Take.ok && confirm2Take.reason === "not-found",
+      JSON.stringify(confirm2Take)
     );
 
     // (d) BOOKING_CANCELLED → informational push, NO buttons.
@@ -1651,6 +1804,16 @@ try {
         confirmedOrder?.status === "confirmed",
         `status=${confirmedOrder?.status}`
       );
+      // Sibling mutual exclusion on the order pair: Mark-confirmed winning
+      // its claim discarded [Cancel order] — a day-3 Cancel tap can no
+      // longer cancel (and restock) an order that may already have shipped.
+      const cancelOrderId = (orderRow[1]?.callback_data ?? "").replace(/^confirm:/, "");
+      const cancelTake = cancelOrderId ? await takePendingAction(cancelOrderId) : null;
+      check(
+        "Mark-confirmed discards the sibling Cancel-order pending (take → not-found)",
+        cancelTake !== null && !cancelTake.ok && cancelTake.reason === "not-found",
+        JSON.stringify(cancelTake)
+      );
 
       // Tap [Mark sold out] → REAL catalog flips soldOut: true.
       telegramCalls.length = 0;
@@ -1720,12 +1883,27 @@ try {
     }
   }
 
-  console.log("\n=== 19. No bound owner → zero pushes, flows still succeed ===");
+  console.log("\n=== 19. No bound owner → zero pushes, flows still succeed (seam, owner.json untouched) ===");
   {
+    // The no-owner branch used to be exercised by DELETING the real
+    // telegram/owner.json — a SIGKILL inside that window would have left
+    // one-time owner binding REOPENED (a takeover vector) with no cleanup
+    // able to run. Instead, the undici-dispatcher seam answers 404 for
+    // owner.json READS only (the SDK maps a true 404 to null = "unbound")
+    // while the real blob never leaves the store.
     const catalogBytes = await readBlobText("catalog/products.json");
-    await del("telegram/owner.json");
+    const ownerBytesBefore = await readBlobText("telegram/owner.json");
+    check(
+      "owner binding present before the no-owner simulation",
+      ownerBytesBefore !== null
+    );
     let orphanOrder = "";
     try {
+      blobOwner404Mock.activate();
+      check(
+        "seam active: getOwnerChatId() reports unbound (owner.json untouched)",
+        (await getOwnerChatId()) === null
+      );
       telegramCalls.length = 0;
       const calRes = await calWebhookPOST(
         calRequest({
@@ -1767,6 +1945,7 @@ try {
         `calls=${telegramCalls.length}`
       );
     } finally {
+      blobOwner404Mock.deactivate();
       if (orphanOrder) {
         try {
           await del(`orders/${orphanOrder}.json`);
@@ -1778,10 +1957,84 @@ try {
       if (catalogBytes !== null) {
         await restoreBlobText("catalog/products.json", catalogBytes, "application/json");
       }
-      // Re-bind the harness owner (final cleanup still restores the true
-      // pre-run snapshot; this just keeps any later sections coherent).
-      await bindOwner(OWNER_CHAT);
+      check(
+        "owner.json byte-identical after the no-owner section (never deleted)",
+        (await readBlobText("telegram/owner.json")) === ownerBytesBefore
+      );
     }
+  }
+
+  console.log("\n=== 20. Report day-marker idempotency (claims pattern) ===");
+  {
+    // claimDailySend guards the digest/weekly routes against the residual
+    // double-fire windows the Cairo-hour guard can't close (60-min-plus
+    // Actions delays, prod workflow_dispatch). Synthetic job name + far-past
+    // date keys so this can never collide with real markers; cleaned up
+    // below AND by the final-cleanup prefix sweep.
+    const JOB = "harness-idem";
+    const day1 = "2000-01-01";
+    const day2 = "2000-01-02";
+    for (const d of [day1, day2]) {
+      try {
+        await del(`reports/sent/${JOB}/${d}.json`);
+      } catch {
+        // stale marker from a crashed previous run — fine
+      }
+    }
+    const first = await claimDailySend(JOB, day1);
+    const second = await claimDailySend(JOB, day1);
+    const nextDay = await claimDailySend(JOB, day2);
+    check("first firing claims the day marker", first === true);
+    check("second firing, same Cairo day → marker already claimed (skip)", second === false);
+    check("next day → fresh marker, proceeds", nextDay === true);
+    check(
+      "malformed marker keys are refused (never written)",
+      (await claimDailySend("Bad/Job", day1)) === false &&
+        (await claimDailySend(JOB, "2000-1-1")) === false
+    );
+    for (const d of [day1, day2]) {
+      try {
+        await del(`reports/sent/${JOB}/${d}.json`);
+      } catch {
+        // best effort — final cleanup sweeps the prefix too
+      }
+    }
+
+    // force=1 (non-production only) bypasses the marker ENTIRELY — it
+    // neither checks nor claims — so repeated dev/harness test sends work
+    // AND never suppress the real scheduled send. Proven against the real
+    // weekly-report route: two forced calls both send (Resend mocked).
+    const { GET: weeklyGET } = await import("../src/app/api/cron/weekly-report/route");
+    const { cairoDateKey } = await import("../src/lib/daily-brief-email");
+    const { NextRequest } = await import("next/server");
+    const weeklyReq = () =>
+      new NextRequest(
+        "https://book.victoriaholisticbeauty.com/api/cron/weekly-report?force=1",
+        { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } }
+      );
+    // The real marker for today (Cairo date) may legitimately pre-exist
+    // (e.g. harness running on a Sunday evening after the real send) —
+    // assert the forced runs leave it EXACTLY as found, claimed or not.
+    const realMarkerPath = `reports/sent/weekly-report/${cairoDateKey(new Date())}.json`;
+    const realMarkerBefore = await readBlobText(realMarkerPath);
+    resendCalls.length = 0;
+    const w1 = (await (await weeklyGET(weeklyReq())).json()) as {
+      ok?: boolean;
+      skipped?: string;
+    };
+    const w2 = (await (await weeklyGET(weeklyReq())).json()) as {
+      ok?: boolean;
+      skipped?: string;
+    };
+    check(
+      "force=1 bypasses the day marker (two forced weekly runs both send)",
+      w1.ok === true && !w1.skipped && w2.ok === true && !w2.skipped,
+      JSON.stringify({ w1: w1.skipped ?? "sent", w2: w2.skipped ?? "sent" })
+    );
+    check(
+      "forced runs never claim the real weekly marker (untouched, claimed or not)",
+      (await readBlobText(realMarkerPath)) === realMarkerBefore
+    );
   }
 } catch (error) {
   crashed = error;
@@ -1800,8 +2053,11 @@ try {
   }
 
   // Pending actions + exactly-once claim markers created by the run — sweep.
+  // reports/sent/harness-idem/ holds ONLY this harness's synthetic day
+  // markers (section 20); real job markers (evening-digest, weekly-report)
+  // live under their own prefixes and are never touched.
   try {
-    for (const prefix of ["telegram/pending/", "telegram/claims/"]) {
+    for (const prefix of ["telegram/pending/", "telegram/claims/", "reports/sent/harness-idem/"]) {
       const { blobs } = await list({ prefix });
       for (const blob of blobs) {
         try {

@@ -405,11 +405,24 @@ async function handleCallback(cb: TgCallbackQuery): Promise<void> {
   if (!taken.ok) {
     const why =
       taken.reason === "expired"
-        ? "⏳ That confirmation expired (15 min limit) — please ask me again."
+        ? "⏳ That confirmation expired — please ask me again."
         : "This action is no longer available (already executed or cancelled).";
     await answerCallbackQuery(cb.id);
     if (messageId !== undefined) await editMessageText(chatId, messageId, why);
     return;
+  }
+
+  // Paired pushed buttons (Confirm/Decline on one notification): the claim
+  // is won — retire the sibling pending NOW, before executing. The
+  // editMessageText below also removes both buttons, but it is best effort
+  // and unreliable for aged messages; without this, a day-3 tap on the
+  // other button would still execute (e.g. cancelling a shipped order).
+  if (taken.action.siblingId) {
+    try {
+      await discardPendingAction(taken.action.siblingId);
+    } catch (error) {
+      console.error("[telegram] Sibling pending discard failed:", error);
+    }
   }
 
   await answerCallbackQuery(cb.id, "On it…");

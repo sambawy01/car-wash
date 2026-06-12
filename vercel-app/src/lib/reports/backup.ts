@@ -15,6 +15,14 @@ import { del, get, list, put } from "@vercel/blob";
  * stores are UTF-8 text). The snapshot never mutates source blobs; it only
  * ever WRITES under backups/.
  *
+ * NOT A POINT-IN-TIME SNAPSHOT: blobs are read one by one over several
+ * seconds with no store-wide transaction (Blob has none). Writes that land
+ * mid-snapshot can make the capture a mix of before/after states ACROSS
+ * files (e.g. an order blob from 03:00:01 next to a catalog from 03:00:04).
+ * Each individual file is still internally consistent, and every store here
+ * is an independent document, so per-file restores are always safe — just
+ * never treat one snapshot as a transactionally consistent whole.
+ *
  * Retention: backups/YYYY-MM-DD.json (Cairo date), newest BACKUP_KEEP kept,
  * older deleted. Re-running on the same day overwrites that day's snapshot.
  *
@@ -45,6 +53,12 @@ export interface BackupFile {
 export interface BackupSnapshot {
   version: 1;
   generatedAt: string;
+  /**
+   * True when the orders listing hit ORDERS_LIST_LIMIT with more blobs
+   * remaining — the snapshot is then INCOMPLETE (orders beyond the limit
+   * are absent, not "missing"). Alarm-worthy: the cap assumes a small shop.
+   */
+  truncated: boolean;
   /** Blobs that were listed/expected but unreadable at snapshot time. */
   missing: string[];
   files: BackupFile[];
@@ -63,7 +77,7 @@ export async function buildBackupSnapshot(
   const files: BackupFile[] = [];
   const missing: string[] = [];
 
-  const { blobs } = await list({
+  const { blobs, hasMore } = await list({
     prefix: ORDERS_PREFIX,
     limit: ORDERS_LIST_LIMIT,
   });
@@ -88,9 +102,16 @@ export async function buildBackupSnapshot(
     }
   }
 
+  if (hasMore) {
+    console.error(
+      `[backup] Orders listing truncated at ${ORDERS_LIST_LIMIT} — snapshot is INCOMPLETE`
+    );
+  }
+
   return {
     version: 1,
     generatedAt: now.toISOString(),
+    truncated: Boolean(hasMore),
     missing,
     files,
   };

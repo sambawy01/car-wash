@@ -32,7 +32,11 @@ export interface CalDriftItem {
 }
 
 export interface CalSyncCheckResult {
-  /** Treatments actually verified against Cal. */
+  /**
+   * Treatments whose verification CONCLUDED — clean, drifted, or 404 (a
+   * confirmed-missing event type IS a verdict). Treatments whose Cal fetch
+   * failed transiently are counted in `errors`, never here.
+   */
   checked: number;
   /** Catalog entries skipped (deactivated with no linked event type). */
   skipped: number;
@@ -144,20 +148,21 @@ export async function checkCalSync(): Promise<CalSyncCheckResult> {
       }
       try {
         const result = await fetchEventType(apiUrl, apiKey, t.eventTypeId);
-        checked++;
         if (result.ok) {
+          checked++;
           drift.push(...checkOne(t, result.eventType));
         } else if (result.notFound) {
+          checked++;
           drift.push({
             slug: t.slug,
             eventTypeId: t.eventTypeId,
             problem: "event type not found on Cal (404)",
           });
         } else {
+          // Verification did NOT conclude — `errors`, not `checked`.
           errors.push(`${t.slug}: ${result.error}`);
         }
       } catch (error) {
-        checked++;
         errors.push(
           `${t.slug}: ${error instanceof Error ? error.message : String(error)}`
         );

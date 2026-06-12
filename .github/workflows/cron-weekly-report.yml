@@ -2,7 +2,16 @@
 #
 # Double UTC schedule + server-side Cairo guard (weekday Sunday AND hour 18)
 # — same DST-proof pattern as the daily brief; the off-hour firing returns
-# {skipped} and can never double-send. Auth: Bearer CRON_SECRET, fail closed.
+# {skipped}. The hour guard alone is not airtight against 60-minute-plus
+# Actions delays or a dispatch during the window — the route also claims a
+# per-day sent marker before sending. Auth: Bearer CRON_SECRET, fail closed.
+#
+# PUBLIC-LOG HYGIENE: this repo is public, so Actions logs are world-
+# readable. Only {ok, skipped, error} from the response is ever printed —
+# the full body carries business data (revenue, top treatments).
+#
+# NOTE: GitHub auto-disables scheduled workflows after 60 days without
+# repository activity — keepalive.yml re-enables them weekly (see there).
 name: cron-weekly-report
 
 on:
@@ -31,5 +40,6 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "https://book.victoriaholisticbeauty.com/api/cron/weekly-report")
           echo "HTTP ${code}"
-          cat /tmp/resp.json
+          # Public repo: never dump the full body (business data) into logs.
+          jq '{ok, skipped, error}' /tmp/resp.json || echo "(non-JSON response body suppressed)"
           test "${code}" = "200"

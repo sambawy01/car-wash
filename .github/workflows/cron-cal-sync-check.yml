@@ -6,6 +6,13 @@
 # Double UTC schedule + server-side Cairo guard (weekday Monday AND hour 9)
 # — same DST-proof pattern as the daily brief. Auth: Bearer CRON_SECRET,
 # fail closed.
+#
+# PUBLIC-LOG HYGIENE: this repo is public, so Actions logs are world-
+# readable. Only {ok, skipped, error} from the response is ever printed —
+# the full body carries business data (drift detail, catalog contents).
+#
+# NOTE: GitHub auto-disables scheduled workflows after 60 days without
+# repository activity — keepalive.yml re-enables them weekly (see there).
 name: cron-cal-sync-check
 
 on:
@@ -34,5 +41,6 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "https://book.victoriaholisticbeauty.com/api/cron/cal-sync-check")
           echo "HTTP ${code}"
-          cat /tmp/resp.json
+          # Public repo: never dump the full body (business data) into logs.
+          jq '{ok, skipped, error}' /tmp/resp.json || echo "(non-JSON response body suppressed)"
           test "${code}" = "200"

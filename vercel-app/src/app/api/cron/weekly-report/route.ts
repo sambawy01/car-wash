@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { cairoHourNow } from "@/lib/daily-brief-email";
+import { cairoDateKey, cairoHourNow } from "@/lib/daily-brief-email";
 import {
   buildWeeklyReportEmail,
   gatherWeeklyReportData,
 } from "@/lib/reports/weekly-report";
 import {
   cairoWeekdayNow,
+  claimDailySend,
   cronAuthError,
   isForced,
   pushOwnerTelegram,
@@ -19,10 +20,13 @@ import {
  * Auth: Bearer CRON_SECRET, fail closed.
  *
  * DST-proofing: the workflow fires Sundays at BOTH 15:00 and 16:00 UTC; this
- * guard only proceeds when Cairo wall time is Sunday 18:00 — one firing
- * sends, the other returns {skipped}. Both UTC firings stay on Sunday in
- * Cairo (17:00/18:00 local), so the weekday check can't drift either.
- * `?force=1` bypasses the guard outside production only.
+ * guard only proceeds when Cairo wall time is Sunday 18:00 — normally one
+ * firing sends and the other returns {skipped}. Both UTC firings stay on
+ * Sunday in Cairo (17:00/18:00 local), so the weekday check can't drift.
+ * The wall-clock guard alone is not airtight (60-minute-plus Actions delays
+ * can land both firings in the window; a prod workflow_dispatch passes it
+ * too), so the route also claims a per-day marker before sending
+ * (claimDailySend). `?force=1` bypasses the guard outside production only.
  *
  * Content: this week vs last week (Cairo Mon–Sun weeks) — confirmed
  * bookings, top treatments, order count + EGP revenue, cancellations.
@@ -47,6 +51,19 @@ export async function GET(request: NextRequest) {
       skipped: "not Sunday 18:00 Cairo",
       cairoWeekday,
       cairoHour,
+    });
+  }
+
+  // Double-fire guard: claim today's marker (claims pattern, fail closed).
+  // `force` (non-production only) bypasses the marker entirely — it neither
+  // checks nor claims, so dev/preview test sends never suppress the real
+  // Sunday send.
+  if (!force && !(await claimDailySend("weekly-report", cairoDateKey(new Date())))) {
+    return NextResponse.json({
+      ok: true,
+      cairoWeekday,
+      cairoHour,
+      skipped: "already sent today (day marker)",
     });
   }
 

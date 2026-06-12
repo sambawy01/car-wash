@@ -1,0 +1,54 @@
+# Schedule keepalive — Monday 04:23 UTC weekly.
+#
+# WHY THIS EXISTS: GitHub automatically DISABLES all scheduled workflows in
+# a repository after 60 days without repository activity (commits). On a
+# quiet repo that would silently kill the watchdog and the whole cron fleet
+# — the watchdog dying silently is precisely the failure mode it exists to
+# detect. Calling the "enable workflow" API resets that 60-day timer, so
+# this job re-enables every scheduled workflow (including ITSELF — the API
+# call counts as activity for this workflow too, keeping the keepalive
+# alive) once a week using the default GITHUB_TOKEN.
+#
+# The enable call is idempotent: enabling an already-enabled workflow is a
+# 204 no-op. If a workflow file is ever renamed, update FLEET below — an
+# unknown filename fails the run, which surfaces as a red Actions run.
+#
+# Permissions: `actions: write` on the default token is required for the
+# enable endpoint; everything else stays at none.
+name: keepalive
+
+on:
+  schedule:
+    - cron: "23 4 * * 1" # weekly — well inside any 60-day window
+  workflow_dispatch: {}
+
+permissions:
+  actions: write
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Re-enable every scheduled workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          FLEET: >-
+            keepalive.yml
+            watchdog.yml
+            cron-backup.yml
+            cron-cal-sync-check.yml
+            cron-evening-digest.yml
+            cron-weekly-report.yml
+        run: |
+          set -euo pipefail
+          for wf in ${FLEET}; do
+            echo "enable ${wf}"
+            gh api -X PUT "repos/${REPO}/actions/workflows/${wf}/enable"
+          done
+          echo "All scheduled workflows re-enabled (60-day auto-disable timer reset)."

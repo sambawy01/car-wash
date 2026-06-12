@@ -39,7 +39,8 @@ import type { StoredOrder } from "../orders";
  *
  * Language: notifications are EN (Victoria's admin/notification surfaces are
  * EN throughout); client names, treatments and product names interpolate
- * as-is, so Russian content renders naturally.
+ * with control characters stripped (see pushSafe) but otherwise as-is, so
+ * Russian content renders naturally.
  */
 
 /** Canned decline reason — Cal.com emails it to the client verbatim. */
@@ -103,18 +104,36 @@ interface PushButton {
 }
 
 /**
+ * Strip control characters (\r, \n, \t and friends) from client-controlled
+ * text interpolated into owner pushes — names, item titles, phones. Without
+ * this, a crafted booking/order "name" containing newlines could forge
+ * extra lines or fields inside a notification Victoria trusts. Normal
+ * content (incl. Russian) passes through unchanged.
+ */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS_RE = /[\u0000-\u001f\u007f]+/g;
+function pushSafe(value: unknown): string {
+  return String(value ?? "").replace(CONTROL_CHARS_RE, " ").trim();
+}
+
+/**
  * Park a mutation as a long-TTL pending action and return its inline button.
  * Validates args through the same gate as chat-initiated mutations so what
  * Victoria's tap executes is exactly what was disclosed; the summary keeps
  * the human context AND the structural disclosure line from describeMutation
  * (the tap edits the message to `summary + result`).
+ *
+ * `ids` lets paired buttons (Confirm/Decline on one push) pre-generate both
+ * pending ids and cross-link them as siblings — the webhook executor
+ * discards the sibling after a winning claim (see PendingAction.siblingId).
  */
 async function pushActionButton(
   owner: number,
   label: string,
   tool: string,
   args: Record<string, unknown>,
-  context: string
+  context: string,
+  ids?: { id: string; siblingId: string }
 ): Promise<PushButton | null> {
   const validated = validateMutationArgs(tool, args);
   if (!validated.ok) {
@@ -127,6 +146,7 @@ async function pushActionButton(
     args: validated.args,
     summary: `${context}\n${describeMutation(tool, validated.args)}`,
     ttlMs: NOTIFY_PENDING_TTL_MS,
+    ...(ids ? { id: ids.id, siblingId: ids.siblingId } : {}),
   });
   return { text: label, callback_data: `confirm:${pending.id}` };
 }
@@ -150,19 +170,27 @@ export async function notifyBookingRequest(
     const owner = await ownerForPush();
     if (owner === null || !details.uid) return;
 
+    const name = pushSafe(details.attendeeName);
+    const service = pushSafe(details.service);
+    const phone = pushSafe(details.attendeePhone);
     const when = formatCairoTime(details.start);
     const headline =
-      `🔔 New booking request — ${details.attendeeName}, ` +
-      `${details.service}, ${when}, ${details.attendeePhone}`;
-    const context = `Booking request: ${details.attendeeName} — ${details.service}, ${when}`;
+      `🔔 New booking request — ${name}, ` +
+      `${service}, ${when}, ${phone}`;
+    const context = `Booking request: ${name} — ${service}, ${when}`;
 
+    // Confirm and Decline are cross-linked siblings: whichever wins its
+    // claim retires the other (see PendingAction.siblingId).
+    const confirmId = crypto.randomUUID();
+    const declineId = crypto.randomUUID();
     const buttons: PushButton[] = [];
     const confirmBtn = await pushActionButton(
       owner,
       "✅ Confirm",
       "booking_confirm",
       { uid: details.uid },
-      context
+      context,
+      { id: confirmId, siblingId: declineId }
     );
     if (confirmBtn) buttons.push(confirmBtn);
     const declineBtn = await pushActionButton(
@@ -170,7 +198,8 @@ export async function notifyBookingRequest(
       "❌ Decline",
       "booking_decline",
       { uid: details.uid, reason: DECLINE_REASON },
-      context
+      context,
+      { id: declineId, siblingId: confirmId }
     );
     if (declineBtn) buttons.push(declineBtn);
 
@@ -185,9 +214,9 @@ export async function notifyBookingCancelled(
   details: BookingDetails
 ): Promise<void> {
   const when = formatCairoTime(details.start);
-  const reason = details.reason ? ` Reason: ${details.reason}` : "";
+  const reason = details.reason ? ` Reason: ${pushSafe(details.reason)}` : "";
   await notifyOwner(
-    `❌ ${details.attendeeName} cancelled ${details.service} on ${when}.${reason}`
+    `❌ ${pushSafe(details.attendeeName)} cancelled ${pushSafe(details.service)} on ${when}.${reason}`
   );
 }
 
@@ -203,22 +232,31 @@ export async function notifyNewOrder(order: StoredOrder): Promise<void> {
     const owner = await ownerForPush();
     if (owner === null) return;
 
+    const buyer = pushSafe(order.name);
+    const phone = pushSafe(order.phone);
     const itemCount = order.items.reduce((sum, i) => sum + i.qty, 0);
     const itemList = order.items
-      .map((i) => `${i.qty}× ${i.names.en}`)
+      .map((i) => `${i.qty}× ${pushSafe(i.names.en)}`)
       .join(", ");
     const headline =
-      `🛍 New order ${order.orderNumber} — ${order.name}, ` +
-      `${order.totals.egp} EGP, ${itemCount} item(s): ${itemList}, ${order.phone}`;
-    const context = `Order ${order.orderNumber}: ${order.name}, ${order.totals.egp} EGP`;
+      `🛍 New order ${order.orderNumber} — ${buyer}, ` +
+      `${order.totals.egp} EGP, ${itemCount} item(s): ${itemList}, ${phone}`;
+    const context = `Order ${order.orderNumber}: ${buyer}, ${order.totals.egp} EGP`;
 
+    // Mark-confirmed and Cancel are cross-linked siblings (see
+    // PendingAction.siblingId): the first winning tap retires the other, so
+    // a day-3 Cancel tap can't cancel an order confirmed (and possibly
+    // shipped) on day 1 just because an editMessageText failed.
+    const confirmId = crypto.randomUUID();
+    const cancelId = crypto.randomUUID();
     const buttons: PushButton[] = [];
     const confirmBtn = await pushActionButton(
       owner,
       "✅ Mark confirmed",
       "order_set_status",
       { orderNumber: order.orderNumber, status: "confirmed" },
-      context
+      context,
+      { id: confirmId, siblingId: cancelId }
     );
     if (confirmBtn) buttons.push(confirmBtn);
     const cancelBtn = await pushActionButton(
@@ -230,7 +268,8 @@ export async function notifyNewOrder(order: StoredOrder): Promise<void> {
         status: "cancelled",
         reason: ORDER_CANCEL_REASON,
       },
-      context
+      context,
+      { id: cancelId, siblingId: confirmId }
     );
     if (cancelBtn) buttons.push(cancelBtn);
 
@@ -276,10 +315,11 @@ export async function notifyStockChanges(
     if (owner === null) return;
 
     for (const change of relevant) {
+      const name = pushSafe(change.name);
       if (change.after === 0) {
         await sendMessage(
           owner,
-          `⚠️ ${change.name} just hit 0 in stock — it now shows as sold out on the site automatically.`
+          `⚠️ ${name} just hit 0 in stock — it now shows as sold out on the site automatically.`
         );
         continue;
       }
@@ -288,11 +328,11 @@ export async function notifyStockChanges(
         "🚫 Mark sold out",
         "product_update",
         { slug: change.slug, soldOut: true },
-        `Low stock: ${change.name} — ${change.after} left`
+        `Low stock: ${name} — ${change.after} left`
       );
       await sendMessage(
         owner,
-        `⚠️ ${change.name} down to ${change.after} left`,
+        `⚠️ ${name} down to ${change.after} left`,
         { replyMarkup: keyboard(soldOutBtn ? [soldOutBtn] : []) }
       );
     }

@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from "node:crypto";
+import { put } from "@vercel/blob";
 import { NextRequest, NextResponse } from "next/server";
 import { getOwnerChatId } from "../assistant/state";
 import { sendMessage, telegramConfigured } from "../telegram";
@@ -12,8 +14,12 @@ import { sendMessage, telegramConfigured } from "../telegram";
  * - DST-proof scheduling: Cairo flips between UTC+2 and UTC+3, and GitHub
  *   cron is fixed UTC — so each workflow fires at BOTH candidate UTC hours
  *   and the route only proceeds when the Africa/Cairo wall clock matches its
- *   window (cairoHourNow / cairoWeekdayNow). One firing runs, the other
- *   returns {skipped}. Schedule jitter therefore can never double-fire.
+ *   window (cairoHourNow / cairoWeekdayNow). Normally one firing runs and
+ *   the other returns {skipped} — but the wall-clock guard alone is NOT
+ *   airtight: GitHub schedule delays of 60+ minutes can land BOTH firings
+ *   inside the same Cairo window, and a production workflow_dispatch during
+ *   the window passes it too. Jobs that send owner email therefore ALSO
+ *   claim a per-day marker (claimDailySend below) before sending.
  * - `?force=1` bypasses the time guard, but ONLY outside production.
  */
 
@@ -24,14 +30,76 @@ const EMAIL_FROM =
 
 // --- cron route guards ---------------------------------------------------------
 
-/** Bearer CRON_SECRET, fail closed. Returns the 401 response or null (pass). */
+/**
+ * Constant-time string equality. Compares fixed-length sha256 digests so
+ * the comparison itself leaks neither contents nor length (timingSafeEqual
+ * requires equal-length inputs; hashing first removes the length channel).
+ */
+function safeSecretEqual(a: string, b: string): boolean {
+  const da = createHash("sha256").update(a, "utf8").digest();
+  const db = createHash("sha256").update(b, "utf8").digest();
+  return timingSafeEqual(da, db);
+}
+
+/**
+ * Bearer CRON_SECRET, fail closed (401 when the secret is unset or the
+ * header mismatches — constant-time). Returns the 401 response or null
+ * (pass). Shared by every /api/cron/* route including the daily brief.
+ */
 export function cronAuthError(request: NextRequest): NextResponse | null {
   const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
+  const auth = request.headers.get("authorization") ?? "";
+  if (!secret || !safeSecretEqual(auth, `Bearer ${secret}`)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   return null;
+}
+
+/**
+ * Claim today's send for a job — the codebase's exactly-once claims pattern
+ * (see claimPending in ../assistant/state.ts): the Blob API enforces
+ * `allowOverwrite: false` server-side, so when two firings race, exactly
+ * one put of reports/sent/<job>/<cairoDateKey>.json succeeds.
+ *
+ * This closes the double-fire windows the Cairo wall-clock guard cannot:
+ * both UTC firings landing in the same Cairo window under 60-minute-plus
+ * GitHub schedule delays, and a production workflow_dispatch during the
+ * window. Returns true when THIS call claimed the day.
+ *
+ * FAIL CLOSED: a firing that cannot PROVE it claimed first returns false
+ * and skips. Duplicate owner emails are the harm this exists to prevent,
+ * and the marker only gates firings that already passed the schedule guard
+ * — a same-day retry path is workflow_dispatch + the marker's absence the
+ * next day, never a blind resend.
+ *
+ * Markers are a few bytes each and never swept (a year of daily jobs is
+ * well under a thousand tiny blobs) — deliberate: keeping them makes the
+ * guard immune to a sweeping bug resurrecting a day.
+ */
+export async function claimDailySend(
+  job: string,
+  cairoDateKey: string
+): Promise<boolean> {
+  // Internal-only inputs, but never let a malformed key write a stray path.
+  if (!/^[a-z0-9-]+$/.test(job) || !/^\d{4}-\d{2}-\d{2}$/.test(cairoDateKey)) {
+    console.error(`[reports] Invalid day-marker key: ${job}/${cairoDateKey}`);
+    return false;
+  }
+  try {
+    await put(
+      `reports/sent/${job}/${cairoDateKey}.json`,
+      JSON.stringify({ sentAt: new Date().toISOString() }),
+      {
+        access: "private",
+        contentType: "application/json",
+        addRandomSuffix: false,
+        allowOverwrite: false,
+      }
+    );
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** `?force=1` time-guard bypass — never honored in production. */

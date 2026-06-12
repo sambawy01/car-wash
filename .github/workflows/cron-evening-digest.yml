@@ -4,12 +4,20 @@
 # brief), so this fires from GitHub cron instead. Cairo flips between UTC+2
 # and UTC+3, and GitHub cron is fixed UTC — so we fire at BOTH candidate UTC
 # hours and the endpoint itself guards "Cairo hour == 20" server-side
-# (DST-proof; the off-hour firing returns {skipped}, so jitter or the double
-# schedule can never double-send).
+# (DST-proof; the off-hour firing returns {skipped}). The hour guard alone
+# is not airtight against 60-minute-plus Actions delays or a dispatch during
+# the window — the route also claims a per-day sent marker before sending.
 #
 # Auth: the endpoint requires `Authorization: Bearer ${CRON_SECRET}` and
 # fails closed. Set the repo secret with:
 #   gh secret set CRON_SECRET --body "<value>"
+#
+# PUBLIC-LOG HYGIENE: this repo is public, so Actions logs are world-
+# readable. Only {ok, skipped, error} from the response is ever printed —
+# the full body carries business data (appointments, pending orders).
+#
+# NOTE: GitHub auto-disables scheduled workflows after 60 days without
+# repository activity — keepalive.yml re-enables them weekly (see there).
 name: cron-evening-digest
 
 on:
@@ -38,5 +46,6 @@ jobs:
             -H "Authorization: Bearer ${CRON_SECRET}" \
             "https://book.victoriaholisticbeauty.com/api/cron/evening-digest")
           echo "HTTP ${code}"
-          cat /tmp/resp.json
+          # Public repo: never dump the full body (business data) into logs.
+          jq '{ok, skipped, error}' /tmp/resp.json || echo "(non-JSON response body suppressed)"
           test "${code}" = "200"

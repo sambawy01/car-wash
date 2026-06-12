@@ -5,6 +5,7 @@ import {
   sendDailyBriefEmail,
 } from "@/lib/daily-brief-email";
 import { gatherDailyBriefData } from "@/lib/daily-brief-data";
+import { cronAuthError } from "@/lib/reports/shared";
 import { getOwnerChatId } from "@/lib/assistant/state";
 import { sendMessage, telegramConfigured } from "@/lib/telegram";
 
@@ -30,12 +31,9 @@ import { sendMessage, telegramConfigured } from "@/lib/telegram";
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  // --- auth: fail closed --------------------------------------------------
-  const secret = process.env.CRON_SECRET;
-  const auth = request.headers.get("authorization");
-  if (!secret || auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  // --- auth: fail closed, constant-time (shared cron helper) ---------------
+  const unauthorized = cronAuthError(request);
+  if (unauthorized) return unauthorized;
 
   // --- 8am-Cairo guard ------------------------------------------------------
   const force =
