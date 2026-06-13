@@ -26,14 +26,23 @@
  * analyze a person's face or skin for any cosmetic / medical / treatment
  * assessment ("what treatment does her skin need", "analyze my wrinkles").
  * Victoria's professional eye is the product; an AI skin diagnosis is both
- * off-brand and a medical-advice risk. This is enforced in THREE layers:
+ * off-brand and a medical-advice risk. This is enforced in FIVE layers:
  *   1. the extraction system prompt instructs the model to classify any such
  *      request as kind "skin_assessment" with refuse=true and give NO advice;
  *   2. a code-level caption check (skinAssessmentIntent) forces refusal even if
  *      the model misclassifies — defense in depth;
  *   3. analyzePhoto returns the polite refusal + a booking suggestion and NEVER
- *      reaches the agent/tools for that case.
- * Legitimate ops photos (receipts, product jars, documents) are unaffected.
+ *      reaches the agent/tools for that case;
+ *   4. face presence is classified INDEPENDENTLY of intent (facePresent): the
+ *      moment any human face/skin is visibly the subject we refuse, REGARDLESS
+ *      of kind — so an innocent/no caption ("describe this image") on a real
+ *      face photo can never be relayed as a description of a person's skin even
+ *      if the model misclassifies the request as "general";
+ *   5. a belt-and-suspenders keyword scrub (EN+RU) over the model's free-text
+ *      before relaying a "general" read — if it mentions skin/face/complexion/
+ *      wrinkles/etc. we refuse instead of relaying.
+ * Legitimate ops photos (receipts, product jars, documents) are unaffected
+ * (facePresent is false and their text carries no skin/face vocabulary).
  */
 
 import { EXPENSE_CATEGORIES } from "../finance";
@@ -91,6 +100,33 @@ export function skinAssessmentIntent(caption: string): boolean {
   return SKIN_INTENT_RE.test(c) || SKIN_INTENT_RE_RU.test(c);
 }
 
+// --- LAYER 5: skin/face vocabulary scrub on relayed free-text -----------------
+//
+// Before we relay the model's "general" read/description, scrub it for any
+// skin/face/complexion vocabulary (EN + RU). Unlike skinAssessmentIntent (which
+// targets ASSESSMENT phrasing in the OWNER's caption), this catches the MODEL's
+// OUTPUT describing a person's face/skin at all — so a misclassified face photo
+// whose description slipped through as "general" is refused, never relayed.
+// Tuned to skin/face/body subjects only; ordinary document/receipt/product
+// words (vendor, total, ingredients, size) never trip it.
+const SKIN_TEXT_RE =
+  /\b(skin|face|facial|complexion|cheeks?|forehead|chin|jawline|wrinkl\w*|fine lines?|acne|pimple\w*|pores?|blemish\w*|pigmentation|melasma|rosacea|breakout\w*|blackheads?|whiteheads?|redness|dark circles?|under[\s-]?eye|crow'?s feet|eye bags?|puffiness|sagg?ing|dull(?:ness)?|oily skin|dry skin|texture)\b/i;
+// JS \b is ASCII-only, so it can't bound Cyrillic stems — without a guard,
+// "лиц" (face) would match INSIDE "глицерин" (glycerin). Require a left
+// boundary: start-of-string or a non-letter char before the stem.
+const SKIN_TEXT_RE_RU =
+  /(^|[^а-яёА-ЯЁa-zA-Z])(кож|лиц|подбород|щёк|щек|морщин|акне|прыщ|угр[еия]|поры|пигментац|розацеа|высыпан|чёрные точк|покраснен|круги под глаз|мешки под глаз|дряблост|тусклост)/i;
+
+/**
+ * Does relayed free-text describe a person's skin/face? (forces refusal of a
+ * "general" read — never relay an AI description of someone's skin).
+ */
+export function describesSkin(text: string): boolean {
+  const t = (text || "").slice(0, MAX_TEXT_CHARS);
+  if (!t.trim()) return false;
+  return SKIN_TEXT_RE.test(t) || SKIN_TEXT_RE_RU.test(t);
+}
+
 // --- extraction --------------------------------------------------------------
 
 export type VisionKind = "receipt" | "product" | "general" | "skin_assessment";
@@ -98,6 +134,8 @@ export type VisionKind = "receipt" | "product" | "general" | "skin_assessment";
 interface VisionExtraction {
   kind: VisionKind;
   refuse: boolean;
+  /** True if ANY human face/skin is visibly the subject (independent of kind). */
+  facePresent: boolean;
   vendor: string;
   totalEgp: number | null;
   date: string;
@@ -119,12 +157,14 @@ Choose exactly one "kind":
 
 ABSOLUTE RULE: if kind is "skin_assessment" you MUST set "refuse": true and give NO skin/face/treatment assessment, observation or advice of any kind — not even a hint. Skin reading is the human esthetician's job, never the AI's. When unsure whether a face photo is an assessment request, prefer "skin_assessment" + refuse.
 
+SEPARATELY, set "face_present": true if ANY human face or human skin is visibly the subject of the image — a portrait, selfie, close-up of skin, or any photo where a person's face/skin is the main thing shown — REGARDLESS of the caption or what is being asked, and EVEN IF you classified kind as "general" (e.g. "describe this image"). Set it false for receipts, product packaging, documents, text, objects, scenery, or images with no person as the subject. A small incidental person in the background of an object/scene photo is NOT the subject — set false. When in doubt about a face/skin close-up, set true.
+
 For "receipt", extract: vendor (string), total_egp (number, the grand total in EGP), date (YYYY-MM-DD or ""), category (best guess, ONE of: ${EXPENSE_CATEGORIES.join(", ")}), method (how paid: one of cash, bank-transfer, card, other; "" if unknown).
 For "product", extract: product_name (the product's name in English) and product_desc (a short one-line description, e.g. type + size).
 For "general", put the read/translated/described text in "text".
 
 JSON shape (use null/"" for fields that don't apply):
-{"kind":"receipt|product|general|skin_assessment","refuse":false,"vendor":"","total_egp":null,"date":"","category":"","method":"","product_name":"","product_desc":"","text":""}`;
+{"kind":"receipt|product|general|skin_assessment","refuse":false,"face_present":false,"vendor":"","total_egp":null,"date":"","category":"","method":"","product_name":"","product_desc":"","text":""}`;
 }
 
 function parseJsonLoose(raw: string): Record<string, unknown> | null {
@@ -217,6 +257,7 @@ async function callVision(
   return {
     kind,
     refuse: obj["refuse"] === true,
+    facePresent: obj["face_present"] === true,
     vendor: str(obj, "vendor"),
     totalEgp,
     date: str(obj, "date"),
@@ -263,11 +304,18 @@ export async function analyzePhoto(
   if (!ex) return { kind: "reply", text: VISION_UNCLEAR };
 
   // LAYER 1+3: the model flagged a skin/face assessment → refuse, no analysis.
-  if (ex.kind === "skin_assessment" || ex.refuse) {
+  // LAYER 4: a human face/skin is the subject → refuse REGARDLESS of kind, so
+  // even a "general"/"describe this" request (or a misclassification) on a real
+  // face photo never relays a description of a person's face/skin.
+  if (ex.kind === "skin_assessment" || ex.refuse || ex.facePresent) {
     return { kind: "reply", text: SKIN_REFUSAL };
   }
 
   if (ex.kind === "receipt") {
+    // NOTE: the extracted fields below are UNTRUSTED OCR (vendor/total/date) —
+    // they are interpolated into the stage-2 instruction but never executed
+    // directly: the text agent tool-calls log_expense, which parks behind
+    // Victoria's [Confirm | Cancel] gate, so she sees and approves every value.
     const cat = (EXPENSE_CATEGORIES as readonly string[]).includes(ex.category)
       ? ex.category
       : "other";
@@ -307,7 +355,12 @@ export async function analyzePhoto(
     return { kind: "agent", instruction, echo };
   }
 
-  // general: just relay what was read/described.
+  // general: relay what was read/described — but LAYER 5 first. If the relayed
+  // text describes a person's skin/face (a face photo that slipped through as
+  // "general" with facePresent unset), refuse instead of relaying it.
+  if (describesSkin(ex.text)) {
+    return { kind: "reply", text: SKIN_REFUSAL };
+  }
   const text = ex.text || VISION_UNCLEAR;
   return { kind: "reply", text };
 }
