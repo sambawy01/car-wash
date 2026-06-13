@@ -416,10 +416,11 @@ export async function buildPnL(
   let bookings: CalBooking[] = [];
   try {
     // Pad the Cal window by a day each side so timezone boundaries never clip.
+    // The helper paginates internally and returns the full window (no `take`,
+    // which Cal caps at 250 and would silently truncate treatment revenue).
     bookings = await sources.listBookingsInRange(
       new Date(new Date(`${period.from}T00:00:00.000Z`).getTime() - DAY_MS).toISOString(),
-      new Date(new Date(`${period.to}T23:59:59.999Z`).getTime() + DAY_MS).toISOString(),
-      250
+      new Date(new Date(`${period.to}T23:59:59.999Z`).getTime() + DAY_MS).toISOString()
     );
   } catch (error) {
     console.error("[finance-report] Failed to load Cal bookings:", error);

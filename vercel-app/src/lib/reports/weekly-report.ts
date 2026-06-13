@@ -181,8 +181,7 @@ export async function gatherWeeklyReportData(
   try {
     bookings = await listBookingsInRange(
       new Date(now.getTime() - 15 * DAY_MS).toISOString(),
-      new Date(now.getTime() + 1 * DAY_MS).toISOString(),
-      250
+      new Date(now.getTime() + 1 * DAY_MS).toISOString()
     );
   } catch (error) {
     console.error("[weekly-report] Failed to load Cal bookings:", error);

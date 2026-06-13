@@ -94,33 +94,106 @@ export async function listOwnerBookings(): Promise<CalBooking[]> {
 }
 
 /**
+ * Per-page size for {@link listBookingsInRange}. Cal v2 caps `take` at 250
+ * ("take must not be greater than 250"); 100 keeps us comfortably under that
+ * while paging the whole range. Verified against api.cal.eu/v2: bookings
+ * supports offset pagination via `skip` + `take`, and the response carries a
+ * `pagination` block ({ totalItems, hasNextPage, ... }).
+ */
+const CAL_RANGE_PAGE_SIZE = 100;
+
+/**
+ * Safety cap so a misbehaving upstream can never spin us in an infinite loop.
+ * 50 pages × 100 = 5000 bookings — far beyond any realistic studio window.
+ */
+const CAL_RANGE_MAX_PAGES = 50;
+
+interface CalListResponse {
+  status: string;
+  data: CalBooking[];
+  pagination?: {
+    totalItems?: number;
+    remainingItems?: number;
+    hasNextPage?: boolean;
+    [k: string]: unknown;
+  };
+}
+
+export interface ListBookingsInRangeOptions {
+  /** Per-page `take` (must stay ≤ 250, the Cal v2 cap). Default 100. */
+  pageSize?: number;
+  /** Hard cap on pages fetched before we stop and warn. Default 50. */
+  maxPages?: number;
+}
+
+/**
  * All bookings (any status, including past/cancelled) whose start falls in
  * [afterStartIso, beforeEndIso], sorted by start time. Used by Vassili's
- * stats_summary and client_history tools.
+ * stats_summary / client_history tools, the CRM client profiles and the
+ * finance + weekly reports.
+ *
+ * Cal v2 caps `take` at 250, so this PAGINATES internally (offset pagination
+ * via `skip` + `take`) and accumulates EVERY booking in the window — callers
+ * must NOT pass a `take`; they always receive the full set. Without this a
+ * busy studio's 730-day lookback would either 400 (take>250) or silently
+ * truncate (take=250), dropping clients/history and undercounting revenue.
  */
 export async function listBookingsInRange(
   afterStartIso: string,
   beforeEndIso: string,
-  take = 250
+  options: ListBookingsInRangeOptions = {}
 ): Promise<CalBooking[]> {
   const { apiUrl, apiKey } = getCalEnv();
-  const params = new URLSearchParams({
-    afterStart: afterStartIso,
-    beforeEnd: beforeEndIso,
-    take: String(take),
-  });
-  const res = await fetch(`${apiUrl}/bookings?${params}`, {
-    headers: calHeaders(apiKey),
-    cache: "no-store",
-    signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Cal.com range list failed (${res.status}): ${body.slice(0, 300)}`);
+  const pageSize = Math.min(Math.max(options.pageSize ?? CAL_RANGE_PAGE_SIZE, 1), 250);
+  const maxPages = options.maxPages ?? CAL_RANGE_MAX_PAGES;
+
+  const all: CalBooking[] = [];
+  let skip = 0;
+  let page = 0;
+
+  for (; page < maxPages; page++) {
+    const params = new URLSearchParams({
+      afterStart: afterStartIso,
+      beforeEnd: beforeEndIso,
+      take: String(pageSize),
+      skip: String(skip),
+    });
+    const res = await fetch(`${apiUrl}/bookings?${params}`, {
+      headers: calHeaders(apiKey),
+      cache: "no-store",
+      signal: AbortSignal.timeout(CAL_FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) {
+      const body = await res.text();
+      // Name the take/skip that failed so the friendly 500 the routes return
+      // has an actionable underlying message in the logs.
+      throw new Error(
+        `Cal.com range list failed (${res.status}) at take=${pageSize} skip=${skip}: ${body.slice(0, 300)}`
+      );
+    }
+    const json = (await res.json()) as CalListResponse;
+    const batch = Array.isArray(json.data) ? json.data : [];
+    all.push(...batch);
+
+    // Stop when the page is short/empty (the canonical "last page" signal) or
+    // when Cal's pagination block tells us there is no next page.
+    const hasNext =
+      json.pagination?.hasNextPage ?? batch.length === pageSize;
+    if (batch.length < pageSize || batch.length === 0 || hasNext === false) {
+      break;
+    }
+    skip += pageSize;
   }
-  const json = (await res.json()) as { status: string; data: CalBooking[] };
-  const bookings = Array.isArray(json.data) ? json.data : [];
-  return bookings.sort(
+
+  if (page >= maxPages) {
+    console.warn(
+      `[cal] listBookingsInRange hit the ${maxPages}-page cap ` +
+        `(${all.length} bookings, ${afterStartIso}..${beforeEndIso}); ` +
+        `results may be truncated.`
+    );
+  }
+
+  return all.sort(
     (a, b) => new Date(a.start).getTime() - new Date(b.start).getTime()
   );
 }

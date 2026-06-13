@@ -827,10 +827,11 @@ async function buildProfilesWithOverlay(
   const DAY = 86_400_000;
 
   const [bookings, orders, treatments, overlays] = await Promise.all([
+    // listBookingsInRange paginates internally and returns the FULL window —
+    // no `take` (Cal caps it at 250 and would 400/truncate the 730-day lookback).
     sources.listBookingsInRange(
       new Date(now.getTime() - lookbackDays * DAY).toISOString(),
-      new Date(now.getTime() + lookaheadDays * DAY).toISOString(),
-      500
+      new Date(now.getTime() + lookaheadDays * DAY).toISOString()
     ),
     sources.listOrders({ limit: 500 }),
     sources.getTreatmentsCatalog(),
