@@ -303,8 +303,16 @@ const {
 const { voiceEnabled, transcribeVoice, MAX_VOICE_SECONDS } = await import(
   "../src/lib/assistant/voice"
 );
-const { visionEnabled, analyzePhoto, skinAssessmentIntent, SKIN_REFUSAL } =
-  await import("../src/lib/assistant/vision");
+const {
+  visionEnabled,
+  analyzePhoto,
+  skinAssessmentIntent,
+  describesSkin,
+  SKIN_REFUSAL,
+} = await import("../src/lib/assistant/vision");
+const { getFile, downloadFile, IoDeadlineError } = await import(
+  "../src/lib/telegram"
+);
 const { buildVassiliSystemPrompt } = await import("../src/lib/assistant/prompt");
 const {
   webSearchEnabled,
@@ -424,7 +432,14 @@ async function sendVoice(
   );
 }
 
-async function sendPhoto(chatId: number, buf: Buffer, caption?: string) {
+async function sendPhoto(
+  chatId: number,
+  buf: Buffer,
+  caption?: string,
+  // Override the Telegram-REPORTED file_size on the largest photo (the actual
+  // downloaded bytes stay `buf`) — exercises the preventive size-cap pre-check.
+  reportedSize?: number
+) {
   const file_id = registerFile(buf, "image/png");
   return webhookPOST(
     tgRequest({
@@ -436,7 +451,12 @@ async function sendPhoto(chatId: number, buf: Buffer, caption?: string) {
         ...(caption ? { caption } : {}),
         photo: [
           { file_id: `${file_id}-s`, width: 90, height: 90, file_size: 1000 },
-          { file_id, width: 520, height: 540, file_size: buf.length },
+          {
+            file_id,
+            width: 520,
+            height: 540,
+            file_size: reportedSize ?? buf.length,
+          },
         ],
       },
     }) as never
@@ -3021,6 +3041,205 @@ try {
     check(
       "skin-assessment intent parks NOTHING (no log/add behind a button)",
       lastKeyboardPendingId() === null
+    );
+  }
+
+  console.log(
+    "\n=== 27b. GUARDRAIL finding-1: facePresent + free-text scrub close the general-path face leak ==="
+  );
+  {
+    // LAYER 5 unit: describesSkin scrubs relayed free-text. EN + RU skin/face
+    // vocabulary is caught; ordinary receipt/product/document text is NOT
+    // (no false refusal of a legitimate read).
+    check(
+      "describesSkin: EN skin/face descriptions caught",
+      [
+        "Her complexion shows fine lines around the eyes.",
+        "visible acne and enlarged pores on the cheeks",
+        "the skin looks dry with some redness",
+        "dark circles and under-eye puffiness",
+      ].every(describesSkin)
+    );
+    check(
+      "describesSkin: RU skin/face descriptions caught",
+      [
+        "На лице видны морщины и пигментация.",
+        "кожа сухая, есть покраснение",
+        "акне на щеках",
+      ].every(describesSkin)
+    );
+    check(
+      "describesSkin: ops/document/product text NOT flagged (no false refusal)",
+      [
+        "BEAUTY SUPPLY CO — total 1200 EGP, paid cash",
+        "Invoice #4471, due 2026-06-30, VAT included",
+        "AHAVA Night Cream, 50 ml, retail box",
+        "Ингредиенты: вода, глицерин, экстракт алоэ",
+        "Meeting notes: order more towels and restock shelves",
+      ].every((t) => !describesSkin(t))
+    );
+
+    // LAYER 4 end-to-end with the REAL vision model: a face photo with NO
+    // caption, and with an INNOCENT caption, must REFUSE — driven by
+    // facePresent, NOT the caption pre-check (these captions are not
+    // assessment phrasings, so skinAssessmentIntent is false and the model IS
+    // called). Proves an innocent/no-caption face photo is never relayed as a
+    // description of a person's face/skin.
+    const faceImg = fixture("face.png");
+    check(
+      "control: neither caption trips the caption pre-check (refusal must come from facePresent)",
+      !skinAssessmentIntent("") && !skinAssessmentIntent("describe this image")
+    );
+
+    // (a) NO caption.
+    telegramCalls.length = 0;
+    ollamaModelsSeen.length = 0;
+    await sendPhoto(OWNER_CHAT, faceImg);
+    check(
+      "face photo, NO caption → SKIN_REFUSAL (facePresent path), model WAS called",
+      messagesTo(OWNER_CHAT, /consultation/i).length === 1 &&
+        ollamaModelsSeen.includes(visionModel()),
+      `models=[${ollamaModelsSeen.join(", ")}] reply=${lastTelegramText().slice(0, 80)}`
+    );
+    check(
+      "face photo, NO caption → nothing relayed, nothing parked",
+      lastKeyboardPendingId() === null &&
+        messagesTo(OWNER_CHAT, /From the (receipt|product)/).length === 0
+    );
+
+    // (b) INNOCENT caption ("describe this image").
+    telegramCalls.length = 0;
+    ollamaModelsSeen.length = 0;
+    await sendPhoto(OWNER_CHAT, faceImg, "describe this image");
+    check(
+      "face photo, innocent 'describe this image' caption → SKIN_REFUSAL, model WAS called",
+      messagesTo(OWNER_CHAT, /consultation/i).length === 1 &&
+        ollamaModelsSeen.includes(visionModel()),
+      `models=[${ollamaModelsSeen.join(", ")}] reply=${lastTelegramText().slice(0, 80)}`
+    );
+
+    // (c) Direct analyzePhoto on the face with an innocent caption → refusal
+    //     (kind may be "general" from the model, but facePresent/scrub refuses).
+    const innocentDirect = await analyzePhoto(faceImg, "describe this image", {});
+    check(
+      "analyzePhoto(face, innocent caption) → reply == SKIN_REFUSAL (never a description)",
+      innocentDirect.kind === "reply" && innocentDirect.text === SKIN_REFUSAL,
+      innocentDirect.kind === "reply"
+        ? innocentDirect.text.slice(0, 80)
+        : "agent-instruction (LEAK!)"
+    );
+
+    // (d) Legitimate ops photos still flow — facePresent false. (Receipt and
+    //     product round-trips are exercised in §26; here we assert the
+    //     control directly: a receipt read is NOT refused as a face.)
+    const receiptDirect = await analyzePhoto(
+      fixture("receipt.png"),
+      "receipt for shop supplies",
+      {}
+    );
+    check(
+      "receipt photo still processed (facePresent false → agent instruction, not refusal)",
+      receiptDirect.kind === "agent" && /receipt/i.test(receiptDirect.echo),
+      receiptDirect.kind === "reply"
+        ? `refused: ${receiptDirect.text.slice(0, 60)}`
+        : "agent"
+    );
+  }
+
+  console.log(
+    "\n=== 27c. finding-2: deadline-aware I/O timeouts fail fast (no SIGKILL → redelivery) ==="
+  );
+  {
+    const soon = Date.now() + 1_000; // 1s left << reserve → must fail fast
+
+    // transcribeVoice: tight deadline → typed 'too-slow', NO Groq call.
+    const tx = await transcribeVoice(fixture("voice-en.ogg"), {
+      mime: "audio/ogg",
+      deadlineAt: soon,
+    });
+    check(
+      "transcribeVoice with ~no budget → { ok:false, reason:'too-slow' } (no upstream call)",
+      !tx.ok && tx.reason === "too-slow",
+      tx.ok ? "ok" : tx.reason
+    );
+
+    // getFile / downloadFile: tight deadline → IoDeadlineError BEFORE any fetch.
+    const fid = registerFile(fixture("receipt.png"), "image/png");
+    let getThrew = false;
+    try {
+      await getFile(fid, { deadlineAt: soon });
+    } catch (e) {
+      getThrew = e instanceof IoDeadlineError;
+    }
+    check("getFile with ~no budget → throws IoDeadlineError (fail fast)", getThrew);
+
+    let dlThrew = false;
+    try {
+      await downloadFile(`mock/${fid}`, { maxBytes: 1_000_000, deadlineAt: soon });
+    } catch (e) {
+      dlThrew = e instanceof IoDeadlineError;
+    }
+    check(
+      "downloadFile with ~no budget → throws IoDeadlineError (fail fast)",
+      dlThrew
+    );
+
+    // A comfortable deadline must NOT trip the gate — real download succeeds.
+    const ample = Date.now() + 90_000;
+    const okFile = await getFile(fid, { deadlineAt: ample });
+    const okBytes = okFile.ok
+      ? await downloadFile(okFile.filePath!, {
+          maxBytes: 5_000_000,
+          deadlineAt: ample,
+        })
+      : Buffer.alloc(0);
+    check(
+      "ample deadline → getFile + downloadFile succeed normally (no false fail-fast)",
+      okFile.ok && okBytes.length > 0,
+      `ok=${okFile.ok} bytes=${okBytes.length}`
+    );
+    // NOTE: the full webhook fail-fast → friendly "took too long" reply is the
+    // direct consequence of the typed signals proven above (handleVoice/
+    // handlePhoto map IoDeadlineError and reason:'too-slow' to IO_TOO_SLOW).
+    // The webhook computes its own deadlineAt from maxDuration, so the unit
+    // signals are the faithful, deterministic proof of the path.
+  }
+
+  console.log(
+    "\n=== 27d. finding-3: preventive photo size cap (reported file_size) ==="
+  );
+  {
+    // A photo whose Telegram-REPORTED file_size exceeds the cap is rejected
+    // BEFORE download — no vision-model call, clear message, nothing parked.
+    telegramCalls.length = 0;
+    ollamaModelsSeen.length = 0;
+    await sendPhoto(
+      OWNER_CHAT,
+      fixture("receipt.png"),
+      "receipt",
+      16 * 1024 * 1024 // reported 16 MB > 15 MB cap
+    );
+    check(
+      "oversized photo (reported file_size) → rejected pre-download, clear message",
+      messagesTo(OWNER_CHAT, /too large/i).length === 1,
+      lastTelegramText().slice(0, 100)
+    );
+    check(
+      "oversized photo → NO vision-model call, nothing parked",
+      ollamaModelsSeen.length === 0 && lastKeyboardPendingId() === null
+    );
+    // A normal-sized photo still processes (regression guard) — receipt round
+    // trip is exercised in §26; here just confirm the cap didn't over-reject.
+    telegramCalls.length = 0;
+    ollamaModelsSeen.length = 0;
+    scriptedOllama = [{ message: { role: "assistant", content: "Noted." } }];
+    await sendPhoto(OWNER_CHAT, fixture("receipt.png"), "just a quick read");
+    scriptedOllama = null;
+    check(
+      "normal-sized photo NOT rejected by the size cap (vision model called)",
+      messagesTo(OWNER_CHAT, /too large/i).length === 0 &&
+        ollamaModelsSeen.includes(visionModel()),
+      `models=[${ollamaModelsSeen.join(", ")}]`
     );
   }
 
