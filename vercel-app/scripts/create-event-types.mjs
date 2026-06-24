@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * One-off script: create/update the 11 per-service Cal.com event types
+ * One-off script: create/update the 6 per-service Cal.com event types
  * for Elite Eco Car Wash, all with owner confirmation
  * required (confirmationPolicy: always).
  *
@@ -20,9 +20,13 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 function loadEnvLocal() {
   const envPath = join(__dirname, "..", ".env.local");
   const env = {};
-  for (const line of readFileSync(envPath, "utf8").split("\n")) {
-    const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
-    if (m) env[m[1]] = m[2].trim();
+  try {
+    for (const line of readFileSync(envPath, "utf8").split("\n")) {
+      const m = line.match(/^([A-Z0-9_]+)=(.*)$/);
+      if (m) env[m[1]] = m[2].trim();
+    }
+  } catch (e) {
+    // .env.local may not exist yet — that's fine, we fall back to process.env
   }
   return env;
 }
@@ -30,7 +34,7 @@ function loadEnvLocal() {
 const env = loadEnvLocal();
 const API_KEY = process.env.CALCOM_API_KEY || env.CALCOM_API_KEY;
 const API_URL =
-  process.env.CALCOM_API_URL || env.CALCOM_API_URL || "https://api.cal.eu/v2";
+  process.env.CALCOM_API_URL || env.CALCOM_API_URL || "https://api.cal.com/v2";
 
 if (!API_KEY) {
   console.error("CALCOM_API_KEY missing (set it in vercel-app/.env.local)");
@@ -58,82 +62,48 @@ async function cal(method, path, body) {
   return json.data;
 }
 
-// --- the 11 services ---------------------------------------------------------
+// --- the 6 services ---------------------------------------------------------
 const CONFIRMATION = { type: "always", blockUnconfirmedBookingsInBooker: false };
 const LOCATIONS = [{ type: "attendeeAddress" }];
 
 const SERVICES = [
   {
-    slug: "facial-massage",
-    title: "Facial Massage",
-    durations: [60, 90],
-    description:
-      "Plastic / Myofascial / Buccal — E£1,900 (60m) · E£2,800 (90m) / 2 600–3 900 ₽",
+    slug: "interior-exterior-wash",
+    title: "Interior & Exterior Wash",
+    durations: [60, 75],
+    description: "Complete interior vacuum, dashboard cleaning, and exterior foam wash with hot wax — E£320 (60m) · E£370 (75m)",
   },
   {
-    slug: "body-massage",
-    title: "Medical Body Massage",
-    durations: [40, 60],
-    description: "E£2,100 (40m) · E£2,800 (60m) / 2 900–3 900 ₽",
-  },
-  {
-    slug: "microcurrent-rf",
-    title: "Microcurrent / RF Therapy",
-    durations: [20],
-    description: "E£900 / 1 300 ₽",
-  },
-  {
-    slug: "hydrofacial",
-    title: "HydroFacial + Ultrasonic Cleaning",
-    durations: [60, 90],
-    description: "Onmacabim — E£3,100 / 4 300 ₽",
-  },
-  {
-    slug: "clear-skin-holy-land",
-    title: "Clear Skin with HOLY LAND",
-    durations: [60],
-    description: "Fruit Peel & Hydro Mask — E£1,500 / 2 100 ₽",
-  },
-  {
-    slug: "carboxytherapy",
-    title: "Non-Invasive Carboxytherapy",
+    slug: "wheel-cleaning",
+    title: "Wheel Cleaning",
     durations: [30],
-    description: "E£1,100 / 1 500 ₽",
+    description: "Deep cleaning for alloy wheels, tires, and wheel arches — E£140",
   },
   {
-    slug: "mandelic-peel",
-    title: "Mandelic Onmacabim Peel",
-    durations: [20],
-    description: "All-Season Lifting — E£1,400 / 1 900 ₽",
-  },
-  {
-    slug: "alginate-mask",
-    title: "Alginate Mask",
+    slug: "engine-cleaning",
+    title: "Engine Cleaning",
     durations: [30],
-    description: "E£900 / 1 300 ₽",
+    description: "Safe engine bay degreasing and dressing — E£230",
   },
   {
-    slug: "dermapen-face-neck-decollete",
-    title: "Derma Pen — Full Face + Neck + Décolletage",
+    slug: "polishing-protection",
+    title: "Polishing & Protection",
     durations: [90],
-    description: "E£3,800 / 5 300 ₽",
+    description: "Machine polishing with protective wax coating for long-lasting shine — E£700",
   },
   {
-    slug: "dermapen-face-neck",
-    title: "Derma Pen — Full Face + Neck",
+    slug: "steam-cleaning",
+    title: "Steam Cleaning",
     durations: [60],
-    description: "E£2,800 / 3 900 ₽",
+    description: "Sanitizing steam clean for interior surfaces and upholstery — E£330",
   },
   {
-    slug: "dermapen-single-area",
-    title: "Derma Pen — Single Area",
-    durations: [30],
-    description: "E£2,100 / 2 900 ₽",
+    slug: "waterless-wash",
+    title: "Waterless Wash",
+    durations: [45],
+    description: "Eco-friendly waterless wash using premium spray products — E£220",
   },
 ];
-
-// Existing manually-created event types that must also require confirmation.
-const EXISTING_IDS = [327544, 327595];
 
 // --- main --------------------------------------------------------------------
 function payloadFor(svc) {
@@ -141,7 +111,7 @@ function payloadFor(svc) {
   const payload = {
     title: svc.title,
     slug: svc.slug,
-    lengthInMinutes: longest, // default = longer duration
+    lengthInMinutes: longest,
     description: svc.description,
     locations: LOCATIONS,
     confirmationPolicy: CONFIRMATION,
@@ -163,7 +133,6 @@ async function main() {
     const found = bySlug.get(svc.slug);
     let id;
     if (found) {
-      // slug can't be re-sent unchanged-safely on PATCH in all versions; drop it
       const { slug: _slug, ...patch } = payload;
       const updated = await cal("PATCH", `/event-types/${found.id}`, patch);
       id = updated.id;
@@ -174,7 +143,6 @@ async function main() {
       console.log(`created  ${svc.slug} (id ${id})`);
     }
 
-    // Verify by GET-ing it back
     const check = await cal("GET", `/event-types/${id}`);
     const confirmOk = check.confirmationPolicy?.type === "always";
     const durations = check.lengthInMinutesOptions ?? [check.lengthInMinutes];
@@ -190,26 +158,17 @@ async function main() {
     results.push({ slug: svc.slug, id, durations, confirmation: check.confirmationPolicy.type });
   }
 
-  // Enable confirmation on the two pre-existing event types too.
-  for (const id of EXISTING_IDS) {
-    const updated = await cal("PATCH", `/event-types/${id}`, {
-      confirmationPolicy: CONFIRMATION,
-    });
-    const check = await cal("GET", `/event-types/${id}`);
-    if (check.confirmationPolicy?.type !== "always") {
-      throw new Error(`confirmation not enabled on existing event type ${id}`);
-    }
-    console.log(
-      `patched existing ${id} (${updated.slug}) -> confirmationPolicy: ${check.confirmationPolicy.type}`
-    );
-  }
-
   console.log("\nslug -> id (verified: slug, durations, confirmation=always)");
   console.log("-".repeat(64));
   for (const r of results) {
     console.log(
       `${r.slug.padEnd(30)} ${String(r.id).padEnd(8)} [${r.durations.join(", ")}m]`
     );
+  }
+
+  console.log("\n--- Update services.ts and treatments.ts with these eventTypeId values ---");
+  for (const r of results) {
+    console.log(`  ${r.slug}: ${r.id}`);
   }
 }
 
