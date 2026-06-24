@@ -73,9 +73,9 @@ interface FormState {
 function toFormState(t: Treatment | null): FormState {
   return {
     enName: t?.name.en ?? "",
-    ruName: t?.name.ru ?? "",
+    arName: t?.name.ar ?? "",
     enDesc: t?.description.en ?? "",
-    ruDesc: t?.description.ru ?? "",
+    arDesc: t?.description.ar ?? "",
     duration: t ? String(t.durationMinutes) : "",
     priceEgp: t ? String(t.priceEgp) : "",
     active: t?.active ?? true,
@@ -104,7 +104,7 @@ function TreatmentForm({
     setError(null);
     const duration = Number(form.duration);
     const priceEgp = Number(form.priceEgp);
-    if (!form.enName.trim() || !form.ruName.trim()) {
+    if (!form.enName.trim() || !form.arName.trim()) {
       setError("Both EN and RU names are required.");
       return;
     }
@@ -116,13 +116,13 @@ function TreatmentForm({
       setError("Price (EGP) must be a whole number.");
       return;
     }
-      setError("Price (RUB) must be a whole number.");
+      setError("Price must be a whole number.");
       return;
     }
 
     const body = {
-      name: { en: form.enName.trim(), ru: form.ruName.trim() },
-      description: { en: form.enDesc.trim(), ru: form.ruDesc.trim() },
+      name: { en: form.enName.trim(), ar: form.arName.trim() },
+      description: { en: form.enDesc.trim(), ar: form.arDesc.trim() },
       durationMinutes: duration,
       priceEgp,
       active: form.active,
@@ -272,7 +272,7 @@ function TreatmentRow({
               {chip.label}
             </span>
           </div>
-          <p className="mt-0.5 text-sm text-[#4A5568]">{treatment.name.ru}</p>
+          <p className="mt-0.5 text-sm text-[#4A5568]">{treatment.name.ar}</p>
           <p className="mt-0.5 text-sm text-[#4A5568]">
             {treatment.priceEgp.toLocaleString("en-EG")} EGP ·{" "}
             {treatment.eventTypeId > 0 ? (

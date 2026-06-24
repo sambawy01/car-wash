@@ -110,15 +110,15 @@ function toFormState(p: Product | null): FormState {
     enSub: p?.en.sub ?? "",
     enDesc: p?.en.desc ?? "",
     enUsage: p?.usage?.en ?? "",
-    ruName: p?.ru.name ?? "",
-    ruSub: p?.ru.sub ?? "",
-    ruDesc: p?.ru.desc ?? "",
-    ruUsage: p?.usage?.ru ?? "",
+    arName: p?.ar.name ?? "",
+    arSub: p?.ar.sub ?? "",
+    arDesc: p?.ar.desc ?? "",
+    arUsage: p?.usage?.ar ?? "",
     priceEgp: p ? String(p.priceEgp) : "",
     quantity: p && p.quantity !== null ? String(p.quantity) : "",
     photo: p?.photo ?? "",
     altEn: p?.alt.en ?? "",
-    altRu: p?.alt.ru ?? "",
+    altAr: p?.alt.ar ?? "",
     active: p?.active ?? true,
   };
 }
@@ -179,7 +179,7 @@ function ProductForm({
   async function submit() {
     setError(null);
     const priceEgp = Number(form.priceEgp);
-    if (!form.enName.trim() || !form.ruName.trim()) {
+    if (!form.enName.trim() || !form.arName.trim()) {
       setError("Both EN and RU names are required.");
       return;
     }
@@ -187,7 +187,7 @@ function ProductForm({
       setError("Price (EGP) must be a whole number.");
       return;
     }
-      setError("Price (RUB) must be a whole number.");
+      setError("Price must be a whole number.");
       return;
     }
     let quantity: number | null = null;
@@ -201,12 +201,12 @@ function ProductForm({
 
     const body = {
       en: { name: form.enName.trim(), sub: form.enSub.trim(), desc: form.enDesc.trim() },
-      ru: { name: form.ruName.trim(), sub: form.ruSub.trim(), desc: form.ruDesc.trim() },
-      usage: { en: form.enUsage.trim(), ru: form.ruUsage.trim() },
+      ar: { name: form.arName.trim(), sub: form.arSub.trim(), desc: form.arDesc.trim() },
+      usage: { en: form.enUsage.trim(), ar: form.arUsage.trim() },
       priceEgp,
       quantity,
       photo: form.photo.trim(),
-      alt: { en: form.altEn.trim(), ru: form.altRu.trim() },
+      alt: { en: form.altEn.trim(), ar: form.altAr.trim() },
       active: form.active,
     };
 
@@ -294,7 +294,7 @@ function ProductForm({
           </div>
           <div>
             <label className={labelCls}>Photo alt text (RU)</label>
-            <input className={inputCls} value={form.altRu} onChange={(e) => set({ altRu: e.target.value })} />
+            <input className={inputCls} value={form.altAr} onChange={(e) => set({ altRu: e.target.value })} />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-[#0A1A2F]">

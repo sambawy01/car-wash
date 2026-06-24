@@ -1006,9 +1006,6 @@ async function execProductAdd(args: Record<string, unknown>): Promise<string> {
   if (typeof args.priceEgp !== "number" || args.priceEgp <= 0)
     return "A positive priceEgp is required.";
   const priceEgp = Math.round(args.priceEgp);
-  const =
-    typeof args.=== "number" && args.>= 0
-            : 0;
   const quantity =
     typeof args.quantity === "number" && args.quantity >= 0
       ? Math.round(args.quantity)
@@ -1022,12 +1019,12 @@ async function execProductAdd(args: Record<string, unknown>): Promise<string> {
   const product: Product = {
     slug,
     en: { name: nameEn, sub: "", desc: str("descEn").slice(0, 2000) },
-    ru: { name: nameRu, sub: "", desc: str("descRu").slice(0, 2000) },
+    ar: { name: nameRu, sub: "", desc: str("descRu").slice(0, 2000) },
     priceEgp,
     photo: str("imageUrl").slice(0, 500),
-    alt: { en: nameEn, ru: nameRu },
+    alt: { en: nameEn, ar: nameRu },
     ...(usageEn || usageRu
-      ? { usage: { en: usageEn, ru: usageRu } }
+      ? { usage: { en: usageEn, ar: usageRu } }
       : {}),
     quantity,
     soldOut: false,
@@ -1238,7 +1235,7 @@ async function execOrderLookup(
     lines.push(`— ${i.qty}× ${i.names.en} — ${i.lineTotals.egp} EGP`);
   }
   lines.push(
-    `Total: ${order.totals.egp} EGP / ${order.totals.rub} RUB`,
+    `Total: ${order.totals.egp} EGP / ${order.totals} RUB`,
     `Client language: ${order.lang}`,
     "Status history:"
   );
