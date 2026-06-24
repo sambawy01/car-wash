@@ -115,13 +115,11 @@ interface OrderLine {
   product: Product;
   qty: number;
   lineEgp: number;
-  lineRub: number;
 }
 
 interface ValidatedOrder {
   lines: OrderLine[];
   totalEgp: number;
-  totalRub: number;
   name: string;
   phone: string; // normalized (spaces/dashes/parens stripped)
   email: string; // optional — "" when the buyer left it blank
@@ -173,11 +171,11 @@ function validateOrder(
       const product = productsBySlug.get(item.slug)!;
       // Stock checks — bilingual messages the static shop shows verbatim.
       if (effectiveSoldOut(product)) {
-        fields.items = `“${product.en.name}” is sold out / «${product.ru.name}» нет в наличии`;
+        fields.items = `“${product.en.name}” is sold out / «${product.ar.name}» غير متوفر`;
         break;
       }
       if (typeof product.quantity === "number" && item.qty > product.quantity) {
-        fields.items = `Only ${product.quantity} left of “${product.en.name}” / Осталось только ${product.quantity}: «${product.ru.name}»`;
+        fields.items = `Only ${product.quantity} left of “${product.en.name}” / Осталось только ${product.quantity}: «${product.ar.name}»`;
         break;
       }
       seen.add(item.slug);
@@ -247,7 +245,6 @@ function validateOrder(
     order: {
       lines,
       totalEgp: lines.reduce((sum, l) => sum + l.lineEgp, 0),
-      totalRub: lines.reduce((sum, l) => sum + l.lineRub, 0),
       name,
       phone: normalizedPhone,
       email,
@@ -291,13 +288,11 @@ function toOrderEmailInput(
     lang: order.lang,
     lines: order.lines.map((l) => ({
       nameEn: l.product.en.name,
-      nameRu: l.product.ru.name,
+      nameAr: l.product.ar.name,
       qty: l.qty,
       lineEgp: l.lineEgp,
-      lineRub: l.lineRub,
     })),
     totalEgp: order.totalEgp,
-    totalRub: order.totalRub,
   };
 }
 
@@ -521,7 +516,7 @@ export async function POST(request: NextRequest) {
     items: result.order.lines.map((l) => ({
       slug: l.product.slug,
       qty: l.qty,
-      names: { en: l.product.en.name, ru: l.product.ru.name },
+      names: { en: l.product.en.name, ar: l.product.ar.name },
       lineTotals: { egp: l.lineEgp },
     })),
     totals: { egp: result.order.totalEgp },

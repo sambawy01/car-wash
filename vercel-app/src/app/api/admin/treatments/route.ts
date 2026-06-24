@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
       slug,
       eventTypeId: cal.synced && cal.eventTypeId ? cal.eventTypeId : 0,
       name: input.name,
-      description: input.description ?? { en: "", ru: "" },
+      description: input.description ?? { en: "", ar: "" },
       durationMinutes: input.durationMinutes,
       priceEgp: input.priceEgp,
       active: input.active ?? true,

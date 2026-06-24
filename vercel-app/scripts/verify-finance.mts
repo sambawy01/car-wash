@@ -895,8 +895,8 @@ function mkOrder(orderNumber: string, status: string, egp: number, createdAt: st
     orderNumber,
     createdAt,
     status: status as StoredOrder["status"],
-    items: [{ slug: "x", qty: 1, names: { en: "X", ru: "Х" }, lineTotals: { egp, rub: 0 } }],
-    totals: { egp, rub: 0 },
+    items: [{ slug: "x", qty: 1, names: { en: "X", ar: "X" }, lineTotals: { egp } }],
+    totals: { egp },
     name: "Buyer",
     phone: "+200000000",
     email: "",
@@ -912,16 +912,15 @@ function mkTreatment(
   nameEn: string,
   priceEgp: number,
   eventTypeId = 1,
-  nameRu = nameEn
+  nameAr = nameEn
 ): Treatment {
   return {
     slug,
     eventTypeId,
-    name: { en: nameEn, ru: nameRu },
-    description: { en: "", ru: "" },
+    name: { en: nameEn, ar: nameAr },
+    description: { en: "", ar: "" },
     durationMinutes: 60,
     priceEgp,
-    priceRub: 0,
     active: true,
     createdAt: "2026-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",

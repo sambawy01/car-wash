@@ -43,7 +43,7 @@ const FORM_STRINGS = {
     privacyLink: "Privacy policy",
     privacyPost: "and the processing of your data.",
   },
-  ru: {
+  ar: {
     back: "Назад",
     confirm: "Подтвердить",
     confirming: "Подтверждаем...",

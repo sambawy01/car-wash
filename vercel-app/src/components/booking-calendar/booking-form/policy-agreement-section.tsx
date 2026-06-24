@@ -19,7 +19,7 @@ const COPY = {
       'Your session ends at the booked time regardless of arrival time.',
     ],
   },
-  ru: {
+  ar: {
     heading: 'Правила записи — пожалуйста, прочитайте перед бронированием',
     label: 'Я ознакомилась и согласна с правилами записи',
     rules: [

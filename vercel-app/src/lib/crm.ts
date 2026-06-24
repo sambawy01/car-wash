@@ -965,7 +965,7 @@ async function buildProfilesWithOverlay(
         (o) =>
           ({
             status: o.status,
-            totals: { egp: o.totalEgp, rub: 0 },
+            totals: { egp: o.totalEgp },
           }) as StoredOrder
       )
     );

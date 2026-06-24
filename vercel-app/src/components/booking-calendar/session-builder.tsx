@@ -39,7 +39,7 @@ const STRINGS = {
     calendarDescription:
       "the team will confirm your appointment after you send the request.",
   },
-  ru: {
+  ar: {
     addTreatment: "Добавить ещё одну процедуру к сессии",
     pickerHeading: "Добавить процедуры",
     done: "Готово",

@@ -22,7 +22,7 @@ const CONTACT_STRINGS = {
     phone: "Mobile number (WhatsApp)",
     notes: "Anything the team should know before your session? (optional)",
   },
-  ru: {
+  ar: {
     label: "Контактные данные",
     name: "Имя и фамилия",
     email: "Эл. почта",

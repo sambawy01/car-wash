@@ -92,15 +92,15 @@ interface FormState {
   enSub: string;
   enDesc: string;
   enUsage: string;
-  ruName: string;
-  ruSub: string;
-  ruDesc: string;
-  ruUsage: string;
+  arName: string;
+  arSub: string;
+  arDesc: string;
+  arUsage: string;
   priceEgp: string;
   quantity: string; // "" = untracked
   photo: string;
   altEn: string;
-  altRu: string;
+  altAr: string;
   active: boolean;
 }
 
@@ -180,7 +180,7 @@ function ProductForm({
     setError(null);
     const priceEgp = Number(form.priceEgp);
     if (!form.enName.trim() || !form.arName.trim()) {
-      setError("Both EN and RU names are required.");
+      setError("Both EN and AR names are required.");
       return;
     }
     if (!Number.isInteger(priceEgp) || priceEgp < 0 || form.priceEgp === "") {
@@ -293,8 +293,8 @@ function ProductForm({
             <input className={inputCls} value={form.altEn} onChange={(e) => set({ altEn: e.target.value })} />
           </div>
           <div>
-            <label className={labelCls}>Photo alt text (RU)</label>
-            <input className={inputCls} value={form.altAr} onChange={(e) => set({ altRu: e.target.value })} />
+            <label className={labelCls}>Photo alt text (AR)</label>
+            <input className={inputCls} value={form.altAr} onChange={(e) => set({ altAr: e.target.value })} />
           </div>
         </div>
         <label className="flex items-center gap-2 text-sm text-[#0A1A2F]">

@@ -74,10 +74,10 @@ export async function POST(request: NextRequest) {
     const product: Product = {
       slug,
       en: input.en,
-      ru: input.ru,
+      ar: input.ar,
       priceEgp: input.priceEgp,
       photo: input.photo ?? "",
-      alt: input.alt ?? { en: "", ru: "" },
+      alt: input.alt ?? { en: "", ar: "" },
       ...(input.usage !== undefined ? { usage: input.usage } : {}),
       quantity: input.quantity !== undefined ? input.quantity : null,
       soldOut: input.soldOut ?? false,

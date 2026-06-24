@@ -18,8 +18,8 @@ const MIN_DURATION = 5;
 const MAX_DURATION = 600;
 
 export interface TreatmentInput {
-  name?: { en: string; ru: string };
-  description?: { en: string; ru: string };
+  name?: { en: string; ar: string };
+  description?: { en: string; ar: string };
   durationMinutes?: number;
   priceEgp?: number;
   active?: boolean;
@@ -40,21 +40,21 @@ function validatePair(
   maxLen: number,
   requireText: boolean,
   fields: Record<string, string>
-): { en: string; ru: string } | undefined {
+): { en: string; ar: string } | undefined {
   if (raw === undefined) {
     if (required) fields[key] = `${key} is required`;
     return undefined;
   }
   const o = (raw ?? {}) as Record<string, unknown>;
   const en = str(o.en) ?? "";
-  const ru = str(o.ru) ?? "";
-  if (requireText && (en.length < 1 || ru.length < 1)) {
-    fields[key] = `${key} requires both EN and RU text`;
+  const ar = str(o.ar) ?? "";
+  if (requireText && (en.length < 1 || ar.length < 1)) {
+    fields[key] = `${key} requires both EN and AR text`;
   }
-  if (en.length > maxLen || ru.length > maxLen) {
+  if (en.length > maxLen || ar.length > maxLen) {
     fields[key] = `${key} must be at most ${maxLen} characters`;
   }
-  return { en, ru };
+  return { en, ar };
 }
 
 function validateInt(
