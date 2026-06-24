@@ -1313,6 +1313,7 @@ async function execDocumentCreate(
   const recipient =
     typeof args.recipient === "string" && args.recipient.trim()
       ? args.recipient.trim().slice(0, 120)
+      : undefined;
   if (!title || !body) return "Title and body are both required.";
 
   const { pdf, unsupportedCharsStripped } = await renderLetterheadPdf({
