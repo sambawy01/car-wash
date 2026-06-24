@@ -1,7 +1,7 @@
 /**
- * Voice-note transcription for Vassili — Groq Whisper.
+ * Voice-note transcription for Eco — Groq Whisper.
  *
- * Victoria can send a Telegram voice note (OGG/Opus) instead of typing; the
+ * the team can send a Telegram voice note (OGG/Opus) instead of typing; the
  * webhook downloads the bytes and hands them here. We transcribe with Groq's
  * `whisper-large-v3-turbo` (OpenAI-compatible multipart endpoint) and feed the
  * transcript into the SAME text agent loop as a typed message — so a spoken
@@ -9,9 +9,9 @@
  * through the identical confirm gate.
  *
  * - Language: AUTO (no language param) — Whisper detects EN vs RU itself, which
- *   is exactly Victoria's mix. Verified empirically against both.
+ *   is exactly the team's mix. Verified empirically against both.
  * - Degrades gracefully: with no GROQ_API_KEY (`voiceEnabled()` false) the
- *   webhook tells Victoria voice is unavailable instead of crashing. The key
+ *   webhook tells the team voice is unavailable instead of crashing. The key
  *   is already provisioned in Vercel prod env.
  * - Caps: oversize audio is rejected BEFORE the upload (a friendly message, not
  *   a timeout). Duration is capped in the webhook (Telegram reports it).
@@ -100,7 +100,7 @@ export async function transcribeVoice(
   );
   form.append("model", VOICE_MODEL);
   // JSON response, deterministic decoding. NO language param → auto-detect
-  // (handles Victoria's EN + RU mix).
+  // (handles the team's EN + RU mix).
   form.append("response_format", "json");
   form.append("temperature", "0");
 

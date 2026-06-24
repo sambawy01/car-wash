@@ -12,7 +12,7 @@
 
 const EVENT_TYPES_API_VERSION = "2024-06-14";
 
-/** Same policy as scripts/create-event-types.mjs — Victoria confirms every booking. */
+/** Same policy as scripts/create-event-types.mjs — the team confirms every booking. */
 const CONFIRMATION = {
   type: "always",
   blockUnconfirmedBookingsInBooker: false,

@@ -19,7 +19,7 @@ import { getTreatmentsCatalog, type Treatment } from "../treatments";
  * mismatch. Clean → completely silent (no email, no Telegram — a weekly
  * "all good" is noise). Transient per-event-type fetch errors (non-404) are
  * reported as `errors` in the route response and the Actions log, but never
- * page Victoria — only CONFIRMED drift alerts.
+ * page the team — only CONFIRMED drift alerts.
  */
 
 const EVENT_TYPES_API_VERSION = "2024-06-14";

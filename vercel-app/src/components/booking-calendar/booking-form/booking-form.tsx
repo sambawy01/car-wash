@@ -26,7 +26,7 @@ interface BookingFormProps {
   userTimezone: string; // User's selected timezone
   /** Send the explicit length to Cal.com (multi-duration event types) */
   sendLengthInMinutes?: boolean;
-  /** Multi-treatment sessions: appended to the booking notes for Victoria. */
+  /** Multi-treatment sessions: appended to the booking notes for the team. */
   treatmentsNote?: string;
   lang?: BookingLang;
   onSuccess: (booking: CalcomBookingResponse) => void;
@@ -88,7 +88,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
       // Normalize phone: strip spaces, dashes and parentheses (keep leading +)
       const normalizedPhone = data.phone.replace(/[\s\-()]/g, "");
 
-      // Multi-treatment sessions: the treatments line must reach Victoria, so
+      // Multi-treatment sessions: the treatments line must reach the team, so
       // it is appended to whatever the client wrote in the notes field.
       const notes = [data.notes?.trim(), treatmentsNote]
         .filter(Boolean)
@@ -201,7 +201,7 @@ export const BookingForm: React.FC<BookingFormProps> = ({
           <p className="text-center text-sm text-muted-foreground">
             {ft.privacyPre}{" "}
             <Link
-              href={lang === "ru" ? "/privacy-policy?lang=ru" : "/privacy-policy"}
+              href={lang === "ar" ? "/privacy-policy?lang=ru" : "/privacy-policy"}
               className="font-medium text-foreground underline hover:text-primary transition-colors">
               {ft.privacyLink}
             </Link>{" "}

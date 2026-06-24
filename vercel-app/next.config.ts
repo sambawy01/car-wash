@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   // The letterhead PDF (src/lib/assistant/letterhead-pdf.ts) reads its
   // embedded Cyrillic-capable TTFs with fs at runtime — static tracing can't
   // see that, so include them in the serverless bundle explicitly for every
-  // route that renders a PDF: Vassili's Telegram webhook, the admin finance
+  // route that renders a PDF: Eco's Telegram webhook, the admin finance
   // P&L download, and the monthly P&L cron.
   outputFileTracingIncludes: {
     "/api/telegram/webhook": ["./src/assets/fonts/*.ttf"],

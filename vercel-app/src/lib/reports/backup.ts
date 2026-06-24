@@ -9,7 +9,7 @@ import { del, get, list, put } from "@vercel/blob";
  *                              private notes, tags, visit-derived ids)
  * - catalog/products.json     (shop catalog)
  * - catalog/treatments.json   (treatments catalog)
- * - telegram/audit.jsonl      (Vassili's append-only action log)
+ * - telegram/audit.jsonl      (Eco's append-only action log)
  *
  * PII NOTE: the CRM blobs hold private client notes/tags. The snapshot is only
  * ever written to the private Blob store and emailed to the OWNER address

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Connect Vassili's Telegram bot to the production webhook.
+ * Connect Eco's Telegram bot to the production webhook.
  *
  * Usage:  node scripts/setup-telegram.mjs            (run from vercel-app/)
  *         node scripts/setup-telegram.mjs --info     (only print webhook info)
@@ -27,7 +27,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const WEBHOOK_URL =
-  "https://book.victoriaholisticbeauty.com/api/telegram/webhook";
+  "https://book.eliteecocarwash.com/api/telegram/webhook";
 
 // --- env ---------------------------------------------------------------------
 function loadEnvLocal() {

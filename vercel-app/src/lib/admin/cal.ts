@@ -22,7 +22,7 @@
 const CAL_API_VERSION = "2024-08-13";
 
 /**
- * Hard timeout on every Cal.com call. Vassili's agent loop and the webhook
+ * Hard timeout on every Cal.com call. Eco's agent loop and the webhook
  * route run under an execution deadline — an unresponsive Cal upstream must
  * surface as a tool error, not hang until the function is killed.
  */
@@ -128,7 +128,7 @@ export interface ListBookingsInRangeOptions {
 
 /**
  * All bookings (any status, including past/cancelled) whose start falls in
- * [afterStartIso, beforeEndIso], sorted by start time. Used by Vassili's
+ * [afterStartIso, beforeEndIso], sorted by start time. Used by Eco's
  * stats_summary / client_history tools, the CRM client profiles and the
  * finance + weekly reports.
  *

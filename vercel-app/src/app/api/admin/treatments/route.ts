@@ -21,7 +21,7 @@ import {
 export const runtime = "nodejs";
 
 /**
- * /api/admin/treatments — Victoria's treatments manager.
+ * /api/admin/treatments — the team's treatments manager.
  *
  * GET  → the FULL catalog (inactive treatments and timestamps included).
  * POST → create a treatment. The slug is auto-generated from the EN name
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     );
   }
   const input = result.value as Required<
-    Pick<TreatmentInput, "name" | "durationMinutes" | "priceEgp" | "priceRub">
+    Pick<TreatmentInput, "name" | "durationMinutes" | "priceEgp">
   > &
     TreatmentInput;
 
@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // Create the linked Cal event type first so we can store its id.
     // Best-effort: a Cal failure still saves the treatment (eventTypeId 0)
-    // and is reported in `cal` so Victoria can retry / link manually.
+    // and is reported in `cal` so the team can retry / link manually.
     const cal: CalSyncResult = await createCalEventType({
       title: input.name.en,
       slug,
@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
       description: input.description ?? { en: "", ru: "" },
       durationMinutes: input.durationMinutes,
       priceEgp: input.priceEgp,
-      priceRub: input.priceRub,
       active: input.active ?? true,
       createdAt: now,
       updatedAt: now,

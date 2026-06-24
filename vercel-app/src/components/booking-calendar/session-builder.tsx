@@ -7,7 +7,7 @@
  *   event type, duration toggle for multi-duration services.
  * - 2+ treatments → slots and booking go to the shared COMBINED_SESSION event
  *   type with duration = sum of each chosen service's LONGEST duration, and a
- *   "Treatments: …" line is appended to the booking notes for Victoria.
+ *   "Treatments: …" line is appended to the booking notes for the team.
  */
 
 import { useMemo, useState } from "react";
@@ -22,7 +22,7 @@ import {
   type Service,
 } from "@/lib/services";
 
-type Lang = "en" | "ru";
+type Lang = "en" | "ar";
 
 const STRINGS = {
   en: {
@@ -37,7 +37,7 @@ const STRINGS = {
     changeTreatment: "← Change treatment",
     calendarTitle: "Choose a time that suits you",
     calendarDescription:
-      "Victoria will confirm your appointment after you send the request.",
+      "the team will confirm your appointment after you send the request.",
   },
   ru: {
     addTreatment: "Добавить ещё одну процедуру к сессии",
@@ -56,12 +56,12 @@ const STRINGS = {
 } as const;
 
 function withLang(path: string, lang: Lang) {
-  if (lang !== "ru") return path;
+  if (lang !== "ar") return path;
   return path.includes("?") ? `${path}&lang=ru` : `${path}?lang=ru`;
 }
 
 function durationLabel(durations: number[], lang: Lang) {
-  const unit = lang === "ru" ? "мин" : "min";
+  const unit = lang === "ar" ? "мин" : "min";
   return `${durations.join(" / ")} ${unit}`;
 }
 
@@ -71,9 +71,6 @@ function formatEgp(n: number) {
 }
 
 /** "5 200 ₽" (regular spaces as thousands separators) */
-function formatRub(n: number) {
-  return `${String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ₽`;
-}
 
 interface SessionBuilderProps {
   serviceSlug: string;
@@ -115,8 +112,7 @@ export default function SessionBuilder({
   // Combined sessions always use the longest duration of every treatment.
   const totalMinutes = selected.reduce((sum, s) => sum + longestDuration(s), 0);
   const totalEgp = selected.reduce((sum, s) => sum + s.price.egp, 0);
-  const totalRub = selected.reduce((sum, s) => sum + s.price.rub, 0);
-
+  
   // 4 treatments max per session (matches the Cal event type's options set).
   const atMaxTreatments = selected.length >= 4;
 
@@ -142,7 +138,7 @@ export default function SessionBuilder({
   const multiDuration = baseService.durations.length > 1;
   const unit = t.min;
 
-  // Treatment list for Victoria — appended to the booking notes (EN titles so
+  // Treatment list for the team — appended to the booking notes (EN titles so
   // the line is consistent in the admin inbox and emails regardless of lang).
   const treatmentsNote = isMulti
     ? `Treatments: ${selected
@@ -152,15 +148,15 @@ export default function SessionBuilder({
 
   const summaryLine = `${selected
     .map((s) => `${s[lang].title} ${longestDuration(s)}`)
-    .join(" + ")} — ${totalMinutes} ${t.minTotal} · ${formatEgp(totalEgp)} / ${formatRub(totalRub)}`;
+    .join(" + ")} — ${totalMinutes} ${t.minTotal} · ${formatEgp(totalEgp)} `;
 
   return (
     <div>
       <div className="mb-8 text-center">
-        <h2 className="font-serif text-2xl text-[#3A332C]">
+        <h2 className="font-serif text-2xl text-[#0A1A2F]">
           {baseService[lang].title}
         </h2>
-        <p className="mt-2 text-sm text-[#847866]">
+        <p className="mt-2 text-sm text-[#4A5568]">
           {baseService.priceLine[lang]} ·{" "}
           {durationLabel(baseService.durations, lang)}
         </p>
@@ -168,7 +164,7 @@ export default function SessionBuilder({
         {/* Duration toggle — single-treatment mode only; combined sessions
             always use each treatment's longest duration. */}
         {multiDuration && !isMulti && (
-          <div className="mt-4 inline-flex gap-2 rounded-full border border-[#3A332C]/10 bg-[#FFFDF9] p-1">
+          <div className="mt-4 inline-flex gap-2 rounded-full border border-[#0A1A2F]/10 bg-[#FFFFFF] p-1">
             {baseService.durations.map((d) => (
               <Link
                 key={d}
@@ -178,8 +174,8 @@ export default function SessionBuilder({
                 )}
                 className={
                   d === duration
-                    ? "rounded-full bg-[#A9745A] px-4 py-1.5 text-sm font-medium text-[#FDF9F3]"
-                    : "rounded-full px-4 py-1.5 text-sm text-[#847866] transition-colors hover:text-[#A9745A]"
+                    ? "rounded-full bg-[#0D3B66] px-4 py-1.5 text-sm font-medium text-[#F8FAFC]"
+                    : "rounded-full px-4 py-1.5 text-sm text-[#4A5568] transition-colors hover:text-[#0D3B66]"
                 }
               >
                 {d} {unit}
@@ -194,7 +190,7 @@ export default function SessionBuilder({
             type="button"
             onClick={() => setPickerOpen((open) => !open)}
             aria-expanded={pickerOpen}
-            className="inline-flex items-center gap-2 rounded-full border border-[#A9745A]/40 bg-[#FFFDF9] px-5 py-2 text-sm text-[#A9745A] transition-colors hover:border-[#A9745A] hover:bg-[#A9745A]/5"
+            className="inline-flex items-center gap-2 rounded-full border border-[#0D3B66]/40 bg-[#FFFFFF] px-5 py-2 text-sm text-[#0D3B66] transition-colors hover:border-[#0D3B66] hover:bg-[#0D3B66]/5"
           >
             <Plus aria-hidden="true" className="h-4 w-4" />
             {t.addTreatment}
@@ -202,8 +198,8 @@ export default function SessionBuilder({
         </div>
 
         {pickerOpen && (
-          <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] p-4 text-left shadow-sm">
-            <p className="mb-3 px-1 text-xs font-medium uppercase tracking-[0.15em] text-[#847866]">
+          <div className="mx-auto mt-4 max-w-xl rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] p-4 text-left shadow-sm">
+            <p className="mb-3 px-1 text-xs font-medium uppercase tracking-[0.15em] text-[#4A5568]">
               {t.pickerHeading}
             </p>
             <ul className="flex flex-col gap-1">
@@ -216,7 +212,7 @@ export default function SessionBuilder({
                       className={`flex items-baseline gap-3 rounded-xl px-3 py-2.5 transition-colors ${
                         blocked
                           ? "cursor-not-allowed opacity-40"
-                          : "cursor-pointer hover:bg-[#A9745A]/5"
+                          : "cursor-pointer hover:bg-[#0D3B66]/5"
                       }`}
                     >
                       <input
@@ -224,17 +220,17 @@ export default function SessionBuilder({
                         checked={checked}
                         disabled={blocked}
                         onChange={() => toggleExtra(service.slug)}
-                        className="relative top-0.5 size-4 shrink-0 cursor-pointer accent-[#A9745A] disabled:cursor-not-allowed"
+                        className="relative top-0.5 size-4 shrink-0 cursor-pointer accent-[#0D3B66] disabled:cursor-not-allowed"
                       />
                       <span className="flex-1">
-                        <span className="block text-[15px] text-[#3A332C]">
+                        <span className="block text-[15px] text-[#0A1A2F]">
                           {service[lang].title}
                         </span>
-                        <span className="mt-0.5 block text-xs text-[#847866]">
+                        <span className="mt-0.5 block text-xs text-[#4A5568]">
                           {service.priceLine[lang]}
                         </span>
                       </span>
-                      <span className="shrink-0 text-sm text-[#A9745A]">
+                      <span className="shrink-0 text-sm text-[#0D3B66]">
                         {longestDuration(service)} {unit}
                       </span>
                     </label>
@@ -243,7 +239,7 @@ export default function SessionBuilder({
               })}
             </ul>
             {anyBlocked && (
-              <p className="mt-3 rounded-xl bg-[#A9745A]/10 px-3 py-2 text-sm text-[#8A5238]">
+              <p className="mt-3 rounded-xl bg-[#0D3B66]/10 px-3 py-2 text-sm text-[#1A5F9E]">
                 {atMaxTreatments ? t.maxCount : t.overLimit}
               </p>
             )}
@@ -251,7 +247,7 @@ export default function SessionBuilder({
               <button
                 type="button"
                 onClick={() => setPickerOpen(false)}
-                className="rounded-full bg-[#A9745A] px-5 py-1.5 text-sm font-medium text-[#FDF9F3] transition-opacity hover:opacity-90"
+                className="rounded-full bg-[#0D3B66] px-5 py-1.5 text-sm font-medium text-[#F8FAFC] transition-opacity hover:opacity-90"
               >
                 {t.done}
               </button>
@@ -266,7 +262,7 @@ export default function SessionBuilder({
               {selected.map((service, i) => (
                 <span
                   key={service.slug}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#A9745A]/30 bg-[#A9745A]/10 py-1.5 pl-3.5 pr-2.5 text-sm text-[#8A5238]"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-[#0D3B66]/30 bg-[#0D3B66]/10 py-1.5 pl-3.5 pr-2.5 text-sm text-[#1A5F9E]"
                 >
                   {service[lang].title} {longestDuration(service)}
                   {i === 0 ? (
@@ -276,7 +272,7 @@ export default function SessionBuilder({
                       type="button"
                       onClick={() => toggleExtra(service.slug)}
                       aria-label={`${t.removeTreatment}: ${service[lang].title}`}
-                      className="rounded-full p-0.5 transition-colors hover:bg-[#A9745A]/20"
+                      className="rounded-full p-0.5 transition-colors hover:bg-[#0D3B66]/20"
                     >
                       <X aria-hidden="true" className="h-3.5 w-3.5" />
                     </button>
@@ -284,7 +280,7 @@ export default function SessionBuilder({
                 </span>
               ))}
             </div>
-            <p className="mt-3 text-sm font-medium text-[#3A332C]">
+            <p className="mt-3 text-sm font-medium text-[#0A1A2F]">
               {summaryLine}
             </p>
           </div>
@@ -293,7 +289,7 @@ export default function SessionBuilder({
         <p className="mt-4 text-sm">
           <Link
             href={withLang("/book", lang)}
-            className="text-[#A9745A] underline-offset-4 hover:underline"
+            className="text-[#0D3B66] underline-offset-4 hover:underline"
           >
             {t.changeTreatment}
           </Link>

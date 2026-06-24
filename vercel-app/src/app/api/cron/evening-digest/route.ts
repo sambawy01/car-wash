@@ -30,7 +30,7 @@ import {
  *
  * EMPTY STATE: skipped entirely — no Telegram, no email. The morning brief
  * is the guaranteed daily heartbeat; the evening digest only speaks when
- * something actually needs Victoria, so it never trains her to ignore it.
+ * something actually needs the team, so it never trains her to ignore it.
  * (Exception: data-source failures still send, with a warning — documented
  * in the builder.)
  */

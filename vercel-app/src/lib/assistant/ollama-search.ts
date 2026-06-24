@@ -20,7 +20,7 @@
  *
  * SECURITY: web_fetch pulls UNTRUSTED third-party page text into the agent's
  * context. It is read-only and every third-party-visible action still passes
- * through Victoria's [Confirm] gate, so containment holds — but the system
+ * through the team's [Confirm] gate, so containment holds — but the system
  * prompt tells the model to treat fetched content as data, never instructions.
  *
  * ANTI-EXFILTRATION (per-run allowlist): web_fetch's URL is model-controlled,

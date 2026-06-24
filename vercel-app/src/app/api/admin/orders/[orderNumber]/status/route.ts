@@ -159,7 +159,7 @@ export async function POST(
     }
 
     // Cancelled orders give their stock back to the catalog. Never fatal —
-    // the order is already cancelled; Victoria can fix counts in /admin.
+    // the order is already cancelled; the team can fix counts in /admin.
     let stockRestored = false;
     if (nextStatus === "cancelled") {
       try {

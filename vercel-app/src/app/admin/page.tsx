@@ -133,7 +133,7 @@ export default async function AdminPage({
           Elite Eco Car Wash
         </p>
         <h1 className="mt-2 font-serif text-4xl text-[#0A1A2F]">Car wash admin</h1>
-        <p className="mt-2 text-sm text-[#847866]">
+        <p className="mt-2 text-sm text-[#4A5568]">
           Times shown in Cairo time (Africa/Cairo).
         </p>
       </header>
@@ -143,7 +143,7 @@ export default async function AdminPage({
         rebookingDue={rebooking.length}
         bookings={
           loadError ? (
-            <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
+            <div className="rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-6 py-5 text-sm text-[#B91C1C]">
               {loadError}
             </div>
           ) : (

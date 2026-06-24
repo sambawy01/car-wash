@@ -13,7 +13,7 @@ import { formatCairoTime, type BookingDetails } from "../booking-emails";
 import type { StoredOrder } from "../orders";
 
 /**
- * Proactive Telegram pushes to Victoria (the bound owner chat): new booking
+ * Proactive Telegram pushes to the team (the bound owner chat): new booking
  * requests, new shop orders, low-stock alerts — each with one-tap action
  * buttons where it makes sense.
  *
@@ -32,12 +32,12 @@ import type { StoredOrder } from "../orders";
  * → createPendingAction) and its callback_data is `confirm:<id>` — exactly
  * what the Telegram webhook's callback handler executes, with the same
  * atomic exactly-once claims, owner-only checks and audit trail. The pushed
- * button itself IS the confirmation step (Victoria's tap = approval),
+ * button itself IS the confirmation step (the team's tap = approval),
  * consistent with the chat flow where the inline keyboard is the gate.
- * Pushed pendings use NOTIFY_PENDING_TTL_MS (7 days) — Victoria may tap a
+ * Pushed pendings use NOTIFY_PENDING_TTL_MS (7 days) — the team may tap a
  * notification button hours later; the 15-minute chat default would kill it.
  *
- * Language: notifications are EN (Victoria's admin/notification surfaces are
+ * Language: notifications are EN (the team's admin/notification surfaces are
  * EN throughout); client names, treatments and product names interpolate
  * with control characters stripped (see pushSafe) but otherwise as-is, so
  * Russian content renders naturally.
@@ -108,7 +108,7 @@ interface PushButton {
  * text interpolated into owner pushes — names, item titles, phones:
  * - C0 controls + DEL (U+0000-U+001F, U+007F): \r, \n, \t and friends —
  *   newlines could forge extra lines or fields inside a notification
- *   Victoria trusts.
+ *   the team trusts.
  * - C1 controls (U+0080-U+009F): includes NEL (U+0085), another line break.
  * - Line/paragraph separators (U+2028, U+2029): Unicode line breaks.
  * - Bidi controls (U+202A-U+202E embeds/overrides, U+2066-U+2069 isolates):
@@ -126,7 +126,7 @@ function pushSafe(value: unknown): string {
 /**
  * Park a mutation as a long-TTL pending action and return its inline button.
  * Validates args through the same gate as chat-initiated mutations so what
- * Victoria's tap executes is exactly what was disclosed; the summary keeps
+ * the team's tap executes is exactly what was disclosed; the summary keeps
  * the human context AND the structural disclosure line from describeMutation
  * (the tap edits the message to `summary + result`).
  *
@@ -168,7 +168,7 @@ function keyboard(buttons: PushButton[]): InlineKeyboard | undefined {
  * "🔔 New booking request" push with one-tap [✅ Confirm | ❌ Decline].
  * Confirm executes booking_confirm(uid); Decline executes booking_decline
  * with the canned schedule-conflict reason (a one-tap decline cannot ask for
- * free text — for a custom reason Victoria declines via chat instead).
+ * free text — for a custom reason the team declines via chat instead).
  */
 export async function notifyBookingRequest(
   details: BookingDetails

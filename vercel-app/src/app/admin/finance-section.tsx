@@ -5,7 +5,7 @@ import type { PnL } from "@/lib/finance-report";
 import type { LedgerEntry, LedgerDirection } from "@/lib/finance";
 
 /**
- * Finance manager — Victoria's private ledger + live P&L inside /admin.
+ * Finance manager — the team's private ledger + live P&L inside /admin.
  *
  * - Month selector drives a GET /api/admin/finance?month=YYYY-MM that returns
  *   the P&L (summary numbers AND the in-range manual entries) in one fetch.
@@ -35,7 +35,7 @@ const EXPENSE_CATEGORIES = [
 const INCOME_CATEGORIES = ["treatment-cash", "gift-card", "other"] as const;
 const PAYMENT_METHODS = ["cash", "bank-transfer", "card", "other"] as const;
 
-const SITE_BASE = "https://victoriaholisticbeauty.com/";
+const SITE_BASE = "https://eliteecocarwash.com/";
 
 /* ---------- helpers ---------- */
 
@@ -91,14 +91,14 @@ function labelMethod(m: string): string {
 /* ---------- shared styles ---------- */
 
 const inputCls =
-  "w-full rounded-xl border border-[#3A332C]/15 bg-white px-3 py-2 text-sm text-[#3A332C] outline-none focus:border-[#8A5238]";
+  "w-full rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-2 text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]";
 const labelCls =
-  "mb-1 block text-xs font-medium uppercase tracking-[0.08em] text-[#847866]";
+  "mb-1 block text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]";
 const buttonBase =
   "rounded-full px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50";
-const primaryBtn = `${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`;
-const subtleBtn = `${buttonBase} border border-[#3A332C]/15 bg-[#FFFDF9] text-[#3A332C] hover:bg-[#F4EFE7]`;
-const dangerBtn = `${buttonBase} border border-[#B5483A]/30 bg-[#FFFDF9] text-[#B5483A] hover:bg-[#B5483A]/5`;
+const primaryBtn = `${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`;
+const subtleBtn = `${buttonBase} border border-[#0A1A2F]/15 bg-[#FFFFFF] text-[#0A1A2F] hover:bg-[#F8FAFC]`;
+const dangerBtn = `${buttonBase} border border-[#B91C1C]/30 bg-[#FFFFFF] text-[#B91C1C] hover:bg-[#B91C1C]/5`;
 
 /* ---------- summary cards ---------- */
 
@@ -117,7 +117,7 @@ function SummaryCards({ pnl }: { pnl: PnL }) {
     {
       label: "Expenses",
       value: egp(pnl.expenses.totalEgp),
-      cls: "bg-[#B5483A]/10 border-[#B5483A]/25 text-[#B5483A]",
+      cls: "bg-[#B91C1C]/10 border-[#B91C1C]/25 text-[#B91C1C]",
       sub: pnl.expenses.byCategory
         .slice(0, 3)
         .map((c) => `${labelCategory(c.category)} ${egp(c.amountEgp)}`),
@@ -127,8 +127,8 @@ function SummaryCards({ pnl }: { pnl: PnL }) {
       value: egp(Math.abs(pnl.netEgp)),
       cls:
         pnl.netEgp >= 0
-          ? "bg-[#8A5238]/10 border-[#8A5238]/25 text-[#8A5238]"
-          : "bg-[#B5483A]/10 border-[#B5483A]/25 text-[#B5483A]",
+          ? "bg-[#1A5F9E]/10 border-[#1A5F9E]/25 text-[#1A5F9E]"
+          : "bg-[#B91C1C]/10 border-[#B91C1C]/25 text-[#B91C1C]",
       sub: [`${pnl.counts.confirmedBookings} confirmed bookings`, `${pnl.counts.revenueOrders} paid orders`],
     },
   ];
@@ -305,8 +305,8 @@ function EntryForm({
   const cats = categoriesFor(form.direction);
 
   return (
-    <div className="rounded-2xl border border-[#8A5238]/25 bg-[#FFFDF9] px-5 py-5 shadow-sm">
-      <h3 className="font-serif text-xl text-[#3A332C]">
+    <div className="rounded-2xl border border-[#1A5F9E]/25 bg-[#FFFFFF] px-5 py-5 shadow-sm">
+      <h3 className="font-serif text-xl text-[#0A1A2F]">
         {entry ? "Edit entry" : "Add entry"}
       </h3>
 
@@ -387,13 +387,13 @@ function EntryForm({
             ref={fileRef}
             type="file"
             accept="image/jpeg,image/png,image/webp"
-            className="text-sm text-[#847866] file:mr-3 file:rounded-full file:border-0 file:bg-[#3A332C]/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#3A332C]"
+            className="text-sm text-[#4A5568] file:mr-3 file:rounded-full file:border-0 file:bg-[#0A1A2F]/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#0A1A2F]"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (file) void uploadReceipt(file);
             }}
           />
-          {uploading && <span className="text-sm text-[#847866]">Uploading…</span>}
+          {uploading && <span className="text-sm text-[#4A5568]">Uploading…</span>}
         </div>
         {form.receiptUrl && (
           <div className="mt-3 flex items-center gap-3">
@@ -401,12 +401,12 @@ function EntryForm({
             <img
               src={photoSrc(form.receiptUrl)}
               alt="Receipt preview"
-              className="h-20 w-20 rounded-xl border border-[#3A332C]/10 object-cover"
+              className="h-20 w-20 rounded-xl border border-[#0A1A2F]/10 object-cover"
             />
             <button
               type="button"
               onClick={() => set({ receiptUrl: "" })}
-              className="text-sm text-[#B5483A] underline"
+              className="text-sm text-[#B91C1C] underline"
             >
               Remove
             </button>
@@ -414,7 +414,7 @@ function EntryForm({
         )}
       </div>
 
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
 
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" disabled={busy || uploading} onClick={() => void submit()} className={primaryBtn}>
@@ -473,14 +473,14 @@ function EntryRow({
 
   const isExpense = entry.direction === "expense";
   return (
-    <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-4 py-3 shadow-sm">
+    <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-4 py-3 shadow-sm">
       <div className="flex items-start gap-3">
         {entry.receiptUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={photoSrc(entry.receiptUrl)}
             alt="Receipt"
-            className="h-12 w-12 shrink-0 rounded-lg border border-[#3A332C]/10 object-cover"
+            className="h-12 w-12 shrink-0 rounded-lg border border-[#0A1A2F]/10 object-cover"
             loading="lazy"
           />
         ) : null}
@@ -489,21 +489,21 @@ function EntryRow({
             <span
               className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 isExpense
-                  ? "bg-[#B5483A]/15 text-[#B5483A]"
+                  ? "bg-[#B91C1C]/15 text-[#B91C1C]"
                   : "bg-[#6B7A4F]/15 text-[#55633D]"
               }`}
             >
               {isExpense ? "−" : "+"} {egp(entry.amountEgp)}
             </span>
-            <span className="text-sm font-medium text-[#3A332C]">
+            <span className="text-sm font-medium text-[#0A1A2F]">
               {labelCategory(entry.category)}
             </span>
-            <span className="text-xs text-[#847866]">
+            <span className="text-xs text-[#4A5568]">
               {entry.date} · {labelMethod(entry.method)}
             </span>
           </div>
           {entry.note && (
-            <p className="mt-0.5 truncate text-sm text-[#847866]">{entry.note}</p>
+            <p className="mt-0.5 truncate text-sm text-[#4A5568]">{entry.note}</p>
           )}
         </div>
         <div className="flex shrink-0 gap-2">
@@ -515,7 +515,7 @@ function EntryRow({
           </button>
         </div>
       </div>
-      {error && <p className="mt-2 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-2 text-sm text-[#B91C1C]">{error}</p>}
     </article>
   );
 }
@@ -616,16 +616,16 @@ export default function FinanceSection({
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-serif text-2xl text-[#3A332C]">Finance</h2>
+        <h2 className="font-serif text-2xl text-[#0A1A2F]">Finance</h2>
         <div className="flex flex-wrap items-center gap-2">
-          <label className="text-xs font-medium uppercase tracking-[0.08em] text-[#847866]">
+          <label className="text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]">
             Month
           </label>
           <input
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value || currentCairoMonth())}
-            className="rounded-xl border border-[#3A332C]/15 bg-white px-3 py-1.5 text-sm text-[#3A332C] outline-none focus:border-[#8A5238]"
+            className="rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-1.5 text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]"
           />
         </div>
       </div>
@@ -634,12 +634,12 @@ export default function FinanceSection({
         <div className="mb-4 space-y-4">
           <SummaryCards pnl={pnl} />
           {pnl.failures.length > 0 && (
-            <div className="rounded-xl border border-[#E5DCCB] bg-[#F4EFE7] px-4 py-2 text-sm text-[#847866]">
+            <div className="rounded-xl border border-[#D1D9E0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#4A5568]">
               Heads up: couldn&apos;t load {pnl.failures.join(", ")} — some numbers may be incomplete.
             </div>
           )}
           {pnl.revenue.unmatchedBookings > 0 && (
-            <div className="rounded-xl border border-[#E5DCCB] bg-[#F4EFE7] px-4 py-2 text-sm text-[#847866]">
+            <div className="rounded-xl border border-[#D1D9E0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#4A5568]">
               {pnl.revenue.unmatchedBookings} confirmed booking
               {pnl.revenue.unmatchedBookings === 1 ? "" : "s"} weren&apos;t
               auto-priced (e.g. combined sessions or removed treatments) and{" "}
@@ -649,7 +649,7 @@ export default function FinanceSection({
             </div>
           )}
           {month === currentCairoMonth() && (
-            <div className="rounded-xl border border-[#E5DCCB] bg-[#F4EFE7] px-4 py-2 text-sm text-[#847866]">
+            <div className="rounded-xl border border-[#D1D9E0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#4A5568]">
               Month-to-date: confirmed bookings still upcoming this month are counted
               as earned revenue (confirmed = earned).
             </div>
@@ -681,7 +681,7 @@ export default function FinanceSection({
       )}
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-4 text-sm text-[#B5483A]">
+        <div className="mb-4 rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-6 py-4 text-sm text-[#B91C1C]">
           {error}
         </div>
       )}
@@ -708,9 +708,9 @@ export default function FinanceSection({
         )}
 
         {loading ? (
-          <p className="text-sm text-[#847866]">Loading…</p>
+          <p className="text-sm text-[#4A5568]">Loading…</p>
         ) : pnl && pnl.entries.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+          <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
             No manual entries this month. Platform income (shop &amp; treatments) is
             counted automatically in the summary above.
           </div>

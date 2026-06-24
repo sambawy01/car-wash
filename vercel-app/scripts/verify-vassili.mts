@@ -1,5 +1,5 @@
 /**
- * End-to-end verification harness for Vassili (the Telegram assistant).
+ * End-to-end verification harness for Eco (the Telegram assistant).
  *
  * Run from vercel-app/:   npx tsx scripts/verify-vassili.mts
  *
@@ -313,7 +313,7 @@ const {
 const { getFile, downloadFile, IoDeadlineError } = await import(
   "../src/lib/telegram"
 );
-const { buildVassiliSystemPrompt } = await import("../src/lib/assistant/prompt");
+const { buildEcoSystemPrompt } = await import("../src/lib/assistant/prompt");
 const {
   webSearchEnabled,
   WEB_SEARCH_DISABLED_MESSAGE,
@@ -334,7 +334,7 @@ let updateId = 1;
 let messageId = 100;
 
 function tgRequest(update: unknown, secret = "test-webhook-secret"): Request {
-  return new Request("https://book.victoriaholisticbeauty.com/api/telegram/webhook", {
+  return new Request("https://book.eliteecocarwash.com/api/telegram/webhook", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -350,7 +350,7 @@ function calRequest(body: unknown): Request {
   const signature = createHmac("sha256", process.env.CAL_WEBHOOK_SECRET!)
     .update(raw)
     .digest("hex");
-  return new Request("https://book.victoriaholisticbeauty.com/api/cal/webhook", {
+  return new Request("https://book.eliteecocarwash.com/api/cal/webhook", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -362,7 +362,7 @@ function calRequest(body: unknown): Request {
 
 /** Shop order POST (no Origin header — same-origin is allowed by CORS). */
 function orderRequest(body: unknown): Request {
-  return new Request("https://book.victoriaholisticbeauty.com/api/order", {
+  return new Request("https://book.eliteecocarwash.com/api/order", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -508,7 +508,7 @@ function messagesTo(chatId: number, re: RegExp): Captured[] {
   });
 }
 
-const ALERT_RE = /tried to access Vassili/;
+const ALERT_RE = /tried to access Eco/;
 const REFUSAL_RE = /private assistant/;
 
 async function readAuditEntries(): Promise<
@@ -1143,7 +1143,7 @@ try {
     const { GET: cronGET } = await import("../src/app/api/cron/daily-brief/route");
     const { NextRequest } = await import("next/server");
     const req = new NextRequest(
-      "https://book.victoriaholisticbeauty.com/api/cron/daily-brief?force=1",
+      "https://book.eliteecocarwash.com/api/cron/daily-brief?force=1",
       { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } }
     );
     const res = await cronGET(req);
@@ -2421,7 +2421,7 @@ try {
     const { NextRequest } = await import("next/server");
     const weeklyReq = () =>
       new NextRequest(
-        "https://book.victoriaholisticbeauty.com/api/cron/weekly-report?force=1",
+        "https://book.eliteecocarwash.com/api/cron/weekly-report?force=1",
         { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } }
       );
     // The real marker for today (Cairo date) may legitimately pre-exist
@@ -2746,7 +2746,7 @@ try {
 
     // The persona advertises web lookups (and the untrusted-content rule) ONLY
     // when web search is actually usable.
-    const prompt = buildVassiliSystemPrompt();
+    const prompt = buildEcoSystemPrompt();
     check(
       "system prompt advertises web lookups iff enabled",
       enabled ? /web_search/.test(prompt) : !/web_search/.test(prompt)

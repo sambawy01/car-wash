@@ -9,7 +9,7 @@ import type {
 } from "@/lib/crm";
 
 /**
- * Clients manager — Victoria's private CRM inside /admin (the 6th tab).
+ * Clients manager — the team's private CRM inside /admin (the 6th tab).
  *
  * Profiles are DERIVED from bookings + orders (no duplicate records); this
  * view adds the stored overlay (private notes + tags) on top. Two views:
@@ -18,7 +18,7 @@ import type {
  *   notes (add / delete) and tags (add / remove).
  * - "Re-booking radar": clients overdue for a check-in, each with a suggested
  *   branded DRAFT and a copy affordance (sending stays manual — paste into an
- *   email, or ask Vassili to send via the confirmed email tool).
+ *   email, or ask Eco to send via the confirmed email tool).
  *
  * PRIVATE PII: this tab is admin-only and never exposed publicly. Notes are
  * owner-private. Auth mirrors finance-section: legacy ?key= flows down as
@@ -76,12 +76,12 @@ function fmtDateTime(iso: string): string {
 /* ---------- shared styles ---------- */
 
 const inputCls =
-  "w-full rounded-xl border border-[#3A332C]/15 bg-white px-3 py-2 text-sm text-[#3A332C] outline-none focus:border-[#8A5238]";
+  "w-full rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-2 text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]";
 const buttonBase =
   "rounded-full px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50";
-const primaryBtn = `${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`;
-const subtleBtn = `${buttonBase} border border-[#3A332C]/15 bg-[#FFFDF9] text-[#3A332C] hover:bg-[#F4EFE7]`;
-const dangerBtn = `${buttonBase} border border-[#B5483A]/30 bg-[#FFFDF9] text-[#B5483A] hover:bg-[#B5483A]/5`;
+const primaryBtn = `${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`;
+const subtleBtn = `${buttonBase} border border-[#0A1A2F]/15 bg-[#FFFFFF] text-[#0A1A2F] hover:bg-[#F8FAFC]`;
+const dangerBtn = `${buttonBase} border border-[#B91C1C]/30 bg-[#FFFFFF] text-[#B91C1C] hover:bg-[#B91C1C]/5`;
 
 /**
  * Small hint shown on phone-only profiles. Their identity rests on the last-9-
@@ -132,7 +132,7 @@ function TagPill({
           type="button"
           onClick={onRemove}
           aria-label={`Remove tag ${tag}`}
-          className="text-[#55633D]/70 hover:text-[#B5483A]"
+          className="text-[#55633D]/70 hover:text-[#B91C1C]"
         >
           ×
         </button>
@@ -305,10 +305,10 @@ function ProfileCard({
   }
 
   return (
-    <div className="rounded-2xl border border-[#8A5238]/25 bg-[#FFFDF9] px-5 py-5 shadow-sm">
+    <div className="rounded-2xl border border-[#1A5F9E]/25 bg-[#FFFFFF] px-5 py-5 shadow-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className="font-serif text-2xl text-[#3A332C]">
+          <h3 className="font-serif text-2xl text-[#0A1A2F]">
             {profile?.displayName ?? "Client"}
           </h3>
           {profile?.matchedByPhone && <MatchedByPhoneHint />}
@@ -319,47 +319,47 @@ function ProfileCard({
         </button>
       </div>
 
-      {loading && <p className="mt-3 text-sm text-[#847866]">Loading…</p>}
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {loading && <p className="mt-3 text-sm text-[#4A5568]">Loading…</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
 
       {profile && (
         <div className="mt-4 space-y-5">
           {/* contact + stats */}
-          <div className="grid grid-cols-1 gap-2 text-sm text-[#3A332C] sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 text-sm text-[#0A1A2F] sm:grid-cols-2">
             <p>
-              <span className="text-[#847866]">Email:</span>{" "}
+              <span className="text-[#4A5568]">Email:</span>{" "}
               {profile.email || "—"}
             </p>
             <p>
-              <span className="text-[#847866]">Phone:</span>{" "}
+              <span className="text-[#4A5568]">Phone:</span>{" "}
               {profile.phone || "—"}
             </p>
             <p>
-              <span className="text-[#847866]">Last visit:</span>{" "}
+              <span className="text-[#4A5568]">Last visit:</span>{" "}
               {fmtDate(profile.lastVisit)}
             </p>
             <p>
-              <span className="text-[#847866]">Next visit:</span>{" "}
+              <span className="text-[#4A5568]">Next visit:</span>{" "}
               {fmtDate(profile.nextVisit)}
             </p>
             <p>
-              <span className="text-[#847866]">Total spend:</span>{" "}
+              <span className="text-[#4A5568]">Total spend:</span>{" "}
               {egp(profile.totalSpendEgp)}
             </p>
             <p>
-              <span className="text-[#847866]">Language:</span>{" "}
+              <span className="text-[#4A5568]">Language:</span>{" "}
               {profile.lang.toUpperCase()}
             </p>
           </div>
 
           {/* tags */}
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#847866]">
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]">
               Tags
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {profile.tags.length === 0 && (
-                <span className="text-sm text-[#847866]">No tags yet.</span>
+                <span className="text-sm text-[#4A5568]">No tags yet.</span>
               )}
               {profile.tags.map((t) => (
                 <TagPill
@@ -398,21 +398,21 @@ function ProfileCard({
 
           {/* notes */}
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#847866]">
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]">
               Private notes (only you see these)
             </p>
             <div className="space-y-2">
               {profile.notes.length === 0 && (
-                <p className="text-sm text-[#847866]">No notes yet.</p>
+                <p className="text-sm text-[#4A5568]">No notes yet.</p>
               )}
               {profile.notes.map((n) => (
                 <div
                   key={n.id}
-                  className="flex items-start justify-between gap-3 rounded-xl border border-[#3A332C]/10 bg-white px-3 py-2"
+                  className="flex items-start justify-between gap-3 rounded-xl border border-[#0A1A2F]/10 bg-white px-3 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm text-[#3A332C]">{n.text}</p>
-                    <p className="mt-0.5 text-xs text-[#847866]">
+                    <p className="text-sm text-[#0A1A2F]">{n.text}</p>
+                    <p className="mt-0.5 text-xs text-[#4A5568]">
                       {fmtDateTime(n.createdAt)}
                     </p>
                   </div>
@@ -420,7 +420,7 @@ function ProfileCard({
                     type="button"
                     disabled={busy}
                     onClick={() => void deleteNote(n.id)}
-                    className="shrink-0 text-sm text-[#B5483A] underline"
+                    className="shrink-0 text-sm text-[#B91C1C] underline"
                   >
                     Delete
                   </button>
@@ -448,17 +448,17 @@ function ProfileCard({
 
           {/* booking history */}
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#847866]">
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]">
               Booking history ({profile.bookings.length})
             </p>
             <div className="space-y-1">
               {profile.bookings.length === 0 && (
-                <p className="text-sm text-[#847866]">No bookings.</p>
+                <p className="text-sm text-[#4A5568]">No bookings.</p>
               )}
               {profile.bookings.slice(0, 30).map((b) => (
-                <p key={b.uid} className="text-sm text-[#3A332C]">
+                <p key={b.uid} className="text-sm text-[#0A1A2F]">
                   {fmtDateTime(b.start)} · {b.treatment} ·{" "}
-                  <span className="text-[#847866]">{b.status}</span>
+                  <span className="text-[#4A5568]">{b.status}</span>
                 </p>
               ))}
             </div>
@@ -466,17 +466,17 @@ function ProfileCard({
 
           {/* order history */}
           <div>
-            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#847866]">
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]">
               Order history ({profile.orders.length})
             </p>
             <div className="space-y-1">
               {profile.orders.length === 0 && (
-                <p className="text-sm text-[#847866]">No orders.</p>
+                <p className="text-sm text-[#4A5568]">No orders.</p>
               )}
               {profile.orders.slice(0, 30).map((o) => (
-                <p key={o.orderNumber} className="text-sm text-[#3A332C]">
+                <p key={o.orderNumber} className="text-sm text-[#0A1A2F]">
                   {o.orderNumber} · {fmtDate(o.createdAt)} · {egp(o.totalEgp)} ·{" "}
-                  <span className="text-[#847866]">{o.status}</span>
+                  <span className="text-[#4A5568]">{o.status}</span>
                   {o.items.length ? ` — ${o.items.join(", ")}` : ""}
                 </p>
               ))}
@@ -484,8 +484,8 @@ function ProfileCard({
           </div>
 
           {/* danger zone — right to erasure */}
-          <div className="border-t border-[#3A332C]/10 pt-4">
-            <p className="mb-2 text-xs text-[#847866]">
+          <div className="border-t border-[#0A1A2F]/10 pt-4">
+            <p className="mb-2 text-xs text-[#4A5568]">
               Delete this client&apos;s internal records (private notes and
               tags). Their booking and order history is kept.
             </p>
@@ -532,11 +532,11 @@ function DraftBox({ client }: { client: RebookingClient }) {
         {open ? "Hide draft" : "Draft check-in"}
       </button>
       {open && (
-        <div className="mt-2 rounded-xl border border-[#3A332C]/10 bg-white px-3 py-3">
-          <p className="text-sm font-medium text-[#3A332C]">
+        <div className="mt-2 rounded-xl border border-[#0A1A2F]/10 bg-white px-3 py-3">
+          <p className="text-sm font-medium text-[#0A1A2F]">
             Subject: {draft.subject}
           </p>
-          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-[#3A332C]">
+          <pre className="mt-2 whitespace-pre-wrap font-sans text-sm text-[#0A1A2F]">
             {draft.body}
           </pre>
           <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -551,12 +551,12 @@ function DraftBox({ client }: { client: RebookingClient }) {
                 Open in email
               </a>
             ) : (
-              <span className="text-xs text-[#847866]">
+              <span className="text-xs text-[#4A5568]">
                 No email on file — copy and send another way.
               </span>
             )}
           </div>
-          <p className="mt-2 text-xs text-[#847866]">
+          <p className="mt-2 text-xs text-[#4A5568]">
             This is a draft for you to review. Nothing is sent automatically.
           </p>
         </div>
@@ -613,13 +613,13 @@ function RadarView({
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <label className="text-xs font-medium uppercase tracking-[0.08em] text-[#847866]">
+        <label className="text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]">
           Overdue by
         </label>
         <select
           value={weeks}
           onChange={(e) => setWeeks(Number(e.target.value))}
-          className="rounded-xl border border-[#3A332C]/15 bg-white px-3 py-1.5 text-sm text-[#3A332C] outline-none focus:border-[#8A5238]"
+          className="rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-1.5 text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]"
         >
           {[4, 6, 8, 12, 16].map((w) => (
             <option key={w} value={w}>
@@ -629,11 +629,11 @@ function RadarView({
         </select>
       </div>
 
-      {error && <p className="mb-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mb-3 text-sm text-[#B91C1C]">{error}</p>}
       {loading ? (
-        <p className="text-sm text-[#847866]">Loading…</p>
+        <p className="text-sm text-[#4A5568]">Loading…</p>
       ) : clients.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+        <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
           No clients are overdue for a check-in right now. 🌿
         </div>
       ) : (
@@ -641,23 +641,23 @@ function RadarView({
           {clients.map((c) => (
             <article
               key={c.clientId}
-              className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-4 py-3 shadow-sm"
+              className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-4 py-3 shadow-sm"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0">
                   <button
                     type="button"
                     onClick={() => onOpenClient(c.clientId)}
-                    className="text-left text-base font-medium text-[#3A332C] underline-offset-2 hover:underline"
+                    className="text-left text-base font-medium text-[#0A1A2F] underline-offset-2 hover:underline"
                   >
                     {c.displayName}
                   </button>
-                  <p className="text-sm text-[#847866]">
+                  <p className="text-sm text-[#4A5568]">
                     {c.email || c.phone || "no contact"} · last{" "}
                     {c.lastTreatment || "visit"} {fmtDate(c.lastVisit)}
                   </p>
                 </div>
-                <span className="inline-block rounded-full bg-[#B5483A]/12 px-3 py-0.5 text-xs font-semibold text-[#B5483A]">
+                <span className="inline-block rounded-full bg-[#B91C1C]/12 px-3 py-0.5 text-xs font-semibold text-[#B91C1C]">
                   {c.overdueWeeks}w overdue
                 </span>
               </div>
@@ -763,7 +763,7 @@ export default function ClientsSection({
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-serif text-2xl text-[#3A332C]">Clients</h2>
+        <h2 className="font-serif text-2xl text-[#0A1A2F]">Clients</h2>
         <div className="flex gap-2">
           <button
             type="button"
@@ -782,24 +782,24 @@ export default function ClientsSection({
         </div>
       </div>
 
-      <p className="mb-4 text-sm text-[#847866]">
+      <p className="mb-4 text-sm text-[#4A5568]">
         Profiles are built automatically from bookings and orders. Notes and
         tags are private — clients never see them.
       </p>
 
       {error && (
-        <div className="mb-4 rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-4 text-sm text-[#B5483A]">
+        <div className="mb-4 rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-6 py-4 text-sm text-[#B91C1C]">
           {error}
         </div>
       )}
 
       {unlinked.length > 0 && (
-        <div className="mb-4 rounded-2xl border border-[#C08A2D]/35 bg-[#FFFDF9] px-5 py-4">
+        <div className="mb-4 rounded-2xl border border-[#C08A2D]/35 bg-[#FFFFFF] px-5 py-4">
           <p className="text-sm font-medium text-[#8A6418]">
             {unlinked.length} note record
             {unlinked.length === 1 ? "" : "s"} not linked to any current client
           </p>
-          <p className="mt-1 text-xs text-[#847866]">
+          <p className="mt-1 text-xs text-[#4A5568]">
             These hold notes/tags whose client no longer resolves (e.g. a
             phone-only client whose visits aged out). Nothing is lost — review,
             then delete if no longer needed.
@@ -808,14 +808,14 @@ export default function ClientsSection({
             {unlinked.map((u) => (
               <div
                 key={u.clientId}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#3A332C]/10 bg-white px-3 py-2"
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[#0A1A2F]/10 bg-white px-3 py-2"
               >
                 <div className="min-w-0">
-                  <p className="text-sm text-[#3A332C]">
+                  <p className="text-sm text-[#0A1A2F]">
                     {u.noteCount} note{u.noteCount === 1 ? "" : "s"}
                     {u.tags.length ? ` · tags: ${u.tags.join(", ")}` : ""}
                   </p>
-                  <p className="font-mono text-xs text-[#847866]">{u.clientId}</p>
+                  <p className="font-mono text-xs text-[#4A5568]">{u.clientId}</p>
                 </div>
                 <button
                   type="button"
@@ -857,9 +857,9 @@ export default function ClientsSection({
           />
 
           {loading ? (
-            <p className="text-sm text-[#847866]">Loading…</p>
+            <p className="text-sm text-[#4A5568]">Loading…</p>
           ) : clients.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+            <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
               {search.trim()
                 ? `No clients match "${search.trim()}".`
                 : "No clients yet — they appear here after their first booking or order."}
@@ -871,21 +871,21 @@ export default function ClientsSection({
                   key={c.clientId}
                   type="button"
                   onClick={() => setSelected(c.clientId)}
-                  className="block w-full rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#F4EFE7]"
+                  className="block w-full rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-4 py-3 text-left shadow-sm transition-colors hover:bg-[#F8FAFC]"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <span className="flex flex-wrap items-center gap-2">
-                      <span className="text-base font-medium text-[#3A332C]">
+                      <span className="text-base font-medium text-[#0A1A2F]">
                         {c.displayName}
                       </span>
                       {c.matchedByPhone && <MatchedByPhoneHint />}
                       {c.reconciledFromPhone && <MergedByPhoneHint />}
                     </span>
-                    <span className="text-sm text-[#847866]">
+                    <span className="text-sm text-[#4A5568]">
                       {egp(c.totalSpendEgp)}
                     </span>
                   </div>
-                  <p className="text-sm text-[#847866]">
+                  <p className="text-sm text-[#4A5568]">
                     {c.bookingsCount} booking{c.bookingsCount === 1 ? "" : "s"} ·{" "}
                     {c.ordersCount} order{c.ordersCount === 1 ? "" : "s"} · last
                     visit {fmtDate(c.lastVisit)}
@@ -897,7 +897,7 @@ export default function ClientsSection({
                         <TagPill key={t} tag={t} />
                       ))}
                       {c.noteCount > 0 && (
-                        <span className="text-xs text-[#847866]">
+                        <span className="text-xs text-[#4A5568]">
                           {c.noteCount} note{c.noteCount === 1 ? "" : "s"}
                         </span>
                       )}

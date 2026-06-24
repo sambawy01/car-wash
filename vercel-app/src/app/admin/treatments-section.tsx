@@ -4,13 +4,13 @@ import { useState } from "react";
 import type { Treatment } from "@/lib/treatments";
 
 /**
- * Treatments manager — Victoria's service menu CRUD inside /admin,
+ * Treatments manager — the team's service menu CRUD inside /admin,
  * mirroring the products section UX (list, inline edit, add form,
  * active toggle).
  *
  * Saves report Cal.com sync status: name/duration/visibility changes are
  * best-effort pushed to the linked Cal event type; when that fails the save
- * still succeeds and a notice asks Victoria to update Cal manually.
+ * still succeeds and a notice asks the team to update Cal manually.
  * Prices live only in this catalog — they never touch Cal.
  */
 
@@ -44,18 +44,18 @@ function calNotice(cal: SaveResponse["cal"]): string | null {
 /* ---------- shared styles (same palette as the products section) ---------- */
 
 const inputCls =
-  "w-full rounded-xl border border-[#3A332C]/15 bg-white px-3 py-2 text-sm text-[#3A332C] outline-none focus:border-[#8A5238]";
+  "w-full rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-2 text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]";
 const labelCls =
-  "mb-1 block text-xs font-medium uppercase tracking-[0.08em] text-[#847866]";
+  "mb-1 block text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]";
 const buttonBase =
   "rounded-full px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50";
-const primaryBtn = `${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`;
-const subtleBtn = `${buttonBase} border border-[#3A332C]/15 bg-[#FFFDF9] text-[#3A332C] hover:bg-[#F4EFE7]`;
+const primaryBtn = `${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`;
+const subtleBtn = `${buttonBase} border border-[#0A1A2F]/15 bg-[#FFFFFF] text-[#0A1A2F] hover:bg-[#F8FAFC]`;
 
 function statusChip(t: Treatment): { label: string; cls: string } {
   return t.active
     ? { label: "Active", cls: "bg-[#6B7A4F]/15 text-[#55633D]" }
-    : { label: "Hidden", cls: "bg-[#3A332C]/10 text-[#3A332C]" };
+    : { label: "Hidden", cls: "bg-[#0A1A2F]/10 text-[#0A1A2F]" };
 }
 
 /* ---------- treatment form (add / edit) ---------- */
@@ -67,7 +67,6 @@ interface FormState {
   ruDesc: string;
   duration: string;
   priceEgp: string;
-  priceRub: string;
   active: boolean;
 }
 
@@ -79,7 +78,6 @@ function toFormState(t: Treatment | null): FormState {
     ruDesc: t?.description.ru ?? "",
     duration: t ? String(t.durationMinutes) : "",
     priceEgp: t ? String(t.priceEgp) : "",
-    priceRub: t ? String(t.priceRub) : "",
     active: t?.active ?? true,
   };
 }
@@ -106,7 +104,6 @@ function TreatmentForm({
     setError(null);
     const duration = Number(form.duration);
     const priceEgp = Number(form.priceEgp);
-    const priceRub = Number(form.priceRub);
     if (!form.enName.trim() || !form.ruName.trim()) {
       setError("Both EN and RU names are required.");
       return;
@@ -119,7 +116,6 @@ function TreatmentForm({
       setError("Price (EGP) must be a whole number.");
       return;
     }
-    if (!Number.isInteger(priceRub) || priceRub < 0 || form.priceRub === "") {
       setError("Price (RUB) must be a whole number.");
       return;
     }
@@ -129,7 +125,6 @@ function TreatmentForm({
       description: { en: form.enDesc.trim(), ru: form.ruDesc.trim() },
       durationMinutes: duration,
       priceEgp,
-      priceRub,
       active: form.active,
     };
 
@@ -159,12 +154,12 @@ function TreatmentForm({
   }
 
   return (
-    <div className="rounded-2xl border border-[#8A5238]/25 bg-[#FFFDF9] px-5 py-5 shadow-sm">
-      <h3 className="font-serif text-xl text-[#3A332C]">
+    <div className="rounded-2xl border border-[#1A5F9E]/25 bg-[#FFFFFF] px-5 py-5 shadow-sm">
+      <h3 className="font-serif text-xl text-[#0A1A2F]">
         {treatment ? `Edit — ${treatment.name.en}` : "Add treatment"}
       </h3>
       {treatment ? (
-        <p className="mt-1 text-xs text-[#847866]">
+        <p className="mt-1 text-xs text-[#4A5568]">
           Slug: <code>{treatment.slug}</code> (permanent)
           {treatment.eventTypeId > 0 ? (
             <>
@@ -176,73 +171,29 @@ function TreatmentForm({
           )}
         </p>
       ) : (
-        <p className="mt-1 text-xs text-[#847866]">
-          A Cal.com event type (with Victoria&apos;s confirmation required) is
+        <p className="mt-1 text-xs text-[#4A5568]">
+          A Cal.com event type (with the team&apos;s confirmation required) is
           created automatically.
         </p>
       )}
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-3">
-          <div>
-            <label className={labelCls}>Name (EN)</label>
-            <input className={inputCls} value={form.enName} onChange={(e) => set({ enName: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Description (EN)</label>
-            <textarea
-              className={inputCls}
-              rows={2}
-              value={form.enDesc}
-              placeholder="Plastic / Myofascial / Buccal"
-              onChange={(e) => set({ enDesc: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className={labelCls}>Name (RU)</label>
-            <input className={inputCls} value={form.ruName} onChange={(e) => set({ ruName: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Description (RU)</label>
-            <textarea
-              className={inputCls}
-              rows={2}
-              value={form.ruDesc}
-              placeholder="пластический / миофасциальный / буккальный"
-              onChange={(e) => set({ ruDesc: e.target.value })}
-            />
-          </div>
+          <div>set({ /* removed */ })} />
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <label className={labelCls}>Duration (minutes)</label>
-          <input className={inputCls} inputMode="numeric" value={form.duration} onChange={(e) => set({ duration: e.target.value })} />
-        </div>
-        <div>
-          <label className={labelCls}>Price (EGP)</label>
-          <input className={inputCls} inputMode="numeric" value={form.priceEgp} onChange={(e) => set({ priceEgp: e.target.value })} />
-        </div>
-        <div>
-          <label className={labelCls}>Price (RUB)</label>
-          <input className={inputCls} inputMode="numeric" value={form.priceRub} onChange={(e) => set({ priceRub: e.target.value })} />
-        </div>
-      </div>
-
-      <label className="mt-4 flex items-center gap-2 text-sm text-[#3A332C]">
+      <label className="mt-4 flex items-center gap-2 text-sm text-[#0A1A2F]">
         <input
           type="checkbox"
           checked={form.active}
           onChange={(e) => set({ active: e.target.checked })}
-          className="h-4 w-4 accent-[#8A5238]"
+          className="h-4 w-4 accent-[#1A5F9E]"
         />
         Visible on the site and bookable
       </label>
 
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
 
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" disabled={busy} onClick={() => void submit()} className={primaryBtn}>
@@ -300,19 +251,19 @@ function TreatmentRow({
   const chip = statusChip(treatment);
 
   return (
-    <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-4 py-4 shadow-sm sm:px-5">
+    <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-4 py-4 shadow-sm sm:px-5">
       <div className="flex items-start gap-3">
-        <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-[#E0D8CE] text-[#3A332C]">
+        <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-xl bg-[#E0D8CE] text-[#0A1A2F]">
           <span className="font-serif text-lg leading-none">
             {treatment.durationMinutes}
           </span>
-          <span className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-[#847866]">
+          <span className="mt-0.5 text-[10px] uppercase tracking-[0.1em] text-[#4A5568]">
             min
           </span>
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="font-serif text-lg leading-snug text-[#3A332C]">
+            <h3 className="font-serif text-lg leading-snug text-[#0A1A2F]">
               {treatment.name.en}
             </h3>
             <span
@@ -321,14 +272,13 @@ function TreatmentRow({
               {chip.label}
             </span>
           </div>
-          <p className="mt-0.5 text-sm text-[#847866]">{treatment.name.ru}</p>
-          <p className="mt-0.5 text-sm text-[#847866]">
+          <p className="mt-0.5 text-sm text-[#4A5568]">{treatment.name.ru}</p>
+          <p className="mt-0.5 text-sm text-[#4A5568]">
             {treatment.priceEgp.toLocaleString("en-EG")} EGP ·{" "}
-            {treatment.priceRub.toLocaleString("ru-RU")} RUB
             {treatment.eventTypeId > 0 ? (
               <span className="text-xs"> · Cal #{treatment.eventTypeId}</span>
             ) : (
-              <span className="text-xs text-[#B5483A]"> · no Cal event type</span>
+              <span className="text-xs text-[#B91C1C]"> · no Cal event type</span>
             )}
           </p>
         </div>
@@ -348,7 +298,7 @@ function TreatmentRow({
         </button>
       </div>
 
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
     </article>
   );
 }
@@ -390,10 +340,10 @@ export default function TreatmentsSection({
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-serif text-2xl text-[#3A332C]">
+        <h2 className="font-serif text-2xl text-[#0A1A2F]">
           Treatments
           {treatments.length > 0 && (
-            <span className="ml-2 align-middle font-sans text-sm text-[#8A5238]">
+            <span className="ml-2 align-middle font-sans text-sm text-[#1A5F9E]">
               {treatments.length}
             </span>
           )}
@@ -406,13 +356,13 @@ export default function TreatmentsSection({
       </div>
 
       {calMessage && (
-        <div className="mb-4 rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-5 py-3 text-sm text-[#B5483A]">
+        <div className="mb-4 rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-5 py-3 text-sm text-[#B91C1C]">
           {calMessage}
         </div>
       )}
 
       {loadError ? (
-        <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
+        <div className="rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-6 py-5 text-sm text-[#B91C1C]">
           {loadError}
         </div>
       ) : (
@@ -435,7 +385,7 @@ export default function TreatmentsSection({
             />
           )}
           {treatments.length === 0 && !adding ? (
-            <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+            <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
               No treatments yet — add the first one.
             </div>
           ) : (

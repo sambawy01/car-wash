@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import type { CalBooking } from "@/lib/admin/cal";
 import { COMBINED_SESSION, SERVICES } from "@/lib/services";
 
-const PUBLIC_BOOKING_BASE = "https://book.victoriaholisticbeauty.com/book";
+const PUBLIC_BOOKING_BASE = "https://book.eliteecocarwash.com/book";
 const CAIRO_TZ = "Africa/Cairo";
 
 /* ---------- helpers ---------- */
@@ -54,7 +54,7 @@ function shiftDate(date: string, days: number): string {
  * Cal rejects reschedules to anything that isn't a genuinely free slot
  * ("User either already has booking at this time or is not available").
  * The move UI only offers fetched slots, so a residual rejection means the
- * slot was taken between fetch and submit — translate it for Victoria.
+ * slot was taken between fetch and submit — translate it for the team.
  */
 function mapMoveError(message: string): string {
   return /already has booking|not available|no longer available|no_available/i.test(
@@ -117,10 +117,10 @@ function suggestTemplate(booking: CalBooking): string {
 function StatusChip({ status }: { status: string }) {
   const styles =
     status === "pending"
-      ? "bg-[#A9745A]/15 text-[#8A5238]"
+      ? "bg-[#0D3B66]/15 text-[#1A5F9E]"
       : status === "accepted"
         ? "bg-[#6B7A4F]/15 text-[#55633D]"
-        : "bg-[#3A332C]/10 text-[#3A332C]";
+        : "bg-[#0A1A2F]/10 text-[#0A1A2F]";
   const label = status === "accepted" ? "confirmed" : status;
   return (
     <span
@@ -133,7 +133,7 @@ function StatusChip({ status }: { status: string }) {
 
 function EmptyState({ text }: { text: string }) {
   return (
-    <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+    <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
       {text}
     </div>
   );
@@ -263,7 +263,7 @@ function PendingCard({
     if (!moveSlot) return;
     const ok = await callAction(
       "reschedule",
-      { start: moveSlot, reason: "Moved by Victoria" },
+      { start: moveSlot, reason: "Moved by admin" },
       "Booking moved to the new time.",
       mapMoveError
     );
@@ -293,30 +293,30 @@ function PendingCard({
 
   if (done) {
     return (
-      <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-5 py-4 shadow-sm">
+      <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-5 py-4 shadow-sm">
         <p className="text-sm text-[#55633D]">{done}</p>
       </article>
     );
   }
 
   return (
-    <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-5 py-5 shadow-sm">
+    <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-5 py-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-serif text-xl text-[#3A332C]">
+          <h3 className="font-serif text-xl text-[#0A1A2F]">
             {serviceTitle(booking)}
           </h3>
-          <p className="mt-1 text-sm text-[#3A332C]">
+          <p className="mt-1 text-sm text-[#0A1A2F]">
             {attendee?.name}
             {attendee?.email ? (
-              <span className="text-[#847866]"> · {attendee.email}</span>
+              <span className="text-[#4A5568]"> · {attendee.email}</span>
             ) : null}
           </p>
-          <p className="mt-1 text-sm font-medium text-[#8A5238]">
+          <p className="mt-1 text-sm font-medium text-[#1A5F9E]">
             {formatCairo(booking.start)} · {booking.duration} min
           </p>
           {bookingNotes(booking) && (
-            <p className="mt-2 whitespace-pre-line rounded-xl bg-[#3A332C]/5 px-3 py-2 text-sm text-[#3A332C]">
+            <p className="mt-2 whitespace-pre-line rounded-xl bg-[#0A1A2F]/5 px-3 py-2 text-sm text-[#0A1A2F]">
               {bookingNotes(booking)}
             </p>
           )}
@@ -330,7 +330,7 @@ function PendingCard({
             type="button"
             disabled={busy}
             onClick={() => callAction("confirm", undefined, "Booking confirmed.")}
-            className={`${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`}
+            className={`${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`}
           >
             {busy ? "Working…" : "Confirm"}
           </button>
@@ -338,7 +338,7 @@ function PendingCard({
             type="button"
             disabled={busy}
             onClick={() => openMode("decline")}
-            className={`${buttonBase} border border-[#B5483A]/40 text-[#B5483A] hover:bg-[#B5483A]/5`}
+            className={`${buttonBase} border border-[#B91C1C]/40 text-[#B91C1C] hover:bg-[#B91C1C]/5`}
           >
             Decline with note
           </button>
@@ -346,7 +346,7 @@ function PendingCard({
             type="button"
             disabled={busy}
             onClick={() => openMode("suggest")}
-            className={`${buttonBase} border border-[#8A5238]/40 text-[#8A5238] hover:bg-[#8A5238]/5`}
+            className={`${buttonBase} border border-[#1A5F9E]/40 text-[#1A5F9E] hover:bg-[#1A5F9E]/5`}
           >
             Suggest reschedule
           </button>
@@ -354,7 +354,7 @@ function PendingCard({
             type="button"
             disabled={busy}
             onClick={() => openMode("move")}
-            className={`${buttonBase} border border-[#3A332C]/20 text-[#3A332C] hover:bg-[#3A332C]/5`}
+            className={`${buttonBase} border border-[#0A1A2F]/20 text-[#0A1A2F] hover:bg-[#0A1A2F]/5`}
           >
             Move to new time
           </button>
@@ -363,7 +363,7 @@ function PendingCard({
 
       {(mode === "decline" || mode === "suggest") && (
         <div className="mt-4 space-y-3">
-          <label className="block text-sm font-medium text-[#3A332C]">
+          <label className="block text-sm font-medium text-[#0A1A2F]">
             {mode === "decline"
               ? "Note to the client (required — sent in the decline email)"
               : "Reschedule invitation (sent in the decline email — add your suggested times)"}
@@ -371,7 +371,7 @@ function PendingCard({
               value={note}
               onChange={(e) => setNote(e.target.value)}
               rows={mode === "suggest" ? 6 : 4}
-              className="mt-2 w-full rounded-xl border border-[#3A332C]/20 bg-white px-3 py-2 text-sm text-[#3A332C] focus:border-[#8A5238] focus:outline-none"
+              className="mt-2 w-full rounded-xl border border-[#0A1A2F]/20 bg-white px-3 py-2 text-sm text-[#0A1A2F] focus:border-[#1A5F9E] focus:outline-none"
               placeholder={
                 mode === "decline" ? "e.g. I'm fully booked that day…" : undefined
               }
@@ -390,7 +390,7 @@ function PendingCard({
                     : "Declined — your note was sent to the client."
                 )
               }
-              className={`${buttonBase} bg-[#B5483A] text-[#FDF9F3] hover:opacity-90`}
+              className={`${buttonBase} bg-[#B91C1C] text-[#F8FAFC] hover:opacity-90`}
             >
               {busy
                 ? "Working…"
@@ -402,7 +402,7 @@ function PendingCard({
               type="button"
               disabled={busy}
               onClick={() => setMode(null)}
-              className={`${buttonBase} text-[#847866] hover:bg-[#3A332C]/5`}
+              className={`${buttonBase} text-[#4A5568] hover:bg-[#0A1A2F]/5`}
             >
               Cancel
             </button>
@@ -412,11 +412,11 @@ function PendingCard({
 
       {mode === "move" && (
         <div className="mt-4 space-y-3">
-          <p className="rounded-xl bg-[#A9745A]/10 px-3 py-2 text-xs text-[#8A5238]">
+          <p className="rounded-xl bg-[#0D3B66]/10 px-3 py-2 text-xs text-[#1A5F9E]">
             This rebooks the appointment to the new time immediately — the
             client is notified by Cal.com, not asked.
           </p>
-          <label className="block text-sm font-medium text-[#3A332C]">
+          <label className="block text-sm font-medium text-[#0A1A2F]">
             New date (Cairo time)
             <input
               type="date"
@@ -435,25 +435,25 @@ function PendingCard({
                   setSlotsLoading(false);
                 }
               }}
-              className="mt-2 w-full rounded-xl border border-[#3A332C]/20 bg-white px-3 py-2 text-sm text-[#3A332C] focus:border-[#8A5238] focus:outline-none"
+              className="mt-2 w-full rounded-xl border border-[#0A1A2F]/20 bg-white px-3 py-2 text-sm text-[#0A1A2F] focus:border-[#1A5F9E] focus:outline-none"
             />
           </label>
           {moveDate &&
             (slotsLoading ? (
-              <p className="text-sm text-[#847866]">Loading available times…</p>
+              <p className="text-sm text-[#4A5568]">Loading available times…</p>
             ) : slotsError ? (
-              <p className="text-sm text-[#B5483A]">{slotsError}</p>
+              <p className="text-sm text-[#B91C1C]">{slotsError}</p>
             ) : moveSlots.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-3 py-2 text-sm text-[#847866]">
+              <p className="rounded-xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-3 py-2 text-sm text-[#4A5568]">
                 No free times this day — try another date.
               </p>
             ) : (
-              <label className="block text-sm font-medium text-[#3A332C]">
+              <label className="block text-sm font-medium text-[#0A1A2F]">
                 New start time (Cairo time) — only free slots are listed
                 <select
                   value={moveSlot}
                   onChange={(e) => setMoveSlot(e.target.value)}
-                  className="mt-2 w-full rounded-xl border border-[#3A332C]/20 bg-white px-3 py-2 text-sm text-[#3A332C] focus:border-[#8A5238] focus:outline-none"
+                  className="mt-2 w-full rounded-xl border border-[#0A1A2F]/20 bg-white px-3 py-2 text-sm text-[#0A1A2F] focus:border-[#1A5F9E] focus:outline-none"
                 >
                   <option value="">Select a time…</option>
                   {moveSlots.map((iso) => (
@@ -469,7 +469,7 @@ function PendingCard({
               type="button"
               disabled={busy || !moveSlot}
               onClick={() => void submitMove()}
-              className={`${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`}
+              className={`${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`}
             >
               {busy ? "Working…" : "Move booking now"}
             </button>
@@ -477,7 +477,7 @@ function PendingCard({
               type="button"
               disabled={busy}
               onClick={() => setMode(null)}
-              className={`${buttonBase} text-[#847866] hover:bg-[#3A332C]/5`}
+              className={`${buttonBase} text-[#4A5568] hover:bg-[#0A1A2F]/5`}
             >
               Cancel
             </button>
@@ -485,7 +485,7 @@ function PendingCard({
         </div>
       )}
 
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
     </article>
   );
 }
@@ -495,23 +495,23 @@ function PendingCard({
 function ConfirmedCard({ booking }: { booking: CalBooking }) {
   const attendee = booking.attendees[0];
   return (
-    <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-5 py-4 shadow-sm">
+    <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-5 py-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
-          <h3 className="font-serif text-lg text-[#3A332C]">
+          <h3 className="font-serif text-lg text-[#0A1A2F]">
             {serviceTitle(booking)}
           </h3>
-          <p className="mt-1 text-sm text-[#3A332C]">
+          <p className="mt-1 text-sm text-[#0A1A2F]">
             {attendee?.name}
             {attendee?.email ? (
-              <span className="text-[#847866]"> · {attendee.email}</span>
+              <span className="text-[#4A5568]"> · {attendee.email}</span>
             ) : null}
           </p>
-          <p className="mt-1 text-sm text-[#847866]">
+          <p className="mt-1 text-sm text-[#4A5568]">
             {formatCairo(booking.start)} · {booking.duration} min
           </p>
           {bookingNotes(booking) && (
-            <p className="mt-2 whitespace-pre-line rounded-xl bg-[#3A332C]/5 px-3 py-2 text-sm text-[#3A332C]">
+            <p className="mt-2 whitespace-pre-line rounded-xl bg-[#0A1A2F]/5 px-3 py-2 text-sm text-[#0A1A2F]">
               {bookingNotes(booking)}
             </p>
           )}
@@ -541,10 +541,10 @@ export default function AdminInbox({
   return (
     <div className="space-y-10">
       <section>
-        <h2 className="mb-4 font-serif text-2xl text-[#3A332C]">
+        <h2 className="mb-4 font-serif text-2xl text-[#0A1A2F]">
           Pending requests
           {pending.length > 0 && (
-            <span className="ml-2 align-middle text-sm font-sans text-[#8A5238]">
+            <span className="ml-2 align-middle text-sm font-sans text-[#1A5F9E]">
               {pending.length}
             </span>
           )}
@@ -566,7 +566,7 @@ export default function AdminInbox({
       </section>
 
       <section>
-        <h2 className="mb-4 font-serif text-2xl text-[#3A332C]">
+        <h2 className="mb-4 font-serif text-2xl text-[#0A1A2F]">
           Upcoming confirmed
         </h2>
         {confirmed.length === 0 ? (

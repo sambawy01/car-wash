@@ -5,7 +5,7 @@ import type { StoredOrder } from "../orders";
 import { cairoClock, cairoDayAndClock, cairoSubjectDate } from "./shared";
 
 /**
- * Victoria's 20:00-Cairo evening digest (/api/cron/evening-digest):
+ * the team's 20:00-Cairo evening digest (/api/cron/evening-digest):
  *
  * - "Tomorrow's appointments": confirmed bookings starting TOMORROW in Cairo
  *   — the evening preview of the next working day.
@@ -49,7 +49,7 @@ export interface EveningDigest {
 const PENDING_STALE_MS = 12 * 60 * 60 * 1000;
 const ORDER_STALE_MS = 48 * 60 * 60 * 1000;
 
-/** "Facial Massage between Victoria Vasilyeva and X" → "Facial Massage". */
+/** "Facial Massage between Elite Eco Car Wash and X" → "Facial Massage". */
 function serviceTitle(booking: CalBooking): string {
   const title = booking.title || "Booking";
   const idx = title.indexOf(" between ");
@@ -170,16 +170,16 @@ export function buildEveningDigest(input: EveningDigestInput): EveningDigest {
 
   // --- html part ---------------------------------------------------------------
   const sectionTitle = (title: string) =>
-    `<p style="margin:28px 0 8px;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(title)}</p>`;
+    `<p style="margin:28px 0 8px;color:#4A5568;font-size:13px;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(title)}</p>`;
   const line = (content: string, muted = false) =>
-    `<p style="margin:0 0 8px;color:${muted ? "#847866" : "#3A332C"};font-size:15px;line-height:1.6;">${content}</p>`;
+    `<p style="margin:0 0 8px;color:${muted ? "#4A5568" : "#0A1A2F"};font-size:15px;line-height:1.6;">${content}</p>`;
   const adminButton = (label: string) =>
-    `<p style="margin:12px 0 0;"><a href="${adminLink}" style="display:inline-block;background-color:#3A332C;color:#FFFDF9;text-decoration:none;padding:10px 24px;border-radius:9999px;font-size:14px;">${escapeHtml(label)}</a></p>`;
+    `<p style="margin:12px 0 0;"><a href="${adminLink}" style="display:inline-block;background-color:#0A1A2F;color:#FFFFFF;text-decoration:none;padding:10px 24px;border-radius:9999px;font-size:14px;">${escapeHtml(label)}</a></p>`;
 
   let contentHtml = "";
 
   if (input.failures.length) {
-    contentHtml += `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;"><p style="margin:0;color:#3A332C;font-size:14px;">Heads up: couldn't load ${escapeHtml(input.failures.join(" and "))} — the sections below may be incomplete.</p></div>`;
+    contentHtml += `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #D1D9E0;border-radius:10px;background-color:#F8FAFC;"><p style="margin:0;color:#0A1A2F;font-size:14px;">Heads up: couldn't load ${escapeHtml(input.failures.join(" and "))} — the sections below may be incomplete.</p></div>`;
   }
 
   contentHtml += sectionTitle(`Tomorrow's appointments (${tomorrow.length})`);
@@ -216,13 +216,13 @@ export function buildEveningDigest(input: EveningDigestInput): EveningDigest {
     for (const o of staleOrders) {
       const items = o.items.map((i) => `${i.qty}× ${i.names.en}`).join(", ");
       contentHtml += line(
-        `<strong>${escapeHtml(o.orderNumber)}</strong> · ${escapeHtml(o.name)} · ${escapeHtml(o.phone)} · ${escapeHtml(String(o.totals.egp))} EGP<br><span style="color:#847866;font-size:14px;">${escapeHtml(items)}</span>`
+        `<strong>${escapeHtml(o.orderNumber)}</strong> · ${escapeHtml(o.name)} · ${escapeHtml(o.phone)} · ${escapeHtml(String(o.totals.egp))} EGP<br><span style="color:#4A5568;font-size:14px;">${escapeHtml(items)}</span>`
       );
     }
     contentHtml += adminButton("Open admin");
   }
 
-  contentHtml += `<p style="margin:28px 0 0;color:#847866;font-size:14px;">Rest well!<br>— your booking assistant</p>`;
+  contentHtml += `<p style="margin:28px 0 0;color:#4A5568;font-size:14px;">Rest well!<br>— your booking assistant</p>`;
 
   const html = brandedEmailHtml({
     heading: `Tomorrow at a glance — ${subjectDate}`,

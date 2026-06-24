@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const SUBSCRIBER_URL =
-  "https://book.victoriaholisticbeauty.com/api/cal/webhook";
+  "https://book.eliteecocarwash.com/api/cal/webhook";
 const TRIGGERS = ["BOOKING_REQUESTED", "BOOKING_CREATED", "BOOKING_CANCELLED"];
 
 // --- env -------------------------------------------------------------------

@@ -26,7 +26,7 @@ import {
  *
  * Routing (branded emails replace/augment Cal's generic ones):
  * - BOOKING_REQUESTED, or BOOKING_CREATED while still pending
- *     → Victoria's "New booking request" + attendee "request received".
+ *     → the team's "New booking request" + attendee "request received".
  * - BOOKING_CREATED with status accepted — this is what Cal fires when the
  *   host CONFIRMS a pending booking (verified in cal.com
  *   handleConfirmation.ts; there is no BOOKING_CONFIRMED/ACCEPTED trigger)
@@ -47,7 +47,7 @@ import {
  *   (2024-08-13) on the NEW booking returns `rescheduledFromUid`, and the old
  *   booking (now cancelled) still answers GET with its original start.
  *
- * Attendee language: `payload.metadata.lang` ("en"/"ru"), recorded by
+ * Attendee language: `payload.metadata.lang` ("en"/"ar"), recorded by
  * /api/booking-calendar/book at creation time. The confirmation-time
  * BOOKING_CREATED payload does NOT carry booking metadata (Cal only sends
  * { videoCallUrl } there), so when lang is missing we fetch the canonical
@@ -319,7 +319,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Victoria's notification only for new requests; attendee email for every
+  // the team's notification only for new requests; attendee email for every
   // lifecycle step. Failures are logged and reported — never re-thrown, and
   // the attendee email is never blocked by an owner-email failure.
   let ownerSent = false;
@@ -328,12 +328,12 @@ export async function POST(request: NextRequest) {
   }
   const attendeeResult = await sendAttendeeEmail(attendeeKind, details);
 
-  // Instant Telegram push to Victoria (best effort by contract — see
+  // Instant Telegram push to the team (best effort by contract — see
   // @/lib/assistant/notify): a new request gets one-tap Confirm/Decline
   // buttons; a cancellation is informational. Never affects the response,
   // silently skipped when no bot token / no bound owner. BOOKING_CANCELLED
   // fires for any canceller (client or host) — pushing both is acceptable:
-  // a host-side cancel just echoes what Victoria already did.
+  // a host-side cancel just echoes what the team already did.
   if (isRequested) {
     await notifyBookingRequest(details);
   } else if (attendeeKind === "cancelled") {

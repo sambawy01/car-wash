@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * QA tool: render EVERY email template the app can send and verify each HTML
- * body carries Victoria's branding (dark #100D0B band + white logo header).
+ * body carries Victoria's branding (dark #0A1A2F band + white logo header).
  *
  * No emails are sent and no env is needed — the builders in src/lib are pure.
  * They are compiled with the project's TypeScript into .email-preview/ (git-
@@ -70,7 +70,7 @@ const bookingBase = {
 
 const orderInput = (lang) => ({
   orderNumber: "VV-TEST01",
-  name: lang === "ru" ? "Анна Тест" : "Anna Test",
+  name: lang === "ar" ? "Анна Тест" : "Anna Test",
   phone: "+201234567890",
   email: "anna@example.com",
   address: "12 Palm Hills, Cairo",
@@ -102,7 +102,7 @@ const storedOrder = (lang) => ({
     },
   ],
   totals: { egp: 2400, rub: 6600 },
-  name: lang === "ru" ? "Анна Тест" : "Anna Test",
+  name: lang === "ar" ? "Анна Тест" : "Anna Test",
   phone: "+201234567890",
   email: "anna@example.com",
   address: "12 Palm Hills, Cairo",
@@ -116,7 +116,7 @@ const previews = [
   ["booking-owner-notification", bookingEmails.buildOwnerNotificationEmail(bookingBase)],
 ];
 
-for (const lang of ["en", "ru"]) {
+for (const lang of ["en", "ar"]) {
   previews.push([
     `booking-attendee-requested-${lang}`,
     bookingEmails.buildAttendeeEmail("requested", { ...bookingBase, lang }),
@@ -163,8 +163,8 @@ previews.push(["order-owner-notification", orderEmails.buildOwnerOrderEmail(orde
 
 // --- verify the band -----------------------------------------------------------------
 const BAND_MARKERS = [
-  'bgcolor="#100D0B"',
-  "https://victoriaholisticbeauty.com/assets/logo-white.png",
+  'bgcolor="#0A1A2F"',
+  "https://eliteecocarwash.com/assets/logo-white.png",
 ];
 
 let failures = 0;

@@ -38,7 +38,7 @@ function itemsSummary(order: StoredOrder): string {
 /* ---------- status chip (earthy palette) ---------- */
 
 const CHIP_STYLES: Record<OrderStatus, string> = {
-  ordered: "bg-[#A9745A]/15 text-[#8A5238]", // clay — same family as pending
+  ordered: "bg-[#0D3B66]/15 text-[#1A5F9E]", // clay — same family as pending
   confirmed: "bg-[#4F7A72]/15 text-[#3D6359]", // teal/sage — accepted
   shipped: "bg-[#C2A14D]/20 text-[#8A6E2F]", // amber/gold — in transit
   delivered: "bg-[#6B7A4F]/15 text-[#55633D]", // olive — done
@@ -48,7 +48,7 @@ const CHIP_STYLES: Record<OrderStatus, string> = {
 function OrderStatusChip({ status }: { status: OrderStatus }) {
   return (
     <span
-      className={`inline-block rounded-full px-3 py-1 text-xs font-medium capitalize ${CHIP_STYLES[status] ?? "bg-[#3A332C]/10 text-[#3A332C]"}`}
+      className={`inline-block rounded-full px-3 py-1 text-xs font-medium capitalize ${CHIP_STYLES[status] ?? "bg-[#0A1A2F]/10 text-[#0A1A2F]"}`}
     >
       {status}
     </span>
@@ -77,7 +77,7 @@ const NEXT_ACTION: Partial<
   },
 };
 
-/** Statuses from which Victoria may cancel (mirrors @/lib/orders). */
+/** Statuses from which the team may cancel (mirrors @/lib/orders). */
 const CANCELLABLE = new Set<OrderStatus>(["ordered", "confirmed"]);
 
 const CANCEL_REASON_OPTIONS: { code: CancelReasonCode; label: string }[] = [
@@ -119,14 +119,14 @@ function CancelReasonPicker({
 
   return (
     <div className="mt-4 rounded-xl border border-[#6E5A52]/25 bg-[#6E5A52]/5 px-4 py-4">
-      <p className="text-sm font-medium text-[#3A332C]">
+      <p className="text-sm font-medium text-[#0A1A2F]">
         Why is this order being cancelled?
       </p>
       <div className="mt-2 space-y-1.5">
         {CANCEL_REASON_OPTIONS.map((option) => (
           <label
             key={option.code}
-            className="flex items-center gap-2 text-sm text-[#3A332C]"
+            className="flex items-center gap-2 text-sm text-[#0A1A2F]"
           >
             <input
               type="radio"
@@ -140,7 +140,7 @@ function CancelReasonPicker({
         ))}
       </div>
       <input
-        className="mt-3 w-full rounded-xl border border-[#3A332C]/15 bg-white px-3 py-2 text-sm text-[#3A332C] outline-none focus:border-[#6E5A52]"
+        className="mt-3 w-full rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-2 text-sm text-[#0A1A2F] outline-none focus:border-[#6E5A52]"
         value={note}
         maxLength={300}
         placeholder={
@@ -148,13 +148,13 @@ function CancelReasonPicker({
         }
         onChange={(e) => setNote(e.target.value)}
       />
-      {error && <p className="mt-2 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-2 text-sm text-[#B91C1C]">{error}</p>}
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="button"
           disabled={busy}
           onClick={confirm}
-          className={`${buttonBase} bg-[#6E5A52] text-[#FDF9F3] hover:opacity-90`}
+          className={`${buttonBase} bg-[#6E5A52] text-[#F8FAFC] hover:opacity-90`}
         >
           {busy ? "Cancelling…" : "Cancel order"}
         </button>
@@ -162,7 +162,7 @@ function CancelReasonPicker({
           type="button"
           disabled={busy}
           onClick={onClose}
-          className={`${buttonBase} border border-[#3A332C]/15 bg-[#FFFDF9] text-[#3A332C] hover:bg-[#F4EFE7]`}
+          className={`${buttonBase} border border-[#0A1A2F]/15 bg-[#FFFFFF] text-[#0A1A2F] hover:bg-[#F8FAFC]`}
         >
           Keep order
         </button>
@@ -179,7 +179,7 @@ function OrderCard({
   adminKey: string;
 }) {
   // Optimistic local status — the blob is the source of truth, but we
-  // advance the chip/buttons immediately on a 200 so Victoria isn't left
+  // advance the chip/buttons immediately on a 200 so the team isn't left
   // waiting for a server roundtrip on her phone.
   const [status, setStatus] = useState<OrderStatus>(order.status);
   const [busy, setBusy] = useState(false);
@@ -240,30 +240,30 @@ function OrderCard({
   const cancellable = CANCELLABLE.has(status);
 
   return (
-    <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-5 py-5 shadow-sm">
+    <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-5 py-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          <h3 className="font-serif text-xl text-[#3A332C]">
+          <h3 className="font-serif text-xl text-[#0A1A2F]">
             {order.orderNumber}
-            <span className="ml-2 align-middle font-sans text-sm font-medium text-[#8A5238]">
+            <span className="ml-2 align-middle font-sans text-sm font-medium text-[#1A5F9E]">
               {formatEgp(order.totals.egp)}
             </span>
           </h3>
-          <p className="mt-1 text-sm text-[#3A332C]">
+          <p className="mt-1 text-sm text-[#0A1A2F]">
             {order.name}
-            <span className="text-[#847866]"> · {order.phone}</span>
+            <span className="text-[#4A5568]"> · {order.phone}</span>
             {order.email ? (
-              <span className="text-[#847866]"> · {order.email}</span>
+              <span className="text-[#4A5568]"> · {order.email}</span>
             ) : null}
           </p>
-          <p className="mt-1 text-sm text-[#847866]">
+          <p className="mt-1 text-sm text-[#4A5568]">
             {formatCairo(order.createdAt)} · Cairo time
           </p>
-          <p className="mt-2 rounded-xl bg-[#3A332C]/5 px-3 py-2 text-sm text-[#3A332C]">
+          <p className="mt-2 rounded-xl bg-[#0A1A2F]/5 px-3 py-2 text-sm text-[#0A1A2F]">
             {itemsSummary(order)}
           </p>
           {order.note ? (
-            <p className="mt-2 text-sm italic text-[#847866]">
+            <p className="mt-2 text-sm italic text-[#4A5568]">
               “{order.note}”
             </p>
           ) : null}
@@ -278,7 +278,7 @@ function OrderCard({
               type="button"
               disabled={busy}
               onClick={() => transition(action.next)}
-              className={`${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`}
+              className={`${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`}
             >
               {busy ? action.busyLabel : action.label}
             </button>
@@ -292,7 +292,7 @@ function OrderCard({
                 setNotice(null);
                 setCancelling(true);
               }}
-              className={`${buttonBase} border border-[#6E5A52]/30 bg-[#FFFDF9] text-[#6E5A52] hover:bg-[#6E5A52]/5`}
+              className={`${buttonBase} border border-[#6E5A52]/30 bg-[#FFFFFF] text-[#6E5A52] hover:bg-[#6E5A52]/5`}
             >
               Cancel
             </button>
@@ -309,7 +309,7 @@ function OrderCard({
       )}
 
       {notice && <p className="mt-3 text-sm text-[#55633D]">{notice}</p>}
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
     </article>
   );
 }
@@ -327,20 +327,20 @@ export default function OrdersSection({
 }) {
   return (
     <section>
-      <h2 className="mb-4 font-serif text-2xl text-[#3A332C]">
+      <h2 className="mb-4 font-serif text-2xl text-[#0A1A2F]">
         Shop orders
         {orders.length > 0 && (
-          <span className="ml-2 align-middle font-sans text-sm text-[#8A5238]">
+          <span className="ml-2 align-middle font-sans text-sm text-[#1A5F9E]">
             {orders.length}
           </span>
         )}
       </h2>
       {loadError ? (
-        <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
+        <div className="rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-6 py-5 text-sm text-[#B91C1C]">
           {loadError}
         </div>
       ) : orders.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+        <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
           No shop orders yet — they will appear here as soon as a client
           orders from the shop.
         </div>

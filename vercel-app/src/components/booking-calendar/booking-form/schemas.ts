@@ -1,22 +1,22 @@
 import { z } from 'zod';
 
-export type BookingLang = 'en' | 'ru';
+export type BookingLang = 'en' | 'ar';
 
 export const createBookingSchema = (lang: BookingLang = 'en') =>
   z.object({
     name: z
       .string()
-      .min(1, lang === 'ru' ? 'Укажите имя' : 'Name is required')
-      .min(2, lang === 'ru' ? 'Имя слишком короткое' : 'Name must be at least 2 characters'),
+      .min(1, lang === 'ar' ? 'Укажите имя' : 'Name is required')
+      .min(2, lang === 'ar' ? 'Имя слишком короткое' : 'Name must be at least 2 characters'),
     email: z
       .string()
-      .min(1, lang === 'ru' ? 'Укажите эл. почту' : 'Email is required')
-      .email(lang === 'ru' ? 'Неверный адрес эл. почты' : 'Invalid email address'),
+      .min(1, lang === 'ar' ? 'Укажите эл. почту' : 'Email is required')
+      .email(lang === 'ar' ? 'Неверный адрес эл. почты' : 'Invalid email address'),
     phone: z
       .string()
       .regex(
         /^\+?[0-9\s\-()]{8,17}$/,
-        lang === 'ru'
+        lang === 'ar'
           ? 'Укажите номер телефона с кодом страны'
           : 'Enter a valid phone number with country code'
       ),
@@ -26,7 +26,7 @@ export const createBookingSchema = (lang: BookingLang = 'en') =>
       .optional(),
     agreedToPolicy: z.boolean().refine((value) => value === true, {
       message:
-        lang === 'ru'
+        lang === 'ar'
           ? 'Пожалуйста, подтвердите согласие с правилами записи.'
           : 'Please confirm you agree to the reservation policy.',
     }),

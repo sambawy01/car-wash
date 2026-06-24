@@ -26,7 +26,7 @@ import {
  *
  * Drift → Telegram + branded email listing every mismatch.
  * Clean → SILENT (response JSON only). Transient Cal fetch errors are
- * returned/logged but never page Victoria on their own.
+ * returned/logged but never page the team on their own.
  */
 
 export const dynamic = "force-dynamic";
@@ -78,15 +78,15 @@ export async function GET(request: NextRequest) {
   const driftLines = result.drift
     .map(
       (d) =>
-        `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;"><strong>${escapeHtml(d.slug)}</strong> (event type ${d.eventTypeId || "none"}): ${escapeHtml(d.problem)}</p>`
+        `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;line-height:1.6;"><strong>${escapeHtml(d.slug)}</strong> (event type ${d.eventTypeId || "none"}): ${escapeHtml(d.problem)}</p>`
     )
     .join("");
   const errorLines = result.errors.length
-    ? `<p style="margin:16px 0 8px;color:#847866;font-size:14px;">Could not verify (transient Cal errors):</p>` +
+    ? `<p style="margin:16px 0 8px;color:#4A5568;font-size:14px;">Could not verify (transient Cal errors):</p>` +
       result.errors
         .map(
           (e) =>
-            `<p style="margin:0 0 8px;color:#847866;font-size:14px;">${escapeHtml(e)}</p>`
+            `<p style="margin:0 0 8px;color:#4A5568;font-size:14px;">${escapeHtml(e)}</p>`
         )
         .join("")
     : "";
@@ -98,10 +98,10 @@ export async function GET(request: NextRequest) {
       html: brandedEmailHtml({
         heading: "Cal.com sync drift detected",
         contentHtml:
-          `<p style="margin:0 0 16px;color:#3A332C;font-size:15px;line-height:1.6;">The weekly check found mismatches between the treatments catalog and Cal.com:</p>` +
+          `<p style="margin:0 0 16px;color:#0A1A2F;font-size:15px;line-height:1.6;">The weekly check found mismatches between the treatments catalog and Cal.com:</p>` +
           driftLines +
           errorLines +
-          `<p style="margin:24px 0 0;color:#847866;font-size:14px;">Fix from the treatments admin (re-saving a treatment re-syncs its Cal event type), or adjust the event type on Cal.com.</p>`,
+          `<p style="margin:24px 0 0;color:#4A5568;font-size:14px;">Fix from the treatments admin (re-saving a treatment re-syncs its Cal event type), or adjust the event type on Cal.com.</p>`,
       }),
     },
     "cal-sync-check"

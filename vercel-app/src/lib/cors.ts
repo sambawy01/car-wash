@@ -4,8 +4,8 @@
  */
 
 const ALLOWED_ORIGINS = new Set([
-  "https://victoriaholisticbeauty.com",
-  "https://www.victoriaholisticbeauty.com",
+  "https://eliteecocarwash.com",
+  "https://www.eliteecocarwash.com",
   "https://sambawy01.github.io", // legacy URL, redirects to the domain
 ]);
 const LOCAL_ORIGIN_RE = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;

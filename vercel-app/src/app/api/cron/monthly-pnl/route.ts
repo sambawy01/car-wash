@@ -35,7 +35,7 @@ import { sendDocument, telegramConfigured } from "@/lib/telegram";
  * Content: the PREVIOUS calendar month's P&L (revenue = shop orders +
  * treatments + cash/other income; expenses by category; net), rendered on the
  * company letterhead and (a) emailed to NOTIFY_EMAIL as an attachment and
- * (b) pushed to Victoria's Telegram as a short summary + the PDF document.
+ * (b) pushed to the team's Telegram as a short summary + the PDF document.
  */
 
 export const dynamic = "force-dynamic";
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       .split("\n")
       .map(
         (line) =>
-          `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">${line || "&nbsp;"}</p>`
+          `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;line-height:1.6;">${line || "&nbsp;"}</p>`
       )
       .join(""),
     belowCardHtml:

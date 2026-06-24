@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 /**
  * /api/admin/catalog/<slug> — update or delete one product.
  *
- * PUT    → partial update (any of: en, ru, priceEgp, priceRub, photo, alt,
+ * PUT    → partial update (any of: en, ar, priceEgp, photo, alt,
  *          quantity, soldOut, active). The slug itself is immutable.
  * DELETE → remove the product from the catalog. Past orders are unaffected —
  *          they carry their own copies of names and totals.

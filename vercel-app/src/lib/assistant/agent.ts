@@ -1,4 +1,4 @@
-import { buildVassiliSystemPrompt } from "./prompt";
+import { buildEcoSystemPrompt } from "./prompt";
 import {
   TOOLS,
   describeMutation,
@@ -19,7 +19,7 @@ import {
 } from "./ollama-search";
 
 /**
- * Vassili's agent loop — Ollama chat with NATIVE tool calling.
+ * Eco's agent loop — Ollama chat with NATIVE tool calling.
  *
  * Verified empirically against deepseek-v4-flash:cloud (Ollama 0.30):
  * the model advertises the "tools" capability, returns
@@ -243,7 +243,7 @@ export async function runAgent(
 ): Promise<AgentOutcome> {
   const history = await loadHistory();
   const messages: OllamaChatMessage[] = [
-    { role: "system", content: buildVassiliSystemPrompt() },
+    { role: "system", content: buildEcoSystemPrompt() },
     // History keeps full tool-call exchanges (see state.ts) — pass through.
     ...history.map(
       (m): OllamaChatMessage => ({
@@ -373,7 +373,7 @@ export async function runAgent(
       const args = parseArgs(call);
       if (requiresConfirmation(name, args)) {
         // Validate/normalize ONCE — summary and executor must consume the
-        // SAME validated object, so what Victoria confirms is exactly what
+        // SAME validated object, so what the team confirms is exactly what
         // executes. Invalid args (wrong types, empty required strings, bad
         // emails) are REFUSED outright, never queued: a malformed value
         // could render blank on the confirmation card while the executor's
@@ -383,7 +383,7 @@ export async function runAgent(
           // Don't end the loop with a user-facing refusal over a fixable
           // slip (e.g. '"priceEgp": "abc"'): rounds always remain here
           // (finalRound returned above), so feed REFUSED back as a tool
-          // result and let the model self-correct. Victoria only sees a
+          // result and let the model self-correct. the team only sees a
           // refusal if the round budget runs out without usable text
           // (the lastRefusal fallback above).
           lastRefusal = validated.error;
@@ -427,7 +427,7 @@ export async function runAgent(
           {
             role: "tool",
             tool_name: name,
-            content: `Queued — Victoria was shown a [Confirm | Cancel] button for: ${summary}. The system will report the outcome; do not retry.`,
+            content: `Queued — the team was shown a [Confirm | Cancel] button for: ${summary}. The system will report the outcome; do not retry.`,
           }
         );
         await appendAudit({

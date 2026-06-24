@@ -1,17 +1,12 @@
 /**
  * SEED-ONLY shop catalog.
  *
- * Orders are now validated against the DYNAMIC catalog in @/lib/catalog
+ * Orders are validated against the DYNAMIC catalog in @/lib/catalog
  * (Vercel Blob `catalog/products.json`, editable from /admin). This file
  * remains solely as the seed source: when the catalog blob does not exist
  * yet, @/lib/catalog builds its SEED from these six products.
  *
- * Do NOT import this module from the order path — use @/lib/catalog.
- *
- * Prices are in EGP only (integer units, no cents).
- *
- * Slugs and prices MUST stay identical to the PRODUCTS array in /shop.js
- * (static site) — drift breaks order submission.
+ * Prices are in EGP (integer units, no cents).
  */
 
 export interface ShopProduct {
@@ -64,7 +59,7 @@ export const PRODUCTS_BY_SLUG: ReadonlyMap<string, ShopProduct> = new Map(
   SHOP_PRODUCTS.map((p) => [p.slug, p])
 );
 
-/** "3540" -> "E£3,540" (EGP style). */
+/** "3540" -> "3,540" (EGP style). */
 export function formatEgp(amount: number): string {
   return `E£${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
 }

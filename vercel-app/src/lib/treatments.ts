@@ -1,33 +1,22 @@
 import { get, put } from "@vercel/blob";
 
 /**
- * Dynamic treatments catalog on Vercel Blob (private store `vv-orders`),
+ * Dynamic services catalog on Vercel Blob (private store `vv-orders`),
  * mirroring the shop catalog in @/lib/catalog.
  *
  * Layout: ONE JSON document at `catalog/treatments.json` holding the full
- * treatment array (6 services — a single read-modify-write document).
- *
- * Lifecycle:
- * - When the blob does not exist yet, `getTreatmentsCatalog()` returns SEED —
- *   the 6 live services exactly as rendered on the static site and /book
- *   today, each linked to its Cal.com event type. The blob is written lazily
- *   on the first admin save, so a fresh deployment works with zero setup.
- * - A treatment's PRICE lives only here — Cal.com event types carry no price
- *   today and that stays the case. Name/duration changes are best-effort
- *   synced to the linked Cal event type by the admin routes.
- * - Deactivating (active: false) hides the treatment from the public API and
- *   best-effort hides the Cal event type (hidden: true).
+ * service array (6 services — a single read-modify-write document).
  */
 
 export interface Treatment {
   slug: string;
-  /** Linked Cal.com event type. 0 = no linked event type. */
+  /** Linked Cal.com event type (api.cal.eu). 0 = no linked event type. */
   eventTypeId: number;
   name: { en: string; ar: string };
   description: { en: string; ar: string };
   durationMinutes: number;
   priceEgp: number;
-  /** Deactivated treatments stay in the catalog but never reach the public API. */
+  /** Deactivated services stay in the catalog but never reach the public API. */
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -49,21 +38,14 @@ export const TREATMENTS_PATHNAME = "catalog/treatments.json";
 
 const SEED_TIMESTAMP = "2026-06-24T00:00:00.000Z";
 
-/**
- * The 6 live car wash services. Prices include the current rate.
- * Descriptions are the sub-lines from the static pages.
- */
 export const SEED: readonly Treatment[] = [
   {
     slug: "interior-exterior-wash",
     eventTypeId: 0,
-    name: {
-      en: "Interior & Exterior Wash",
-      ar: "غسيل داخلي وخارجي",
-    },
+    name: { en: "Interior & Exterior Wash", ar: "غسيل داخلي وخارجي" },
     description: {
       en: "Complete interior vacuum, dashboard cleaning, and exterior foam wash with hot wax",
-      ar: "تنظيف داخلي شامل بالمكنسة الكهربائية وتنظيف الطابلون وغسيل خارجي بالرغوة مع واكس ساخن",
+      ar: "شفط كامل للداخل، تنظيف لوحة القيادة، وغسيل رغوي للخارج مع شمع ساخن",
     },
     durationMinutes: 75,
     priceEgp: 370,
@@ -74,10 +56,7 @@ export const SEED: readonly Treatment[] = [
   {
     slug: "wheel-cleaning",
     eventTypeId: 0,
-    name: {
-      en: "Wheel Cleaning",
-      ar: "تنظيف الجنوط",
-    },
+    name: { en: "Wheel Cleaning", ar: "تنظيف الجنوط" },
     description: {
       en: "Deep cleaning for alloy wheels, tires, and wheel arches",
       ar: "تنظيف عميق للجنوط والإطارات وأقواس العجلات",
@@ -91,13 +70,10 @@ export const SEED: readonly Treatment[] = [
   {
     slug: "engine-cleaning",
     eventTypeId: 0,
-    name: {
-      en: "Engine Cleaning",
-      ar: "تنظيف المحرك",
-    },
+    name: { en: "Engine Cleaning", ar: "تنظيف المحرك" },
     description: {
       en: "Safe engine bay degreasing and dressing",
-      ar: "إزالة الشحوم من حوض المحرك بأمان وتلميعه",
+      ar: "إزالة شحوم آمنة لحجرة المحرك وتلميع",
     },
     durationMinutes: 30,
     priceEgp: 230,
@@ -108,13 +84,10 @@ export const SEED: readonly Treatment[] = [
   {
     slug: "polishing-protection",
     eventTypeId: 0,
-    name: {
-      en: "Polishing & Protection",
-      ar: "تلميع وحماية الطلاء",
-    },
+    name: { en: "Polishing & Protection", ar: "تلميع وحماية الطلاء" },
     description: {
       en: "Machine polishing with protective wax coating for long-lasting shine",
-      ar: "تلميع بالماكينة مع طبقة حماية بالواكس لبريق يدوم طويلاً",
+      ar: "تلميع بالماكينة مع طبقة شمع حماية لمعان يدوم طويلاً",
     },
     durationMinutes: 90,
     priceEgp: 700,
@@ -125,13 +98,10 @@ export const SEED: readonly Treatment[] = [
   {
     slug: "steam-cleaning",
     eventTypeId: 0,
-    name: {
-      en: "Steam Cleaning",
-      ar: "تنظيف وتعقيم بالبخار",
-    },
+    name: { en: "Steam Cleaning", ar: "تنظيف وتعقيم بالبخار" },
     description: {
       en: "Sanitizing steam clean for interior surfaces and upholstery",
-      ar: "تنظيف وتعقيم بالبخار للأسطح الداخلية والتنجيد",
+      ar: "تنظيف وتعقيم بالبخار للأسطح الداخلية والمقاعد",
     },
     durationMinutes: 60,
     priceEgp: 330,
@@ -142,13 +112,10 @@ export const SEED: readonly Treatment[] = [
   {
     slug: "waterless-wash",
     eventTypeId: 0,
-    name: {
-      en: "Waterless Wash",
-      ar: "غسيل بدون مياه",
-    },
+    name: { en: "Waterless Wash", ar: "غسيل بدون مياه" },
     description: {
       en: "Eco-friendly waterless wash using premium spray products",
-      ar: "غسيل صديق للبيئة بدون مياه باستخدام منتجات رش فاخرة",
+      ar: "غسيل صديق للبيئة بدون مياه باستخدام منتجات بخاخ فاخرة",
     },
     durationMinutes: 45,
     priceEgp: 220,
@@ -179,7 +146,6 @@ export function toPublicTreatment(t: Treatment): PublicTreatment {
 
 // --- Persistence ----------------------------------------------------------------
 
-/** Structural check for one stored treatment entry. */
 function isValidTreatment(value: unknown): value is Treatment {
   const t = value as Treatment | null;
   return (
@@ -208,25 +174,11 @@ function isValidTreatment(value: unknown): value is Treatment {
   );
 }
 
-/**
- * Read the full treatments catalog. A missing blob (fresh store) falls back to
- * SEED; any other failure throws so callers can decide how to degrade — a
- * transient read error must never be mistaken for "empty store" by a writer,
- * or a subsequent save would clobber the real catalog with seed data.
- *
- * Per-item shape validation throws on ANY malformed entry (same policy as the
- * not-an-array corrupt check): a garbage-but-array blob must surface as
- * corruption so readers degrade to SEED, not flow through as a valid catalog
- * — /api/treatments would otherwise serve a blanked/garbled menu and the
- * static pages would hide every treatment row.
- */
 export async function getTreatmentsCatalog(): Promise<Treatment[]> {
   const result = await get(TREATMENTS_PATHNAME, {
     access: "private",
     useCache: false,
   });
-  // The SDK returns null for a missing blob (fresh store) and throws on
-  // transport/auth errors — those propagate to the caller.
   if (!result) return cloneSeed();
   const data = (await new Response(result.stream).json()) as unknown;
   if (!Array.isArray(data)) {
@@ -242,7 +194,6 @@ export async function getTreatmentsCatalog(): Promise<Treatment[]> {
   return data as Treatment[];
 }
 
-/** Overwrite the treatments document (also performs the lazy first write of SEED edits). */
 export async function saveTreatmentsCatalog(
   treatments: Treatment[]
 ): Promise<void> {
@@ -254,13 +205,6 @@ export async function saveTreatmentsCatalog(
   });
 }
 
-// --- Slugs -----------------------------------------------------------------------
-
-/**
- * Kebab-case slug from the EN name, made unique against the existing catalog
- * by appending -2, -3, … Slugs are immutable after creation (they live in
- * booking links, the static pages and Cal event types).
- */
 export function generateTreatmentSlug(
   nameEn: string,
   existing: Set<string>
@@ -273,7 +217,7 @@ export function generateTreatmentSlug(
       .replace(/[^a-z0-9]+/g, "-")
       .replace(/^-+|-+$/g, "")
       .slice(0, 60)
-      .replace(/-+$/, "") || "treatment";
+      .replace(/-+$/, "") || "service";
   if (!existing.has(base)) return base;
   for (let i = 2; ; i++) {
     const candidate = `${base}-${i}`;

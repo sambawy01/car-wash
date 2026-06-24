@@ -23,7 +23,7 @@ export const runtime = "nodejs";
  * /api/admin/treatments/<slug> — update or soft-remove one treatment.
  *
  * PUT    → partial update (any of: name, description, durationMinutes,
- *          priceEgp, priceRub, active). The slug and the Cal event type link
+ *          priceEgp, active). The slug and the Cal event type link
  *          are immutable. After a successful save, changed name/duration/
  *          visibility are BEST-EFFORT synced to the linked Cal event type
  *          (title / lengthInMinutes / hidden) — a Cal failure never fails the

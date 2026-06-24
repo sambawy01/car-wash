@@ -15,7 +15,7 @@ export const runtime = "nodejs";
  * private orders store) and returns the public URL for the catalog's
  * `photo` field.
  *
- * Accepts jpg/png/webp up to 4 MB. No server-side resizing — Victoria's
+ * Accepts jpg/png/webp up to 4 MB. No server-side resizing — the team's
  * photos are product shots, and the shop already lazy-loads images.
  */
 

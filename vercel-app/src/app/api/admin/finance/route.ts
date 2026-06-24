@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * /api/admin/finance — Victoria's private finance ledger.
+ * /api/admin/finance — the team's private finance ledger.
  *
  * GET  → the P&L for a period (default: current month). The response carries
  *        BOTH the summary numbers AND the in-range manual entries, so the

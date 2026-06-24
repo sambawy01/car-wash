@@ -91,7 +91,7 @@ export function unauthorizedResponse(): NextResponse {
     {
       status: 401,
       headers: {
-        "WWW-Authenticate": 'Basic realm="Victoria Admin", charset="UTF-8"',
+        "WWW-Authenticate": 'Basic realm="the team Admin", charset="UTF-8"',
       },
     }
   );

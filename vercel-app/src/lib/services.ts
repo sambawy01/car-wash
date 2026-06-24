@@ -1,7 +1,7 @@
 /**
  * Service catalogue for Elite Eco Car Wash.
- * eventTypeId values are the Cal.com event types created by
- * scripts/create-event-types.mjs — every one requires confirmation.
+ * eventTypeId values are placeholders (0) — create real Cal.com event types
+ * and wire them here.
  */
 
 export interface Service {
@@ -81,12 +81,6 @@ export function getServiceBySlug(slug: string | undefined): Service | undefined 
   return SERVICES.find((s) => s.slug === slug);
 }
 
-/**
- * Multi-service sessions are booked on a single shared Cal.com event type
- * created by scripts/create-combined-session.mjs. Its lengthInMinutesOptions
- * cover every achievable sum of 2–4 services (longest duration per service,
- * capped at 180 min) plus all single-service durations.
- */
 export const COMBINED_SESSION = {
   slug: "combined-session",
   eventTypeId: 0,
@@ -98,7 +92,6 @@ export const COMBINED_DURATION_OPTIONS: readonly number[] = [
 
 export const MAX_COMBINED_MINUTES = 180;
 
-/** Longest duration of a service — combined sessions always use this. */
 export function longestDuration(service: Service): number {
   return Math.max(...service.durations);
 }

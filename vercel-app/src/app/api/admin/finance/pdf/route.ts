@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/admin/finance/pdf?period=...|?month=...
- * → the P&L rendered on the company letterhead (same renderer as Vassili's
+ * → the P&L rendered on the company letterhead (same renderer as Eco's
  *   documents — embedded Cyrillic-capable fonts). Admin-only.
  */
 export async function GET(request: NextRequest) {

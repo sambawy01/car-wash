@@ -68,7 +68,7 @@ export default function AdminTabs({
       <div
         role="tablist"
         aria-label="Admin sections"
-        className="mb-8 flex flex-wrap gap-2 border-b border-[#3A332C]/10 pb-3"
+        className="mb-8 flex flex-wrap gap-2 border-b border-[#0A1A2F]/10 pb-3"
       >
         {tabs.map((tab) => {
           const selected = tab.id === active;
@@ -83,8 +83,8 @@ export default function AdminTabs({
               onClick={() => setActive(tab.id)}
               className={
                 selected
-                  ? "rounded-full bg-[#8A5238] px-4 py-2 text-sm font-medium text-[#FDF9F3]"
-                  : "rounded-full border border-[#3A332C]/15 bg-[#FFFDF9] px-4 py-2 text-sm font-medium text-[#3A332C] transition-colors hover:bg-[#F4EFE7]"
+                  ? "rounded-full bg-[#1A5F9E] px-4 py-2 text-sm font-medium text-[#F8FAFC]"
+                  : "rounded-full border border-[#0A1A2F]/15 bg-[#FFFFFF] px-4 py-2 text-sm font-medium text-[#0A1A2F] transition-colors hover:bg-[#F8FAFC]"
               }
             >
               {tab.label}
@@ -92,8 +92,8 @@ export default function AdminTabs({
                 <span
                   className={`ml-2 inline-block rounded-full px-2 py-0.5 text-xs font-semibold ${
                     selected
-                      ? "bg-[#FDF9F3]/20 text-[#FDF9F3]"
-                      : "bg-[#B5483A]/15 text-[#B5483A]"
+                      ? "bg-[#F8FAFC]/20 text-[#F8FAFC]"
+                      : "bg-[#B91C1C]/15 text-[#B91C1C]"
                   }`}
                 >
                   {tab.badge}

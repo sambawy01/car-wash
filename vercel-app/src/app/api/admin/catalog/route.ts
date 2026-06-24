@@ -17,7 +17,7 @@ import {
 export const runtime = "nodejs";
 
 /**
- * /api/admin/catalog — Victoria's product manager.
+ * /api/admin/catalog — the team's product manager.
  *
  * GET  → the FULL catalog (internal fields included: quantity, manual
  *        soldOut flag, active, timestamps).
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     );
   }
   const input = result.value as Required<
-    Pick<ProductInput, "en" | "ru" | "priceEgp" | "priceRub">
+    Pick<ProductInput, "en" | "ar" | "priceEgp">
   > &
     ProductInput;
 
@@ -76,7 +76,6 @@ export async function POST(request: NextRequest) {
       en: input.en,
       ru: input.ru,
       priceEgp: input.priceEgp,
-      priceRub: input.priceRub,
       photo: input.photo ?? "",
       alt: input.alt ?? { en: "", ru: "" },
       ...(input.usage !== undefined ? { usage: input.usage } : {}),

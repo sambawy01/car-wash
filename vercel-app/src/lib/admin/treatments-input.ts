@@ -22,7 +22,6 @@ export interface TreatmentInput {
   description?: { en: string; ru: string };
   durationMinutes?: number;
   priceEgp?: number;
-  priceRub?: number;
   active?: boolean;
 }
 
@@ -60,7 +59,7 @@ function validatePair(
 
 function validateInt(
   raw: unknown,
-  key: "priceEgp" | "priceRub" | "durationMinutes",
+  key: "priceEgp" | "durationMinutes",
   required: boolean,
   min: number,
   max: number,
@@ -115,8 +114,6 @@ export function validateTreatmentInput(
 
   const priceEgp = validateInt(b.priceEgp, "priceEgp", create, 0, MAX_PRICE, fields);
   if (priceEgp !== undefined) value.priceEgp = priceEgp;
-  const priceRub = validateInt(b.priceRub, "priceRub", create, 0, MAX_PRICE, fields);
-  if (priceRub !== undefined) value.priceRub = priceRub;
 
   if (b.active !== undefined) {
     if (typeof b.active === "boolean") value.active = b.active;
@@ -142,7 +139,6 @@ export function applyTreatmentInput(
       ? { durationMinutes: input.durationMinutes }
       : {}),
     ...(input.priceEgp !== undefined ? { priceEgp: input.priceEgp } : {}),
-    ...(input.priceRub !== undefined ? { priceRub: input.priceRub } : {}),
     ...(input.active !== undefined ? { active: input.active } : {}),
     updatedAt: new Date().toISOString(),
   };

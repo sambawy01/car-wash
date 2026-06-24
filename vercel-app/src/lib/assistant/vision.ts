@@ -1,5 +1,5 @@
 /**
- * Photo / vision understanding for Vassili.
+ * Photo / vision understanding for Eco.
  *
  * TWO-STAGE design (chosen empirically — see decision note below):
  *   Stage 1 (HERE): a multimodal model TRIAGES + EXTRACTS the photo into
@@ -7,7 +7,7 @@
  *     productDesc, text } plus a hard skin-assessment refusal flag.
  *   Stage 2 (webhook): for a receipt/product we synthesize a plain-language
  *     instruction and run it through the EXISTING text agent + tools, so the
- *     mutating action (log_expense / product_add) parks behind Victoria's
+ *     mutating action (log_expense / product_add) parks behind the team's
  *     unchanged [Confirm | Cancel] gate. Nothing mutating ever executes from a
  *     photo without her tap.
  *
@@ -22,10 +22,10 @@
  * matters because a second text-agent round follows under the webhook
  * deadline) with comparable extraction and correct skin-assessment refusal.
  *
- * CRITICAL GUARDRAIL — NO SKIN / FACE ASSESSMENT. Vassili must REFUSE to
+ * CRITICAL GUARDRAIL — NO SKIN / FACE ASSESSMENT. Eco must REFUSE to
  * analyze a person's face or skin for any cosmetic / medical / treatment
  * assessment ("what treatment does her skin need", "analyze my wrinkles").
- * Victoria's professional eye is the product; an AI skin diagnosis is both
+ * the team's professional eye is the product; an AI skin diagnosis is both
  * off-brand and a medical-advice risk. This is enforced in FIVE layers:
  *   1. the extraction system prompt instructs the model to classify any such
  *      request as kind "skin_assessment" with refuse=true and give NO advice;
@@ -59,7 +59,7 @@ const MAX_TEXT_CHARS = 1500;
 /**
  * Is photo understanding usable right now? The multimodal models are
  * cloud-only, so this needs the Ollama Cloud key (same one the agent uses).
- * When absent the webhook tells Victoria photos can't be processed.
+ * When absent the webhook tells the team photos can't be processed.
  */
 export function visionEnabled(): boolean {
   return Boolean((process.env.OLLAMA_API_KEY || "").trim());
@@ -67,7 +67,7 @@ export function visionEnabled(): boolean {
 
 /** The polite refusal for any skin/face-assessment intent (+ booking nudge). */
 export const SKIN_REFUSAL =
-  "I can't assess skin or faces from a photo — reading skin is Victoria's " +
+  "I can't assess skin or faces from a photo — reading skin is the team's " +
   "professional craft, not something I'd ever guess at (and it wouldn't be " +
   "fair to you). If this is for a client, the right next step is a proper " +
   "consultation — I can help you set one up. Happy to help with receipts, " +
@@ -147,7 +147,7 @@ interface VisionExtraction {
 }
 
 function buildVisionPrompt(): string {
-  return `You are the image-triage and extraction step for Vassili, the private ops assistant of a women's holistic beauty studio in Egypt. You receive ONE image plus an optional caption from the studio owner. Classify it and extract structured data. Respond with ONLY a single JSON object — no prose, no markdown fences.
+  return `You are the image-triage and extraction step for Eco, the private ops assistant of a women's holistic beauty studio in Egypt. You receive ONE image plus an optional caption from the studio owner. Classify it and extract structured data. Respond with ONLY a single JSON object — no prose, no markdown fences.
 
 Choose exactly one "kind":
 - "receipt": a receipt, invoice or proof of a business expense/purchase.
@@ -275,7 +275,7 @@ export type PhotoOutcome =
   // Direct reply — refusal, general read/describe, disabled, or unclear.
   | { kind: "reply"; text: string }
   // Feed `instruction` into the text agent (it tool-calls → confirm gate);
-  // `echo` is shown first so Victoria sees what was understood from the photo.
+  // `echo` is shown first so the team sees what was understood from the photo.
   | { kind: "agent"; instruction: string; echo: string };
 
 /**
@@ -315,7 +315,7 @@ export async function analyzePhoto(
     // NOTE: the extracted fields below are UNTRUSTED OCR (vendor/total/date) —
     // they are interpolated into the stage-2 instruction but never executed
     // directly: the text agent tool-calls log_expense, which parks behind
-    // Victoria's [Confirm | Cancel] gate, so she sees and approves every value.
+    // the team's [Confirm | Cancel] gate, so she sees and approves every value.
     const cat = (EXPENSE_CATEGORIES as readonly string[]).includes(ex.category)
       ? ex.category
       : "other";

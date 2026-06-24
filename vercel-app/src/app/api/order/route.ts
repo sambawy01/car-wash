@@ -39,7 +39,7 @@ export const runtime = "nodejs";
  *   never 500s the order — the client still gets { received: true }.
  * - Optional buyer `email`: when present, a second confirmation email is sent
  *   to the buyer. Buyer-email failures never affect the response success or
- *   Victoria's notification — both outcomes are reported separately in
+ *   the team's notification — both outcomes are reported separately in
  *   { received, orderNumber, emailed, ownerEmails, buyerEmailed }.
  * - Every order gets a server-generated order number (VV-XXXXXX) included in
  *   the response and in both emails so it can be quoted over the phone.
@@ -54,12 +54,12 @@ export const runtime = "nodejs";
  *   `stored: boolean`.
  */
 
-const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
+const NOTIFY_EMAIL_DEFAULT = "info@eliteecocarwash.com";
 const EMAIL_FROM =
-  "Victoria Holistic Beauty <orders@victoriaholisticbeauty.com>";
+  "the team Holistic Beauty <orders@eliteecocarwash.com>";
 const BUYER_EMAIL_FROM =
-  "Victoria Vasilyeva Holistic Beauty <bookings@victoriaholisticbeauty.com>";
-const BUYER_REPLY_TO = "victoria@victoriaholisticbeauty.com";
+  "Elite Eco Car Wash <bookings@eliteecocarwash.com>";
+const BUYER_REPLY_TO = "info@eliteecocarwash.com";
 
 const MAX_DISTINCT_ITEMS = 8;
 const MAX_QTY = 10;
@@ -127,7 +127,7 @@ interface ValidatedOrder {
   email: string; // optional — "" when the buyer left it blank
   address: string;
   note: string;
-  lang: "en" | "ru";
+  lang: "en" | "ar";
 }
 
 function validateOrder(
@@ -185,8 +185,7 @@ function validateOrder(
         product,
         qty: item.qty,
         lineEgp: product.priceEgp * item.qty,
-        lineRub: product.priceRub * item.qty,
-      });
+              });
     }
   }
 
@@ -235,8 +234,8 @@ function validateOrder(
   }
 
   // lang ----------------------------------------------------------------------
-  if (b.lang !== "en" && b.lang !== "ru") {
-    fields.lang = "lang must be 'en' or 'ru'";
+  if (b.lang !== "en" && b.lang !== "ar") {
+    fields.lang = "lang must be 'en' or 'ar'";
   }
 
   if (Object.keys(fields).length > 0) {
@@ -254,7 +253,7 @@ function validateOrder(
       email,
       address,
       note,
-      lang: b.lang as "en" | "ru",
+      lang: b.lang as "en" | "ar",
     },
   };
 }
@@ -485,7 +484,7 @@ export async function POST(request: NextRequest) {
 
   // Decrement tracked stock now that the order is accepted. Read-modify-write
   // with tolerable races at this volume; a failure here must never fail the
-  // order — Victoria reconciles stock from the admin panel if it ever drifts.
+  // order — the team reconciles stock from the admin panel if it ever drifts.
   // Pre/post quantities are derived from the catalog already read above
   // (mirroring decrementQuantities' floor-at-0 arithmetic) so the low-stock
   // push below needs no second catalog read.
@@ -513,7 +512,7 @@ export async function POST(request: NextRequest) {
 
   // Persist to Vercel Blob FIRST so the admin inbox sees the order even if
   // both mailers fail. A Blob failure must never fail the order either —
-  // Victoria still gets the notification email with all details.
+  // the team still gets the notification email with all details.
   const createdAt = new Date().toISOString();
   const record: StoredOrder = {
     orderNumber,
@@ -523,9 +522,9 @@ export async function POST(request: NextRequest) {
       slug: l.product.slug,
       qty: l.qty,
       names: { en: l.product.en.name, ru: l.product.ru.name },
-      lineTotals: { egp: l.lineEgp, rub: l.lineRub },
+      lineTotals: { egp: l.lineEgp },
     })),
-    totals: { egp: result.order.totalEgp, rub: result.order.totalRub },
+    totals: { egp: result.order.totalEgp },
     name: result.order.name,
     phone: result.order.phone,
     email: result.order.email,
@@ -543,7 +542,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Mailer failures must never fail the order — respond 200 with emailed:false.
-  // The buyer confirmation is fully independent of Victoria's notification:
+  // The buyer confirmation is fully independent of the team's notification:
   // each has its own try/catch, and both outcomes are reported separately.
   const emailResult = await sendNotificationEmail(result.order, orderNumber);
   const buyerEmailResult = await sendBuyerConfirmationEmail(
@@ -551,10 +550,10 @@ export async function POST(request: NextRequest) {
     orderNumber
   );
 
-  // Instant Telegram pushes to Victoria (best effort by contract — see
+  // Instant Telegram pushes to the team (best effort by contract — see
   // @/lib/assistant/notify; a Telegram failure can never fail the order,
   // and both silently no-op without a bot token / bound owner). The order
-  // push is sent even when Blob persistence failed — Victoria should still
+  // push is sent even when Blob persistence failed — the team should still
   // hear about the order; a tapped button on an unstored order just answers
   // "Order not found". Stock alerts only fire when the decrement really ran.
   await notifyNewOrder(record);

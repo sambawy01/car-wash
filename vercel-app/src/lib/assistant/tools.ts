@@ -150,7 +150,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "booking_decline",
-    "Decline (reject) a pending booking request; the reason is emailed to the client. MUTATING — requires Victoria's button confirmation.",
+    "Decline (reject) a pending booking request; the reason is emailed to the client. MUTATING — requires the team's button confirmation.",
     {
       uid: { type: "string", description: "Cal booking uid" },
       reason: { type: "string", description: "Reason sent to the client" },
@@ -159,7 +159,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "booking_move",
-    "Reschedule a booking to a new start time (rebooks immediately). MUTATING — requires Victoria's button confirmation.",
+    "Reschedule a booking to a new start time (rebooks immediately). MUTATING — requires the team's button confirmation.",
     {
       uid: { type: "string", description: "Cal booking uid" },
       newStartISO: {
@@ -183,7 +183,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "order_set_status",
-    "Advance a shop order's status (ordered→confirmed→shipped→delivered; cancel from ordered/confirmed, reason required when cancelling). Sends the client a status email. MUTATING — requires Victoria's button confirmation.",
+    "Advance a shop order's status (ordered→confirmed→shipped→delivered; cancel from ordered/confirmed, reason required when cancelling). Sends the client a status email. MUTATING — requires the team's button confirmation.",
     {
       orderNumber: { type: "string", description: "e.g. VV-AB12CD" },
       status: {
@@ -203,12 +203,11 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "product_update",
-    "Update a shop product's price, stock quantity or sold-out flag. MUTATING — requires Victoria's button confirmation. Get the slug via catalog_list first.",
+    "Update a shop product's price, stock quantity or sold-out flag. MUTATING — requires the team's button confirmation. Get the slug via catalog_list first.",
     {
       slug: { type: "string", description: "Product slug from catalog_list" },
       priceEgp: { type: "number", description: "New price in EGP" },
-      priceRub: { type: "number", description: "New price in RUB" },
-      quantity: {
+            quantity: {
         type: "number",
         description: "New stock quantity (0 = auto sold-out)",
       },
@@ -218,11 +217,11 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "daily_brief",
-    "Victoria's full daily brief: today's appointments, pending booking requests, shop orders needing action."
+    "the team's full daily brief: today's appointments, pending booking requests, shop orders needing action."
   ),
   tool(
     "email_send",
-    "Send a branded email from bookings@victoriaholisticbeauty.com. Plain-text body. Emails to addresses other than Victoria's own require her button confirmation.",
+    "Send a branded email from bookings@eliteecocarwash.com. Plain-text body. Emails to addresses other than the team's own require her button confirmation.",
     {
       to: { type: "string", description: "Recipient email address" },
       subject: { type: "string" },
@@ -232,7 +231,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "document_create",
-    "Create a PDF document on the company letterhead and send it to Victoria in this chat. Body supports light markdown: '# Heading' lines and '- bullet' lines. English and Russian both render (embedded Cyrillic-capable fonts).",
+    "Create a PDF document on the company letterhead and send it to the team in this chat. Body supports light markdown: '# Heading' lines and '- bullet' lines. English and Russian both render (embedded Cyrillic-capable fonts).",
     {
       title: { type: "string", description: "Document title" },
       body: { type: "string", description: "Document body (markdownish)" },
@@ -245,13 +244,12 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "product_add",
-    "Add a NEW product to the shop catalog. It goes live on the public site immediately after Victoria confirms. MUTATING — requires Victoria's button confirmation.",
+    "Add a NEW product to the shop catalog. It goes live on the public site immediately after the team confirms. MUTATING — requires the team's button confirmation.",
     {
       nameEn: { type: "string", description: "Product name in English" },
       nameRu: { type: "string", description: "Product name in Russian" },
       priceEgp: { type: "number", description: "Price in EGP (required)" },
-      priceRub: { type: "number", description: "Price in RUB (optional)" },
-      descEn: { type: "string", description: "Description in English (optional)" },
+            descEn: { type: "string", description: "Description in English (optional)" },
       descRu: { type: "string", description: "Description in Russian (optional)" },
       usageEn: {
         type: "string",
@@ -271,13 +269,13 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "product_remove",
-    "Remove a product from the shop: it is HIDDEN from the public site (soft remove, reversible) — never hard-deleted. MUTATING — requires Victoria's button confirmation. Get the slug via catalog_list first.",
+    "Remove a product from the shop: it is HIDDEN from the public site (soft remove, reversible) — never hard-deleted. MUTATING — requires the team's button confirmation. Get the slug via catalog_list first.",
     { slug: { type: "string", description: "Product slug from catalog_list" } },
     ["slug"]
   ),
   tool(
     "block_time",
-    "Block whole DAYS on Victoria's Cal.com calendar so clients cannot book them (out-of-office). Cal.com only supports full days on this account — if Victoria asks to block part of a day, tell her only whole days are possible. MUTATING — requires Victoria's button confirmation.",
+    "Block whole DAYS on the team's Cal.com calendar so clients cannot book them (out-of-office). Cal.com only supports full days on this account — if the team asks to block part of a day, tell her only whole days are possible. MUTATING — requires the team's button confirmation.",
     {
       startDate: { type: "string", description: "First blocked day, YYYY-MM-DD" },
       endDate: {
@@ -324,7 +322,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "log_expense",
-    "Record a business EXPENSE in Victoria's private finance ledger (rent, supplies, product stock, marketing, salaries, utilities, bank fees, other). MUTATING — requires Victoria's button confirmation. The ledger is private (clients never see it).",
+    "Record a business EXPENSE in the team's private finance ledger (rent, supplies, product stock, marketing, salaries, utilities, bank fees, other). MUTATING — requires the team's button confirmation. The ledger is private (clients never see it).",
     {
       category: {
         type: "string",
@@ -347,7 +345,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "log_income",
-    "Record off-platform/cash INCOME in Victoria's private finance ledger (treatment paid in cash, gift card, other). Do NOT use this for shop orders or online bookings — those are counted automatically. MUTATING — requires Victoria's button confirmation.",
+    "Record off-platform/cash INCOME in the team's private finance ledger (treatment paid in cash, gift card, other). Do NOT use this for shop orders or online bookings — those are counted automatically. MUTATING — requires the team's button confirmation.",
     {
       category: {
         type: "string",
@@ -385,7 +383,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "finance_pnl_document",
-    "Generate a Profit & Loss statement on the company letterhead (PDF) for a period and send it to Victoria in this chat. Read-only (goes only to Victoria).",
+    "Generate a Profit & Loss statement on the company letterhead (PDF) for a period and send it to the team in this chat. Read-only (goes only to the owner).",
     {
       period: {
         type: "string",
@@ -422,7 +420,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "client_note_add",
-    "Add a PRIVATE note to a client's CRM profile (not visible to the client). MUTATING — requires Victoria's button confirmation. Identify the client by clientId (from client_profile) or by a name/email that matches exactly one client.",
+    "Add a PRIVATE note to a client's CRM profile (not visible to the client). MUTATING — requires the team's button confirmation. Identify the client by clientId (from client_profile) or by a name/email that matches exactly one client.",
     {
       clientId: { type: "string", description: "Client id from client_profile (preferred)" },
       identifier: {
@@ -435,7 +433,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "client_tag",
-    "Add or remove a private label (tag) on a client's CRM profile (e.g. 'vip', 'sensitive-skin'). MUTATING — requires Victoria's button confirmation. Identify the client by clientId or a name/email matching exactly one client.",
+    "Add or remove a private label (tag) on a client's CRM profile (e.g. 'vip', 'sensitive-skin'). MUTATING — requires the team's button confirmation. Identify the client by clientId or a name/email matching exactly one client.",
     {
       clientId: { type: "string", description: "Client id from client_profile (preferred)" },
       identifier: {
@@ -449,7 +447,7 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "draft_client_email",
-    "Compose a branded client email DRAFT (check-in, thank-you, or a custom reply) for a given client. Returns the draft text to Victoria in chat — it does NOT send. To actually send it, use email_send (which asks for confirmation). Read-only.",
+    "Compose a branded client email DRAFT (check-in, thank-you, or a custom reply) for a given client. Returns the draft text to the team in chat — it does NOT send. To actually send it, use email_send (which asks for confirmation). Read-only.",
     {
       query: {
         type: "string",
@@ -507,9 +505,9 @@ const MUTATING_TOOLS = new Set([
   "client_tag",
 ]);
 
-/** Victoria's own addresses — email_send to these skips the confirm gate. */
+/** the team's own addresses — email_send to these skips the confirm gate. */
 function ownerEmailAllowlist(): Set<string> {
-  const set = new Set<string>(["victoria@victoriaholisticbeauty.com"]);
+  const set = new Set<string>(["info@eliteecocarwash.com"]);
   for (const addr of (process.env.NOTIFY_EMAIL || "").split(",")) {
     const a = addr.trim().toLowerCase();
     if (a) set.add(a);
@@ -517,7 +515,7 @@ function ownerEmailAllowlist(): Set<string> {
   return set;
 }
 
-/** Does this tool call need Victoria's [Confirm] tap before executing? */
+/** Does this tool call need the team's [Confirm] tap before executing? */
 export function requiresConfirmation(
   name: string,
   args: Record<string, unknown>
@@ -545,7 +543,7 @@ export type ValidatedArgs =
  * Normalize and validate a MUTATING tool call's arguments against its
  * declared schema — ONCE, before the pending action is created. Both the
  * confirmation summary (describeMutation) and the executor must consume the
- * returned object, so what Victoria confirms is exactly what executes.
+ * returned object, so what the team confirms is exactly what executes.
  *
  * This closes the disclosure/executor divergence: e.g. `to: ["a@evil.com"]`
  * used to render as a BLANK recipient on the confirmation card while the
@@ -608,7 +606,7 @@ export function validateMutationArgs(
       // LLMs routinely emit numbers as strings ('"priceEgp": "250"').
       // Coerce ONLY when the round-trip is lossless (Number() then back to
       // the exact same string) — the summary then renders the coerced
-      // number, so what Victoria confirms is exactly what executes. Anything
+      // number, so what the team confirms is exactly what executes. Anything
       // lossy ("015", "1e3", "250.0") or non-numeric is still refused.
       if (typeof num === "string") {
         const trimmed = num.trim();
@@ -698,9 +696,7 @@ export function describeMutation(
       const changes: string[] = [];
       if (typeof args.priceEgp === "number")
         changes.push(`price ${args.priceEgp} EGP`);
-      if (typeof args.priceRub === "number")
-        changes.push(`price ${args.priceRub} RUB`);
-      if (typeof args.quantity === "number")
+            if (typeof args.quantity === "number")
         changes.push(`quantity ${args.quantity}`);
       if (typeof args.soldOut === "boolean")
         changes.push(`soldOut ${args.soldOut}`);
@@ -715,7 +711,7 @@ export function describeMutation(
           ? `, qty ${args.quantity}`
           : ", stock untracked";
       const rub =
-        typeof args.priceRub === "number" ? ` / ${args.priceRub} RUB` : "";
+        "";
       return (
         `Add product "${s("nameEn")}" (${s("nameRu")}) — ${
           typeof args.priceEgp === "number" ? args.priceEgp : "?"
@@ -744,7 +740,7 @@ export function describeMutation(
         `——— full message ———\n` +
         `${s("body")}\n` +
         `——————————————\n` +
-        `→ This exact email goes to ${s("to")} from bookings@victoriaholisticbeauty.com.`
+        `→ This exact email goes to ${s("to")} from bookings@eliteecocarwash.com.`
       );
     case "log_expense": {
       const amount = typeof args.amountEgp === "number" ? args.amountEgp : "?";
@@ -963,7 +959,7 @@ async function execCatalogList(): Promise<string> {
   return catalog
     .map(
       (p) =>
-        `${p.slug} · ${p.en.name} · ${p.priceEgp} EGP / ${p.priceRub} RUB · qty: ${
+        `${p.slug} · ${p.en.name} · ${p.priceEgp} EGP / qty: ${
           p.quantity === null ? "untracked" : p.quantity
         }${effectiveSoldOut(p) ? " · SOLD OUT" : ""}${p.active ? "" : " · hidden"}`
     )
@@ -983,11 +979,7 @@ async function execProductUpdate(
     product.priceEgp = Math.round(args.priceEgp);
     changes.push(`price ${product.priceEgp} EGP`);
   }
-  if (typeof args.priceRub === "number" && args.priceRub >= 0) {
-    product.priceRub = Math.round(args.priceRub);
-    changes.push(`price ${product.priceRub} RUB`);
-  }
-  if (typeof args.quantity === "number" && args.quantity >= 0) {
+    if (typeof args.quantity === "number" && args.quantity >= 0) {
     product.quantity = Math.round(args.quantity);
     changes.push(`quantity ${product.quantity}`);
   }
@@ -1014,10 +1006,9 @@ async function execProductAdd(args: Record<string, unknown>): Promise<string> {
   if (typeof args.priceEgp !== "number" || args.priceEgp <= 0)
     return "A positive priceEgp is required.";
   const priceEgp = Math.round(args.priceEgp);
-  const priceRub =
-    typeof args.priceRub === "number" && args.priceRub >= 0
-      ? Math.round(args.priceRub)
-      : 0;
+  const =
+    typeof args.=== "number" && args.>= 0
+            : 0;
   const quantity =
     typeof args.quantity === "number" && args.quantity >= 0
       ? Math.round(args.quantity)
@@ -1033,7 +1024,6 @@ async function execProductAdd(args: Record<string, unknown>): Promise<string> {
     en: { name: nameEn, sub: "", desc: str("descEn").slice(0, 2000) },
     ru: { name: nameRu, sub: "", desc: str("descRu").slice(0, 2000) },
     priceEgp,
-    priceRub,
     photo: str("imageUrl").slice(0, 500),
     alt: { en: nameEn, ru: nameRu },
     ...(usageEn || usageRu
@@ -1047,7 +1037,7 @@ async function execProductAdd(args: Record<string, unknown>): Promise<string> {
   };
   catalog.push(product);
   await saveCatalog(catalog);
-  return `Added "${nameEn}" (slug: ${slug}) — ${priceEgp} EGP / ${priceRub} RUB, ${
+  return `Added "${nameEn}" (slug: ${slug}) — ${priceEgp} EGP, ${
     quantity === null ? "stock untracked" : `qty ${quantity}`
   }. It is LIVE on the site now.${
     product.photo ? "" : " No photo yet — add one in /admin when ready."
@@ -1288,7 +1278,7 @@ async function execEmailSend(args: Record<string, unknown>): Promise<string> {
     .split(/\n{2,}/)
     .map(
       (p) =>
-        `<p style="margin:0 0 16px;color:#3A332C;font-size:15px;line-height:1.65;">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`
+        `<p style="margin:0 0 16px;color:#0A1A2F;font-size:15px;line-height:1.65;">${escapeHtml(p).replace(/\n/g, "<br>")}</p>`
     )
     .join("");
   const html = brandedEmailHtml({ heading: subject, contentHtml });
@@ -1301,9 +1291,9 @@ async function execEmailSend(args: Record<string, unknown>): Promise<string> {
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: "Victoria Vasilyeva Holistic Beauty <bookings@victoriaholisticbeauty.com>",
+      from: "Elite Eco Car Wash <bookings@eliteecocarwash.com>",
       to: [to],
-      reply_to: "victoria@victoriaholisticbeauty.com",
+      reply_to: "info@eliteecocarwash.com",
       subject,
       text: body,
       html,
@@ -1326,7 +1316,6 @@ async function execDocumentCreate(
   const recipient =
     typeof args.recipient === "string" && args.recipient.trim()
       ? args.recipient.trim().slice(0, 120)
-      : undefined;
   if (!title || !body) return "Title and body are both required.";
 
   const { pdf, unsupportedCharsStripped } = await renderLetterheadPdf({
@@ -1470,7 +1459,7 @@ function clientDateKey(iso: string | null): string {
   return cairoDayClock(iso);
 }
 
-/** One-block summary of a client profile for Vassili's chat replies. */
+/** One-block summary of a client profile for Eco's chat replies. */
 function formatClientProfile(p: ClientProfile): string {
   const lines = [
     `${p.displayName}${p.email ? ` · ${p.email}` : ""}${p.phone ? ` · ${p.phone}` : ""} (id: ${p.clientId})`,

@@ -22,7 +22,7 @@ export interface ProductInput {
   en?: ProductCopy;
   ru?: ProductCopy;
   priceEgp?: number;
-  priceRub?: number;
+  ?: number;
   photo?: string;
   alt?: { en: string; ru: string };
   /** Manufacturer usage directions; both empty strings = none. */
@@ -42,7 +42,7 @@ function str(v: unknown): string | null {
 
 function validateCopy(
   raw: unknown,
-  key: "en" | "ru",
+  key: "en" | "ar",
   requireName: boolean,
   fields: Record<string, string>
 ): ProductCopy | undefined {
@@ -68,7 +68,7 @@ function validateCopy(
 
 function validatePrice(
   raw: unknown,
-  key: "priceEgp" | "priceRub",
+  key: "priceEgp" | "",
   required: boolean,
   fields: Record<string, string>
 ): number | undefined {
@@ -117,13 +117,13 @@ export function validateProductInput(
 
   const en = validateCopy(b.en, "en", create, fields);
   if (en !== undefined) value.en = en;
-  const ru = validateCopy(b.ru, "ru", create, fields);
+  const ru = validateCopy(b.ru, "ar", create, fields);
   if (ru !== undefined) value.ru = ru;
 
   const priceEgp = validatePrice(b.priceEgp, "priceEgp", create, fields);
   if (priceEgp !== undefined) value.priceEgp = priceEgp;
-  const priceRub = validatePrice(b.priceRub, "priceRub", create, fields);
-  if (priceRub !== undefined) value.priceRub = priceRub;
+  const  = validatePrice(b., "", create, fields);
+  if ( !== undefined) value. = ;
 
   const photo = validatePhoto(b.photo, fields);
   if (photo !== undefined) value.photo = photo;
@@ -186,7 +186,7 @@ export function applyProductInput(product: Product, input: ProductInput): Produc
     ...(input.en !== undefined ? { en: input.en } : {}),
     ...(input.ru !== undefined ? { ru: input.ru } : {}),
     ...(input.priceEgp !== undefined ? { priceEgp: input.priceEgp } : {}),
-    ...(input.priceRub !== undefined ? { priceRub: input.priceRub } : {}),
+    ...(input. !== undefined ? { : input. } : {}),
     ...(input.photo !== undefined ? { photo: input.photo } : {}),
     ...(input.alt !== undefined ? { alt: input.alt } : {}),
     ...(input.usage !== undefined ? { usage: input.usage } : {}),

@@ -25,9 +25,9 @@ interface BookingWidgetProps {
   showHeader?: boolean;
   /** Event type supports multiple durations — send the explicit duration to Cal.com */
   multiDuration?: boolean;
-  /** Multi-treatment sessions: appended to the booking notes for Victoria. */
+  /** Multi-treatment sessions: appended to the booking notes for the team. */
   treatmentsNote?: string;
-  lang?: 'en' | 'ru';
+  lang?: 'en' | 'ar';
 }
 
 const BookingWidget: React.FC<BookingWidgetProps> = ({

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     // Sanitize phone: strip spaces/dashes/parens, then require E.164-ish shape.
     // If it doesn't pass Cal-safe validation, surface it via notes instead so
-    // Victoria still sees it and the booking never fails because of the phone.
+    // the team still sees it and the booking never fails because of the phone.
     let phoneNumber: string | undefined;
     if (typeof bookingData.attendee.phoneNumber === "string") {
       const normalized = bookingData.attendee.phoneNumber
@@ -88,14 +88,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // UI language ("en"/"ru") from the form — recorded on the booking as
+    // UI language ("en"/"ar") from the form — recorded on the booking as
     // metadata.lang so /api/cal/webhook can send the attendee lifecycle
     // emails in the right language. Cal v2 accepts free-form metadata on
     // bookings (≤50 keys, string values ≤500 chars) and returns it on
     // GET /bookings/{uid}. Defaults to "en" for anything unexpected.
-    const lang: "en" | "ru" =
-      bookingData.metadata?.lang === "ru" || bookingData.lang === "ru"
-        ? "ru"
+    const lang: "en" | "ar" =
+      bookingData.metadata?.lang === "ar" || bookingData.lang === "ar"
+        ? "ar"
         : "en";
 
     // Format the booking data for Cal.com v2 API

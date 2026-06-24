@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import type { Product } from "@/lib/catalog";
 
 /**
- * Products manager — Victoria's catalog CRUD inside /admin.
+ * Products manager — the team's catalog CRUD inside /admin.
  *
  * - List: photo thumb, EN name, prices, inline-editable quantity, status
  *   chips, Edit / Sold-out toggle / Delete, plus "Add product".
@@ -12,12 +12,12 @@ import type { Product } from "@/lib/catalog";
  *   photo as pasted URL OR file upload via /api/admin/media, alt texts.
  *   Slug auto-generates server-side on create and is immutable on edit.
  *
- * Auth: when Victoria came through the legacy ?key= link the key is passed
+ * Auth: when the team came through the legacy ?key= link the key is passed
  * down and sent as x-admin-key; with Basic auth the browser re-attaches the
  * Authorization header to these same-origin fetches automatically.
  */
 
-const SITE_BASE = "https://victoriaholisticbeauty.com/";
+const SITE_BASE = "https://eliteecocarwash.com/";
 
 /* ---------- helpers ---------- */
 
@@ -54,17 +54,17 @@ async function readError(res: Response): Promise<string> {
 function statusChips(p: Product): { label: string; cls: string }[] {
   const chips: { label: string; cls: string }[] = [];
   if (!p.active) {
-    chips.push({ label: "Hidden", cls: "bg-[#3A332C]/10 text-[#3A332C]" });
+    chips.push({ label: "Hidden", cls: "bg-[#0A1A2F]/10 text-[#0A1A2F]" });
   }
   if (p.soldOut) {
     chips.push({
       label: "Sold out (manual)",
-      cls: "bg-[#B5483A]/15 text-[#B5483A]",
+      cls: "bg-[#B91C1C]/15 text-[#B91C1C]",
     });
   } else if (p.quantity === 0) {
     chips.push({
       label: "Sold out (0 qty)",
-      cls: "bg-[#B5483A]/15 text-[#B5483A]",
+      cls: "bg-[#B91C1C]/15 text-[#B91C1C]",
     });
   }
   if (p.active && chips.length === 0) {
@@ -76,14 +76,14 @@ function statusChips(p: Product): { label: string; cls: string }[] {
 /* ---------- shared styles ---------- */
 
 const inputCls =
-  "w-full rounded-xl border border-[#3A332C]/15 bg-white px-3 py-2 text-sm text-[#3A332C] outline-none focus:border-[#8A5238]";
+  "w-full rounded-xl border border-[#0A1A2F]/15 bg-white px-3 py-2 text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]";
 const labelCls =
-  "mb-1 block text-xs font-medium uppercase tracking-[0.08em] text-[#847866]";
+  "mb-1 block text-xs font-medium uppercase tracking-[0.08em] text-[#4A5568]";
 const buttonBase =
   "rounded-full px-4 py-2 text-sm font-medium transition-opacity disabled:opacity-50";
-const primaryBtn = `${buttonBase} bg-[#8A5238] text-[#FDF9F3] hover:opacity-90`;
-const subtleBtn = `${buttonBase} border border-[#3A332C]/15 bg-[#FFFDF9] text-[#3A332C] hover:bg-[#F4EFE7]`;
-const dangerBtn = `${buttonBase} border border-[#B5483A]/30 bg-[#FFFDF9] text-[#B5483A] hover:bg-[#B5483A]/5`;
+const primaryBtn = `${buttonBase} bg-[#1A5F9E] text-[#F8FAFC] hover:opacity-90`;
+const subtleBtn = `${buttonBase} border border-[#0A1A2F]/15 bg-[#FFFFFF] text-[#0A1A2F] hover:bg-[#F8FAFC]`;
+const dangerBtn = `${buttonBase} border border-[#B91C1C]/30 bg-[#FFFFFF] text-[#B91C1C] hover:bg-[#B91C1C]/5`;
 
 /* ---------- product form (add / edit) ---------- */
 
@@ -97,7 +97,6 @@ interface FormState {
   ruDesc: string;
   ruUsage: string;
   priceEgp: string;
-  priceRub: string;
   quantity: string; // "" = untracked
   photo: string;
   altEn: string;
@@ -116,7 +115,6 @@ function toFormState(p: Product | null): FormState {
     ruDesc: p?.ru.desc ?? "",
     ruUsage: p?.usage?.ru ?? "",
     priceEgp: p ? String(p.priceEgp) : "",
-    priceRub: p ? String(p.priceRub) : "",
     quantity: p && p.quantity !== null ? String(p.quantity) : "",
     photo: p?.photo ?? "",
     altEn: p?.alt.en ?? "",
@@ -181,7 +179,6 @@ function ProductForm({
   async function submit() {
     setError(null);
     const priceEgp = Number(form.priceEgp);
-    const priceRub = Number(form.priceRub);
     if (!form.enName.trim() || !form.ruName.trim()) {
       setError("Both EN and RU names are required.");
       return;
@@ -190,7 +187,6 @@ function ProductForm({
       setError("Price (EGP) must be a whole number.");
       return;
     }
-    if (!Number.isInteger(priceRub) || priceRub < 0 || form.priceRub === "") {
       setError("Price (RUB) must be a whole number.");
       return;
     }
@@ -208,7 +204,6 @@ function ProductForm({
       ru: { name: form.ruName.trim(), sub: form.ruSub.trim(), desc: form.ruDesc.trim() },
       usage: { en: form.enUsage.trim(), ru: form.ruUsage.trim() },
       priceEgp,
-      priceRub,
       quantity,
       photo: form.photo.trim(),
       alt: { en: form.altEn.trim(), ru: form.altRu.trim() },
@@ -241,75 +236,19 @@ function ProductForm({
   }
 
   return (
-    <div className="rounded-2xl border border-[#8A5238]/25 bg-[#FFFDF9] px-5 py-5 shadow-sm">
-      <h3 className="font-serif text-xl text-[#3A332C]">
+    <div className="rounded-2xl border border-[#1A5F9E]/25 bg-[#FFFFFF] px-5 py-5 shadow-sm">
+      <h3 className="font-serif text-xl text-[#0A1A2F]">
         {product ? `Edit — ${product.en.name}` : "Add product"}
       </h3>
       {product && (
-        <p className="mt-1 text-xs text-[#847866]">
+        <p className="mt-1 text-xs text-[#4A5568]">
           Slug: <code>{product.slug}</code> (permanent)
         </p>
       )}
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-3">
-          <div>
-            <label className={labelCls}>Name (EN)</label>
-            <input className={inputCls} value={form.enName} onChange={(e) => set({ enName: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Subtitle (EN)</label>
-            <input className={inputCls} value={form.enSub} placeholder="DM line · 150 ml" onChange={(e) => set({ enSub: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Description (EN)</label>
-            <textarea className={inputCls} rows={3} value={form.enDesc} onChange={(e) => set({ enDesc: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Usage instructions (EN)</label>
-            <textarea
-              className={inputCls}
-              rows={3}
-              value={form.enUsage}
-              placeholder="Manufacturer's application directions — how and when to use"
-              onChange={(e) => set({ enUsage: e.target.value })}
-            />
-          </div>
-        </div>
-        <div className="space-y-3">
-          <div>
-            <label className={labelCls}>Name (RU)</label>
-            <input className={inputCls} value={form.ruName} onChange={(e) => set({ ruName: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Subtitle (RU)</label>
-            <input className={inputCls} value={form.ruSub} placeholder="линия DM · 150 мл" onChange={(e) => set({ ruSub: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Description (RU)</label>
-            <textarea className={inputCls} rows={3} value={form.ruDesc} onChange={(e) => set({ ruDesc: e.target.value })} />
-          </div>
-          <div>
-            <label className={labelCls}>Usage instructions (RU)</label>
-            <textarea
-              className={inputCls}
-              rows={3}
-              value={form.ruUsage}
-              placeholder="Инструкция производителя по применению"
-              onChange={(e) => set({ ruUsage: e.target.value })}
-            />
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <div>
-          <label className={labelCls}>Price (EGP)</label>
-          <input className={inputCls} inputMode="numeric" value={form.priceEgp} onChange={(e) => set({ priceEgp: e.target.value })} />
-        </div>
-        <div>
-          <label className={labelCls}>Price (RUB)</label>
-          <input className={inputCls} inputMode="numeric" value={form.priceRub} onChange={(e) => set({ priceRub: e.target.value })} />
+          <div>set({ /* removed */ })} />
         </div>
         <div>
           <label className={labelCls}>Quantity (empty = untracked)</label>
@@ -331,20 +270,20 @@ function ProductForm({
               ref={fileRef}
               type="file"
               accept="image/jpeg,image/png,image/webp"
-              className="text-sm text-[#847866] file:mr-3 file:rounded-full file:border-0 file:bg-[#3A332C]/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#3A332C]"
+              className="text-sm text-[#4A5568] file:mr-3 file:rounded-full file:border-0 file:bg-[#0A1A2F]/10 file:px-4 file:py-2 file:text-sm file:font-medium file:text-[#0A1A2F]"
               onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (file) void uploadPhoto(file);
               }}
             />
-            {uploading && <span className="text-sm text-[#847866]">Uploading…</span>}
+            {uploading && <span className="text-sm text-[#4A5568]">Uploading…</span>}
           </div>
           {form.photo && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={photoSrc(form.photo)}
               alt="Product preview"
-              className="mt-3 h-24 w-24 rounded-xl border border-[#3A332C]/10 object-cover"
+              className="mt-3 h-24 w-24 rounded-xl border border-[#0A1A2F]/10 object-cover"
             />
           )}
         </div>
@@ -358,18 +297,18 @@ function ProductForm({
             <input className={inputCls} value={form.altRu} onChange={(e) => set({ altRu: e.target.value })} />
           </div>
         </div>
-        <label className="flex items-center gap-2 text-sm text-[#3A332C]">
+        <label className="flex items-center gap-2 text-sm text-[#0A1A2F]">
           <input
             type="checkbox"
             checked={form.active}
             onChange={(e) => set({ active: e.target.checked })}
-            className="h-4 w-4 accent-[#8A5238]"
+            className="h-4 w-4 accent-[#1A5F9E]"
           />
           Visible in the shop
         </label>
       </div>
 
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
 
       <div className="mt-5 flex flex-wrap gap-2">
         <button type="button" disabled={busy || uploading} onClick={() => void submit()} className={primaryBtn}>
@@ -438,9 +377,9 @@ function QuantityEditor({
 
   return (
     <span className="inline-flex items-center gap-1.5">
-      <label className="text-xs text-[#847866]">Qty</label>
+      <label className="text-xs text-[#4A5568]">Qty</label>
       <input
-        className="w-16 rounded-lg border border-[#3A332C]/15 bg-white px-2 py-1 text-center text-sm text-[#3A332C] outline-none focus:border-[#8A5238]"
+        className="w-16 rounded-lg border border-[#0A1A2F]/15 bg-white px-2 py-1 text-center text-sm text-[#0A1A2F] outline-none focus:border-[#1A5F9E]"
         inputMode="numeric"
         value={value}
         placeholder="—"
@@ -455,7 +394,7 @@ function QuantityEditor({
           type="button"
           disabled={busy}
           onClick={() => void save()}
-          className="rounded-full bg-[#8A5238] px-2.5 py-1 text-xs font-medium text-[#FDF9F3] disabled:opacity-50"
+          className="rounded-full bg-[#1A5F9E] px-2.5 py-1 text-xs font-medium text-[#F8FAFC] disabled:opacity-50"
         >
           {busy ? "…" : "Save"}
         </button>
@@ -535,24 +474,24 @@ function ProductRow({
   }
 
   return (
-    <article className="rounded-2xl border border-[#3A332C]/10 bg-[#FFFDF9] px-4 py-4 shadow-sm sm:px-5">
+    <article className="rounded-2xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-4 py-4 shadow-sm sm:px-5">
       <div className="flex items-start gap-3">
         {product.photo ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={photoSrc(product.photo)}
             alt={product.alt.en || product.en.name}
-            className="h-16 w-16 shrink-0 rounded-xl border border-[#3A332C]/10 object-cover"
+            className="h-16 w-16 shrink-0 rounded-xl border border-[#0A1A2F]/10 object-cover"
             loading="lazy"
           />
         ) : (
-          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#E0D8CE] font-serif text-xl text-[#3A332C]">
+          <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-xl bg-[#E0D8CE] font-serif text-xl text-[#0A1A2F]">
             {product.en.name.charAt(0)}
           </div>
         )}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="font-serif text-lg leading-snug text-[#3A332C]">
+            <h3 className="font-serif text-lg leading-snug text-[#0A1A2F]">
               {product.en.name}
             </h3>
             {statusChips(product).map((chip) => (
@@ -564,10 +503,9 @@ function ProductRow({
               </span>
             ))}
           </div>
-          <p className="mt-0.5 text-sm text-[#847866]">
+          <p className="mt-0.5 text-sm text-[#4A5568]">
             {product.priceEgp.toLocaleString("en-EG")} EGP ·{" "}
-            {product.priceRub.toLocaleString("ru-RU")} RUB
-          </p>
+            </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <QuantityEditor
               key={`${product.slug}-${product.quantity}`}
@@ -597,7 +535,7 @@ function ProductRow({
         </button>
       </div>
 
-      {error && <p className="mt-3 text-sm text-[#B5483A]">{error}</p>}
+      {error && <p className="mt-3 text-sm text-[#B91C1C]">{error}</p>}
     </article>
   );
 }
@@ -640,10 +578,10 @@ export default function ProductsSection({
   return (
     <section>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-serif text-2xl text-[#3A332C]">
+        <h2 className="font-serif text-2xl text-[#0A1A2F]">
           Products
           {products.length > 0 && (
-            <span className="ml-2 align-middle font-sans text-sm text-[#8A5238]">
+            <span className="ml-2 align-middle font-sans text-sm text-[#1A5F9E]">
               {products.length}
             </span>
           )}
@@ -656,7 +594,7 @@ export default function ProductsSection({
       </div>
 
       {loadError ? (
-        <div className="rounded-2xl border border-[#B5483A]/30 bg-[#FFFDF9] px-6 py-5 text-sm text-[#B5483A]">
+        <div className="rounded-2xl border border-[#B91C1C]/30 bg-[#FFFFFF] px-6 py-5 text-sm text-[#B91C1C]">
           {loadError}
         </div>
       ) : (
@@ -679,7 +617,7 @@ export default function ProductsSection({
             />
           )}
           {products.length === 0 && !adding ? (
-            <div className="rounded-2xl border border-dashed border-[#3A332C]/15 bg-[#FFFDF9]/60 px-6 py-8 text-center text-sm text-[#847866]">
+            <div className="rounded-2xl border border-dashed border-[#0A1A2F]/15 bg-[#FFFFFF]/60 px-6 py-8 text-center text-sm text-[#4A5568]">
               No products yet — add the first one.
             </div>
           ) : (

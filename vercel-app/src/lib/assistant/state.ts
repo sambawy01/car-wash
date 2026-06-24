@@ -1,7 +1,7 @@
 import { del, get, list, put } from "@vercel/blob";
 
 /**
- * Vassili's state on Vercel Blob (same private store as orders/catalog,
+ * Eco's state on Vercel Blob (same private store as orders/catalog,
  * authenticated by BLOB_READ_WRITE_TOKEN).
  *
  * Layout:
@@ -25,7 +25,7 @@ export const PENDING_TTL_MS = 15 * 60 * 1000;
 
 /**
  * Long TTL for actions parked behind PUSHED notification buttons (new
- * booking request / new order / low stock). Those buttons sit in Victoria's
+ * booking request / new order / low stock). Those buttons sit in the team's
  * chat unprompted — she may tap hours or days later, so the 15-minute chat
  * default would render every pushed button dead on arrival.
  */
@@ -134,7 +134,7 @@ interface AlertRecord {
  *   per UTC day, and still count against the hourly cap.
  *
  * Best effort (read-modify-write on Blob, not atomic): if state is
- * unreadable we fail OPEN (alert anyway) — the cap protects Victoria from
+ * unreadable we fail OPEN (alert anyway) — the cap protects the team from
  * notification noise; it is not a security boundary.
  */
 export async function shouldAlertOwner(

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * One-off script: create/update the 11 per-service Cal.com event types
- * for Victoria Vasilyeva Holistic Beauty, all with owner confirmation
+ * for Elite Eco Car Wash, all with owner confirmation
  * required (confirmationPolicy: always).
  *
  * Usage:  node scripts/create-event-types.mjs   (run from vercel-app/)

@@ -3,13 +3,13 @@ import { join } from "node:path";
 import PDFDocument from "pdfkit";
 
 /**
- * Company-letterhead PDF for Vassili's `document_create` tool.
+ * Company-letterhead PDF for Eco's `document_create` tool.
  *
  * Design mirrors the branded email shell (@/lib/branded-email):
- * - Dark band (#100D0B) across the top with the white logo PNG
+ * - Dark band (#0A1A2F) across the top with the white logo PNG
  *   (fetched from the live site, falling back to public/logo-white.png,
  *   falling back to a typeset wordmark).
- * - "Earthen Calm" palette: #3A332C ink, #847866 muted, #E5DCCB hairlines.
+ * - "Earthen Calm" palette: #0A1A2F ink, #4A5568 muted, #D1D9E0 hairlines.
  * - EMBEDDED fonts (src/assets/fonts, OFL-licensed ParaType faces, full
  *   Latin + Cyrillic coverage — Russian renders natively):
  *   · PT Sans (regular/bold) for the letter-spaced uppercase headings and
@@ -27,15 +27,15 @@ import PDFDocument from "pdfkit";
  * fonts' repertoire (emoji, CJK, …) had to be removed so the tool can warn.
  */
 
-const LOGO_URL = "https://victoriaholisticbeauty.com/assets/logo-white.png";
+const LOGO_URL = "https://eliteecocarwash.com/assets/logo-white.png";
 const BRAND_NAME = "VICTORIA VASILYEVA — HOLISTIC BEAUTY";
 const FOOTER_TEXT =
-  "victoriaholisticbeauty.com  ·  victoria@victoriaholisticbeauty.com";
+  "eliteecocarwash.com  ·  info@eliteecocarwash.com";
 
-const INK = "#3A332C";
-const MUTED = "#847866";
-const HAIRLINE = "#E5DCCB";
-const BAND = "#100D0B";
+const INK = "#0A1A2F";
+const MUTED = "#4A5568";
+const HAIRLINE = "#D1D9E0";
+const BAND = "#0A1A2F";
 
 const PAGE_MARGIN = 64;
 const BAND_HEIGHT = 110;
@@ -174,7 +174,7 @@ export async function renderLetterheadPdf(
     // use the embedded TTFs registered below. (Types say string; runtime
     // accepts null by design: initFonts(defaultFont) no-ops on falsy.)
     font: null as unknown as string,
-    info: { Title: input.title, Author: "Victoria Vasilyeva Holistic Beauty" },
+    info: { Title: input.title, Author: "Elite Eco Car Wash" },
   });
   doc.registerFont("Sans", fonts.Sans);
   doc.registerFont("Sans-Bold", fonts["Sans-Bold"]);
@@ -214,7 +214,7 @@ export async function renderLetterheadPdf(
       doc
         .font("Sans")
         .fontSize(13)
-        .fillColor("#FFFDF9")
+        .fillColor("#FFFFFF")
         .text(BRAND_NAME, PAGE_MARGIN, BAND_HEIGHT / 2 - 8, {
           width: contentWidth,
           align: "center",

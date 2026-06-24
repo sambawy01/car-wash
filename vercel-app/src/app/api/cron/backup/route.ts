@@ -99,15 +99,15 @@ export async function GET(request: NextRequest) {
   ].join("\n");
 
   const contentHtml =
-    `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">Files captured: <strong>${snapshot.files.length}</strong></p>` +
+    `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;line-height:1.6;">Files captured: <strong>${snapshot.files.length}</strong></p>` +
     (snapshot.truncated
       ? `<p style="margin:0 0 8px;color:#B3261E;font-size:15px;line-height:1.6;"><strong>WARNING:</strong> orders listing hit its cap — this snapshot is incomplete.</p>`
       : "") +
     (snapshot.missing.length
-      ? `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">Missing/unreadable: ${escapeHtml(snapshot.missing.join(", "))}</p>`
+      ? `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;line-height:1.6;">Missing/unreadable: ${escapeHtml(snapshot.missing.join(", "))}</p>`
       : "") +
-    `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">Stored at <strong>${escapeHtml(pathname)}</strong> · newest ${BACKUP_KEEP} kept · ${(json.length / 1024).toFixed(1)} KB</p>` +
-    `<p style="margin:16px 0 0;color:#847866;font-size:14px;">The full snapshot is attached as ${escapeHtml(filename)}. To restore a file, write its <code>text</code> back to its <code>pathname</code> in the Blob store.</p>`;
+    `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;line-height:1.6;">Stored at <strong>${escapeHtml(pathname)}</strong> · newest ${BACKUP_KEEP} kept · ${(json.length / 1024).toFixed(1)} KB</p>` +
+    `<p style="margin:16px 0 0;color:#4A5568;font-size:14px;">The full snapshot is attached as ${escapeHtml(filename)}. To restore a file, write its <code>text</code> back to its <code>pathname</code> in the Blob store.</p>`;
 
   const email = await sendReportEmail(
     {

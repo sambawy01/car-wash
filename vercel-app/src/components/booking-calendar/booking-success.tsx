@@ -20,7 +20,7 @@ interface BookingSuccessProps {
   onCancel: () => void;
   onNewBooking: () => void;
   isRescheduled: boolean;
-  lang?: "en" | "ru";
+  lang?: "en" | "ar";
 }
 
 export const BookingSuccess: React.FC<BookingSuccessProps> = ({
@@ -122,21 +122,21 @@ export const BookingSuccess: React.FC<BookingSuccessProps> = ({
           </div>
         </div>
 
-        {/* Success Message — bookings require Victoria's confirmation, so they
+        {/* Success Message — bookings require the team's confirmation, so they
             start out as pending requests rather than confirmed appointments. */}
         <h2 className="mb-2 text-2xl font-bold text-foreground">
           {isRescheduled
-            ? lang === "ru"
+            ? lang === "ar"
               ? "Запись перенесена"
               : "Appointment rescheduled"
-            : lang === "ru"
+            : lang === "ar"
               ? "Заявка отправлена"
               : "Request sent"}
         </h2>
         <p className="mb-8 text-muted-foreground">
-          {lang === "ru"
+          {lang === "ar"
             ? "Виктория скоро подтвердит вашу запись."
-            : "Victoria will confirm your appointment shortly."}
+            : "the team will confirm your appointment shortly."}
         </p>
 
         {/* Meeting Details Card */}

@@ -6,7 +6,7 @@
 import { webSearchEnabled } from "./ollama-search";
 
 const CAIRO_TZ = "Africa/Cairo";
-export function buildVassiliSystemPrompt(now: Date = new Date()): string {
+export function buildEcoSystemPrompt(now: Date = new Date()): string {
   const nowCairo = new Intl.DateTimeFormat("en-GB", {
     timeZone: CAIRO_TZ,
     weekday: "long",

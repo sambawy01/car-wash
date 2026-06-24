@@ -1,5 +1,5 @@
 /**
- * Minimal Telegram Bot API client for Vassili (Victoria's assistant).
+ * Minimal Telegram Bot API client for Eco (the team's assistant).
  *
  * - Token from env TELEGRAM_BOT_TOKEN. When unset, `telegramConfigured()`
  *   is false and callers must no-op (the webhook route answers 501).

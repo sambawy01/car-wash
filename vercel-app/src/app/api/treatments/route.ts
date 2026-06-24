@@ -11,7 +11,7 @@ export const runtime = "nodejs";
 
 /**
  * GET /api/treatments — the public treatments catalog consumed by the static
- * site (index.html / ru.html) and the /book service picker.
+ * site (index.html / ar.html) and the /book service picker.
  *
  * - Same CORS allowlist as /api/products and /api/chat.
  * - Only ACTIVE treatments, in their public shape (no timestamps).

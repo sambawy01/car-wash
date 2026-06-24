@@ -12,7 +12,7 @@ import {
 
 /**
  * Profit & Loss for the studio — the period-agnostic engine behind the admin
- * Finance tab, the CSV/PDF exports, Vassili's finance_summary tool, and the
+ * Finance tab, the CSV/PDF exports, Eco's finance_summary tool, and the
  * monthly P&L cron.
  *
  * THE NO-DOUBLE-ENTRY MODEL (deliberate — see @/lib/finance):
@@ -34,7 +34,7 @@ import {
  *   period it falls in — it does NOT model no-shows, on-the-day discounts, or
  *   prices that changed after the visit. For a single-practitioner studio
  *   where confirmed visits are reliably honoured this is a sound proxy; if
- *   Victoria wants only PAST (already-happened) confirmed visits to count, the
+ *   the team wants only PAST (already-happened) confirmed visits to count, the
  *   `onlyPastBookings` flag narrows it (default: all confirmed in range).
  *
  * The pure core (`computePnL`) takes already-gathered inputs so it is fully
@@ -250,7 +250,7 @@ export interface PnLInputs {
   onlyPastBookings?: boolean;
 }
 
-/** "Facial Massage between Victoria and X" → "Facial Massage". */
+/** "Facial Massage between the team and X" → "Facial Massage". */
 function serviceTitle(booking: CalBooking): string {
   const title = booking.title || "Booking";
   const idx = title.indexOf(" between ");

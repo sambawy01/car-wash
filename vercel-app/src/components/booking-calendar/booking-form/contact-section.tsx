@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 
 interface ContactSectionProps<T extends FieldValues> {
   control: Control<T>;
-  lang?: "en" | "ru";
+  lang?: "en" | "ar";
 }
 
 const CONTACT_STRINGS = {
@@ -20,7 +20,7 @@ const CONTACT_STRINGS = {
     name: "Full name",
     email: "Email",
     phone: "Mobile number (WhatsApp)",
-    notes: "Anything Victoria should know before your session? (optional)",
+    notes: "Anything the team should know before your session? (optional)",
   },
   ru: {
     label: "Контактные данные",

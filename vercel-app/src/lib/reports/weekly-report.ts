@@ -5,7 +5,7 @@ import { listOrders, type StoredOrder } from "../orders";
 import { cairoSubjectDate, cairoWeekdayNow, type CairoWeekday } from "./shared";
 
 /**
- * Victoria's Sunday-18:00-Cairo weekly report (/api/cron/weekly-report):
+ * the team's Sunday-18:00-Cairo weekly report (/api/cron/weekly-report):
  * this week vs last week across bookings and shop orders.
  *
  * WEEK DEFINITION: Cairo calendar weeks, Monday through Sunday. Everything is
@@ -114,7 +114,7 @@ export function cairoWeekKeys(now: Date, weeksBack: number): string[] {
   return keys;
 }
 
-/** "Facial Massage between Victoria Vasilyeva and X" → "Facial Massage". */
+/** "Facial Massage between Elite Eco Car Wash and X" → "Facial Massage". */
 function serviceTitle(booking: CalBooking): string {
   const title = booking.title || "Booking";
   const idx = title.indexOf(" between ");
@@ -288,13 +288,13 @@ export function buildWeeklyReportEmail(
 
   // --- html part ---------------------------------------------------------------
   const sectionTitle = (title: string) =>
-    `<p style="margin:28px 0 8px;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(title)}</p>`;
+    `<p style="margin:28px 0 8px;color:#4A5568;font-size:13px;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(title)}</p>`;
   const line = (content: string) =>
-    `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;line-height:1.6;">${content}</p>`;
+    `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;line-height:1.6;">${content}</p>`;
 
-  let contentHtml = `<p style="margin:0 0 8px;color:#847866;font-size:14px;">${escapeHtml(thisWeek.label)} · Cairo time</p>`;
+  let contentHtml = `<p style="margin:0 0 8px;color:#4A5568;font-size:14px;">${escapeHtml(thisWeek.label)} · Cairo time</p>`;
   if (failures.length) {
-    contentHtml += `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;"><p style="margin:0;color:#3A332C;font-size:14px;">Heads up: couldn't load ${escapeHtml(failures.join(" and "))} — the numbers below may be incomplete.</p></div>`;
+    contentHtml += `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #D1D9E0;border-radius:10px;background-color:#F8FAFC;"><p style="margin:0;color:#0A1A2F;font-size:14px;">Heads up: couldn't load ${escapeHtml(failures.join(" and "))} — the numbers below may be incomplete.</p></div>`;
   }
   for (const section of sections) {
     contentHtml += sectionTitle(section.title);
@@ -302,7 +302,7 @@ export function buildWeeklyReportEmail(
       contentHtml += line(escapeHtml(l));
     }
   }
-  contentHtml += `<p style="margin:28px 0 0;color:#847866;font-size:14px;">Have a restful Sunday!<br>— your booking assistant</p>`;
+  contentHtml += `<p style="margin:28px 0 0;color:#4A5568;font-size:14px;">Have a restful Sunday!<br>— your booking assistant</p>`;
 
   const html = brandedEmailHtml({
     heading: `Your week in review`,

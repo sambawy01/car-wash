@@ -79,7 +79,7 @@ globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 
   // The letterhead renderer fetches the live logo — answer 404 fast so it
   // falls back to the bundled public/logo-white.png (no slow network wait).
-  if (url.includes("victoriaholisticbeauty.com")) {
+  if (url.includes("eliteecocarwash.com")) {
     return new Response("not found", { status: 404 });
   }
 
@@ -646,7 +646,7 @@ console.log("\n=== 7. P&L PDF on letterhead — EN + RU (Cyrillic) ===");
 }
 
 // ============================================================================
-console.log("\n=== 8. Vassili finance tools: schema, gate, disclosure, executors ===");
+console.log("\n=== 8. Eco finance tools: schema, gate, disclosure, executors ===");
 {
   const memStore = makeMemoryStore();
   __setLedgerStore(memStore);
@@ -713,7 +713,7 @@ console.log("\n=== 8. Vassili finance tools: schema, gate, disclosure, executors
   check("captured a real PDF", Boolean(docPdf && docPdf.subarray(0, 5).toString().startsWith("%PDF")), `size=${docPdf?.length}`);
   if (docPdf) {
     writeFileSync("/tmp/finance-pnl-vassili.pdf", docPdf);
-    console.log("Vassili P&L PDF saved: /tmp/finance-pnl-vassili.pdf");
+    console.log("Eco P&L PDF saved: /tmp/finance-pnl-vassili.pdf");
   }
 }
 
@@ -741,7 +741,7 @@ console.log("\n=== 10. monthly-pnl cron route: auth + window guard + forced buil
   __setLedgerStore(makeMemoryStore());
   await addLedgerEntry({ date: previousMonthPeriod().from, direction: "expense", category: "rent", amountEgp: 4000, method: "bank-transfer" });
 
-  const base = "https://book.victoriaholisticbeauty.com/api/cron/monthly-pnl";
+  const base = "https://book.eliteecocarwash.com/api/cron/monthly-pnl";
 
   // (a) 401 without bearer
   const noAuth = await monthlyPnlGET(new NextRequest(base));

@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
     validated.push({ role: msg.role, content: msg.content });
   }
 
-  const language: "en" | "ru" = lang === "ru" ? "ru" : "en";
+  const language: "en" | "ar" = lang === "ar" ? "ar" : "en";
 
   // Live shop + treatments knowledge: prices, durations, availability and
   // the manufacturer's usage directions come from the dynamic catalogs.

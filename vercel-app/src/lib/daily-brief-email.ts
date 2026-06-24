@@ -91,7 +91,7 @@ function cairoDayAndClock(iso: string): string {
 // --- booking field extraction --------------------------------------------------
 
 /**
- * Cal booking titles read "Facial Massage between Victoria Vasilyeva and X" —
+ * Cal booking titles read "Facial Massage between Elite Eco Car Wash and X" —
  * the brief line already shows the client, so keep just the service part.
  */
 function serviceTitle(booking: CalBooking): string {
@@ -279,18 +279,18 @@ export function buildDailyBriefEmail(input: DailyBriefInput): DailyBrief {
 
   // --- html part ---------------------------------------------------------------
   const sectionTitle = (title: string) =>
-    `<p style="margin:28px 0 8px;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(title)}</p>`;
+    `<p style="margin:28px 0 8px;color:#4A5568;font-size:13px;text-transform:uppercase;letter-spacing:0.12em;">${escapeHtml(title)}</p>`;
 
   const line = (content: string, muted = false) =>
-    `<p style="margin:0 0 8px;color:${muted ? "#847866" : "#3A332C"};font-size:15px;line-height:1.6;">${content}</p>`;
+    `<p style="margin:0 0 8px;color:${muted ? "#4A5568" : "#0A1A2F"};font-size:15px;line-height:1.6;">${content}</p>`;
 
   const adminButton = (label: string) =>
-    `<p style="margin:12px 0 0;"><a href="${adminLink}" style="display:inline-block;background-color:#3A332C;color:#FFFDF9;text-decoration:none;padding:10px 24px;border-radius:9999px;font-size:14px;">${escapeHtml(label)}</a></p>`;
+    `<p style="margin:12px 0 0;"><a href="${adminLink}" style="display:inline-block;background-color:#0A1A2F;color:#FFFFFF;text-decoration:none;padding:10px 24px;border-radius:9999px;font-size:14px;">${escapeHtml(label)}</a></p>`;
 
   let contentHtml = "";
 
   if (input.failures.length) {
-    contentHtml += `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;"><p style="margin:0;color:#3A332C;font-size:14px;">Heads up: couldn't load ${escapeHtml(input.failures.join(" and "))} — the sections below may be incomplete.</p></div>`;
+    contentHtml += `<div style="margin:0 0 16px;padding:12px 16px;border:1px solid #D1D9E0;border-radius:10px;background-color:#F8FAFC;"><p style="margin:0;color:#0A1A2F;font-size:14px;">Heads up: couldn't load ${escapeHtml(input.failures.join(" and "))} — the sections below may be incomplete.</p></div>`;
   }
 
   if (emptyDay) {
@@ -305,7 +305,7 @@ export function buildDailyBriefEmail(input: DailyBriefInput): DailyBrief {
         contentHtml += line(
           `<strong>${escapeHtml(cairoClock(b.start))}</strong> · ${escapeHtml(serviceTitle(b))} · ${escapeHtml(b.attendees?.[0]?.name || "Unknown")} · ${escapeHtml(bookingPhone(b))}` +
             (notes
-              ? `<br><span style="color:#847866;font-size:14px;">${escapeHtml(notes)}</span>`
+              ? `<br><span style="color:#4A5568;font-size:14px;">${escapeHtml(notes)}</span>`
               : "")
         );
       }
@@ -330,7 +330,7 @@ export function buildDailyBriefEmail(input: DailyBriefInput): DailyBrief {
       for (const o of openOrders) {
         const items = o.items.map((i) => `${i.qty}× ${i.names.en}`).join(", ");
         contentHtml += line(
-          `<strong>${escapeHtml(o.orderNumber)}</strong> (${escapeHtml(o.status)}) · ${escapeHtml(o.name)} · ${escapeHtml(o.phone)} · ${escapeHtml(String(o.totals.egp))} EGP<br><span style="color:#847866;font-size:14px;">${escapeHtml(items)}</span>`
+          `<strong>${escapeHtml(o.orderNumber)}</strong> (${escapeHtml(o.status)}) · ${escapeHtml(o.name)} · ${escapeHtml(o.phone)} · ${escapeHtml(String(o.totals.egp))} EGP<br><span style="color:#4A5568;font-size:14px;">${escapeHtml(items)}</span>`
         );
       }
       contentHtml += adminButton("Open admin");
@@ -345,14 +345,14 @@ export function buildDailyBriefEmail(input: DailyBriefInput): DailyBrief {
           ? `${escapeHtml(c.lastTreatment)}, `
           : "";
         contentHtml += line(
-          `<strong>${escapeHtml(c.displayName)}</strong> — ${last}<span style="color:#847866;">${c.overdueWeeks}+ weeks since last visit, nothing booked</span>`
+          `<strong>${escapeHtml(c.displayName)}</strong> — ${last}<span style="color:#4A5568;">${c.overdueWeeks}+ weeks since last visit, nothing booked</span>`
         );
       }
       contentHtml += adminButton("Open clients");
     }
   }
 
-  contentHtml += `<p style="margin:28px 0 0;color:#847866;font-size:14px;">Have a wonderful day!<br>— your booking assistant</p>`;
+  contentHtml += `<p style="margin:28px 0 0;color:#4A5568;font-size:14px;">Have a wonderful day!<br>— your booking assistant</p>`;
 
   const html = brandedEmailHtml({
     heading: `Your day — ${subjectDate}`,

@@ -14,7 +14,7 @@ import { get, list, put } from "@vercel/blob";
  *   intentionally do NOT sort by blob `uploadedAt` — status updates rewrite
  *   the blob and would reshuffle the list.
  * - `useCache: false` on all reads: status transitions rewrite blobs, and a
- *   stale CDN-cached copy would let Victoria double-fire a transition.
+ *   stale CDN-cached copy would let the team double-fire a transition.
  * - Status flow is ordered → confirmed → shipped → delivered, with
  *   `cancelled` reachable from ordered/confirmed (terminal, reason
  *   required). Enforced in `updateOrderStatus`; every transition is

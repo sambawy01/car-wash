@@ -458,7 +458,7 @@ console.log("\n=== 6d. Read-error semantics: transient throws, corrupt throws ==
 }
 
 // ============================================================================
-console.log("\n=== 7. Vassili CRM tools: schema, gate, disclosure, executors ===");
+console.log("\n=== 7. Eco CRM tools: schema, gate, disclosure, executors ===");
 {
   __setCrmStore(makeMemoryStore());
   const treatments = [mkTreatment("facial-massage", "Facial Massage", 3350, 327658)];
@@ -535,7 +535,7 @@ console.log("\n=== 7. Vassili CRM tools: schema, gate, disclosure, executors ===
 // ============================================================================
 console.log("\n=== 8. API auth: unauthenticated GET /api/admin/clients → 401 ===");
 {
-  const res = await clientsGET(new NextRequest("https://book.victoriaholisticbeauty.com/api/admin/clients"));
+  const res = await clientsGET(new NextRequest("https://book.eliteecocarwash.com/api/admin/clients"));
   check("GET /api/admin/clients without auth → 401", res.status === 401, `status=${res.status}`);
 }
 
@@ -668,7 +668,7 @@ console.log("\n=== 14. Right-to-erasure: deleteClientRecords removes overlay + A
   const cid2 = clientIdFor("email:erase2@e.com");
   await addNote(cid2, "route-erased note");
   const res = await clientDELETE(
-    new NextRequest(`https://book.victoriaholisticbeauty.com/api/admin/clients/${cid2}`, {
+    new NextRequest(`https://book.eliteecocarwash.com/api/admin/clients/${cid2}`, {
       method: "DELETE",
       headers: { "x-admin-key": "erase-token" },
     }),
@@ -680,7 +680,7 @@ console.log("\n=== 14. Right-to-erasure: deleteClientRecords removes overlay + A
   // Unauthenticated erasure is refused.
   process.env.ADMIN_TOKEN = "";
   const denied = await clientDELETE(
-    new NextRequest(`https://book.victoriaholisticbeauty.com/api/admin/clients/${cid2}`, { method: "DELETE" }),
+    new NextRequest(`https://book.eliteecocarwash.com/api/admin/clients/${cid2}`, { method: "DELETE" }),
     { params: Promise.resolve({ id: cid2 }) }
   );
   check("DELETE without auth → 401", denied.status === 401, `status=${denied.status}`);
@@ -694,7 +694,7 @@ console.log("\n=== 15. tags route rejects an oversized array (>200) BEFORE proce
   const cid = clientIdFor("email:tags@e.com");
   const huge = Array.from({ length: 201 }, (_, i) => `t${i}`);
   const tooMany = await tagsPUT(
-    new NextRequest(`https://book.victoriaholisticbeauty.com/api/admin/clients/${cid}/tags`, {
+    new NextRequest(`https://book.eliteecocarwash.com/api/admin/clients/${cid}/tags`, {
       method: "PUT",
       headers: { "x-admin-key": "tags-token", "content-type": "application/json" },
       body: JSON.stringify({ tags: huge }),
@@ -703,7 +703,7 @@ console.log("\n=== 15. tags route rejects an oversized array (>200) BEFORE proce
   );
   check("PUT tags with >200 entries → 400 (rejected before processing)", tooMany.status === 400, `status=${tooMany.status}`);
   const sane = await tagsPUT(
-    new NextRequest(`https://book.victoriaholisticbeauty.com/api/admin/clients/${cid}/tags`, {
+    new NextRequest(`https://book.eliteecocarwash.com/api/admin/clients/${cid}/tags`, {
       method: "PUT",
       headers: { "x-admin-key": "tags-token", "content-type": "application/json" },
       body: JSON.stringify({ tags: ["VIP", "gift", "vip"] }),
