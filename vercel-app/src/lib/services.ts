@@ -19,7 +19,7 @@ export interface Service {
 export const SERVICES: Service[] = [
   {
     slug: "interior-exterior-wash",
-    eventTypeId: 0,
+    eventTypeId: 345762,
     en: { title: "Interior & Exterior Wash" },
     ar: { title: "غسيل داخلي وخارجي" },
     durations: [60, 75],
@@ -31,7 +31,7 @@ export const SERVICES: Service[] = [
   },
   {
     slug: "wheel-cleaning",
-    eventTypeId: 0,
+    eventTypeId: 345763,
     en: { title: "Wheel Cleaning" },
     ar: { title: "تنظيف الجنوط" },
     durations: [30],
@@ -40,7 +40,7 @@ export const SERVICES: Service[] = [
   },
   {
     slug: "engine-cleaning",
-    eventTypeId: 0,
+    eventTypeId: 345764,
     en: { title: "Engine Cleaning" },
     ar: { title: "تنظيف المحرك" },
     durations: [30],
@@ -49,7 +49,7 @@ export const SERVICES: Service[] = [
   },
   {
     slug: "polishing-protection",
-    eventTypeId: 0,
+    eventTypeId: 345765,
     en: { title: "Polishing & Protection" },
     ar: { title: "تلميع وحماية الطلاء" },
     durations: [90],
@@ -58,7 +58,7 @@ export const SERVICES: Service[] = [
   },
   {
     slug: "steam-cleaning",
-    eventTypeId: 0,
+    eventTypeId: 345766,
     en: { title: "Steam Cleaning" },
     ar: { title: "تنظيف وتعقيم بالبخار" },
     durations: [60],
@@ -67,7 +67,7 @@ export const SERVICES: Service[] = [
   },
   {
     slug: "waterless-wash",
-    eventTypeId: 0,
+    eventTypeId: 345767,
     en: { title: "Waterless Wash" },
     ar: { title: "غسيل بدون مياه" },
     durations: [45],
@@ -83,7 +83,7 @@ export function getServiceBySlug(slug: string | undefined): Service | undefined 
 
 export const COMBINED_SESSION = {
   slug: "combined-session",
-  eventTypeId: 0,
+  eventTypeId: 345768,
 } as const;
 
 export const COMBINED_DURATION_OPTIONS: readonly number[] = [

@@ -29,7 +29,7 @@
      n = canonical names (EN/AR), d = minutes, e = EGP.
      =================================================================== */
   var SEED = {
-    "interior-exterior-wash": { n: { en: "Interior & Exterior Wash", ar: "غسيل داخلي وخارجي" }, d: 75, e: 370 },
+    "interior-exterior-wash": { n: { en: "Interior & Exterior Wash", ar: "غسيل داخلي وخارجي" }, d: 75, e: 370, et: 345762 },
     "wheel-cleaning": { n: { en: "Wheel Cleaning", ar: "تنظيف الجنوط" }, d: 30, e: 140 },
     "engine-cleaning": { n: { en: "Engine Cleaning", ar: "تنظيف المحرك" }, d: 30, e: 230 },
     "polishing-protection": { n: { en: "Polishing & Protection", ar: "تلميع وحماية الطلاء" }, d: 90, e: 700 },

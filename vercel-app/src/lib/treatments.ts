@@ -41,7 +41,7 @@ const SEED_TIMESTAMP = "2026-06-24T00:00:00.000Z";
 export const SEED: readonly Treatment[] = [
   {
     slug: "interior-exterior-wash",
-    eventTypeId: 0,
+    eventTypeId: 345762,
     name: { en: "Interior & Exterior Wash", ar: "غسيل داخلي وخارجي" },
     description: {
       en: "Complete interior vacuum, dashboard cleaning, and exterior foam wash with hot wax",
@@ -55,7 +55,7 @@ export const SEED: readonly Treatment[] = [
   },
   {
     slug: "wheel-cleaning",
-    eventTypeId: 0,
+    eventTypeId: 345763,
     name: { en: "Wheel Cleaning", ar: "تنظيف الجنوط" },
     description: {
       en: "Deep cleaning for alloy wheels, tires, and wheel arches",
@@ -69,7 +69,7 @@ export const SEED: readonly Treatment[] = [
   },
   {
     slug: "engine-cleaning",
-    eventTypeId: 0,
+    eventTypeId: 345764,
     name: { en: "Engine Cleaning", ar: "تنظيف المحرك" },
     description: {
       en: "Safe engine bay degreasing and dressing",
@@ -83,7 +83,7 @@ export const SEED: readonly Treatment[] = [
   },
   {
     slug: "polishing-protection",
-    eventTypeId: 0,
+    eventTypeId: 345765,
     name: { en: "Polishing & Protection", ar: "تلميع وحماية الطلاء" },
     description: {
       en: "Machine polishing with protective wax coating for long-lasting shine",
@@ -97,7 +97,7 @@ export const SEED: readonly Treatment[] = [
   },
   {
     slug: "steam-cleaning",
-    eventTypeId: 0,
+    eventTypeId: 345766,
     name: { en: "Steam Cleaning", ar: "تنظيف وتعقيم بالبخار" },
     description: {
       en: "Sanitizing steam clean for interior surfaces and upholstery",
@@ -111,7 +111,7 @@ export const SEED: readonly Treatment[] = [
   },
   {
     slug: "waterless-wash",
-    eventTypeId: 0,
+    eventTypeId: 345767,
     name: { en: "Waterless Wash", ar: "غسيل بدون مياه" },
     description: {
       en: "Eco-friendly waterless wash using premium spray products",
