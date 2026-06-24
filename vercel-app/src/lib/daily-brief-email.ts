@@ -3,9 +3,9 @@ import type { CalBooking } from "./admin/cal";
 import type { StoredOrder } from "./orders";
 
 /**
- * Victoria's 8am-Cairo daily brief, sent from /api/cron/daily-brief.
+ * The 8am-Cairo daily brief, sent from /api/cron/daily-brief.
  *
- * One branded email (English — Victoria's ops language, matching /admin):
+ * One branded email (English — the owner's ops language, matching /admin):
  * - "Today's appointments": confirmed bookings starting TODAY in Cairo,
  *   sorted by time — time · service · client · phone (+ notes/treatments).
  * - "Pending booking requests": ALL upcoming pending requests (not just
@@ -19,9 +19,9 @@ import type { StoredOrder } from "./orders";
  * day. Per-recipient Resend sends, same as the other owner emails.
  */
 
-const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
-const ADMIN_URL_BASE = "https://book.victoriaholisticbeauty.com/admin";
-const EMAIL_FROM = "Victoria Holistic Beauty <bookings@victoriaholisticbeauty.com>";
+const NOTIFY_EMAIL_DEFAULT = "info@eliteecocarwash.com";
+const ADMIN_URL_BASE = "https://book.eliteecocarwash.com/admin";
+const EMAIL_FROM = "Elite Eco Car Wash <bookings@eliteecocarwash.com>";
 const CAIRO_TZ = "Africa/Cairo";
 
 // --- Cairo time helpers ------------------------------------------------------

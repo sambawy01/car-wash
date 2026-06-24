@@ -1,23 +1,29 @@
 import type { Metadata } from "next";
-import { Manrope, Tenor_Sans } from "next/font/google";
+import { Manrope, Tenor_Sans, Cairo } from "next/font/google";
 import "./globals.css";
 
 const tenor = Tenor_Sans({
   weight: "400",
   variable: "--font-tenor",
-  subsets: ["latin", "cyrillic"],
+  subsets: ["latin"],
 });
 
 const manrope = Manrope({
   weight: ["400", "500", "600"],
   variable: "--font-manrope",
-  subsets: ["latin", "cyrillic"],
+  subsets: ["latin"],
+});
+
+const cairo = Cairo({
+  weight: ["400", "500", "600"],
+  variable: "--font-cairo",
+  subsets: ["arabic", "latin"],
 });
 
 export const metadata: Metadata = {
-  title: "Victoria Vasilyeva Holistic Beauty",
+  title: "Elite Eco Car Wash",
   description:
-    "Holistic beauty studio — booking and concierge. Egypt & Russia, 10+ years of experience.",
+    "Mobile car wash service in El Gouna, Egypt. We bring the car wash to you!",
 };
 
 export default function RootLayout({
@@ -28,7 +34,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${tenor.variable} ${manrope.variable} h-full antialiased`}
+      className={`${tenor.variable} ${manrope.variable} ${cairo.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">{children}</body>
     </html>

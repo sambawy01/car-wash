@@ -24,7 +24,7 @@ import ClientsSection from "./clients-section";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Admin — Victoria Vasilyeva Holistic Beauty",
+  title: "Admin — Elite Eco Car Wash",
   robots: { index: false, follow: false },
 };
 
@@ -129,10 +129,10 @@ export default async function AdminPage({
   return (
     <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-10 sm:px-6">
       <header className="mb-8">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#847866]">
-          Victoria Vasilyeva Holistic Beauty
+        <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#4A5568]">
+          Elite Eco Car Wash
         </p>
-        <h1 className="mt-2 font-serif text-4xl text-[#3A332C]">Studio admin</h1>
+        <h1 className="mt-2 font-serif text-4xl text-[#0A1A2F]">Car wash admin</h1>
         <p className="mt-2 text-sm text-[#847866]">
           Times shown in Cairo time (Africa/Cairo).
         </p>

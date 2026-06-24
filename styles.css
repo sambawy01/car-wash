@@ -1,24 +1,25 @@
-/* ===== Earthen Calm design system =====
-   Off-white / sand / warm-grey palette, harmonized with the booking app
-   (bg #FAF7F2 · text #3A332C · clay accent). All flat text/bg pairs ≥ 4.5:1. */
+/* ===== Elite Eco Car Wash design system =====
+   Blue / silver / green-eco palette. All flat text/bg pairs ≥ 4.5:1. */
 :root {
-  --bg: #FAF7F2;          /* off-white base */
-  --bg-2: #F3EDE3;        /* sand band — voice, chat header */
-  --bg-3: #EDE5D8;        /* deeper sand — reserve, footer */
-  --card: #FFFDF9;        /* warm off-white card surfaces */
-  --ink: #3A332C;         /* primary text — deep warm grey-brown */
-  --ink-soft: #675D50;    /* secondary text */
-  --clay: #A9745A;        /* decorative accent — borders, washes */
-  --clay-deep: #8A5238;   /* accent text: labels, prices, links, CTA fill */
-  --clay-pale: #E9CDAF;   /* large accent over photo scrims only */
-  --photo-ink: #F4EFE7;   /* text over photo scrims */
-  --line: rgba(58, 51, 44, 0.16);
-  --scrim: 33, 27, 22;    /* warm near-black for photo washes */
+  --bg: #F8FAFC;          /* light blue-white base */
+  --bg-2: #E8ECEF;         /* light silver band — voice, chat header */
+  --bg-3: #D1D9E0;         /* deeper silver — reserve, footer */
+  --card: #FFFFFF;         /* clean white card surfaces */
+  --ink: #0A1A2F;          /* primary text — deep navy */
+  --ink-soft: #4A5568;     /* secondary text — slate grey */
+  --accent-blue: #0D3B66;  /* decorative accent — borders, washes */
+  --accent-deep: #1A5F9E;  /* accent text: labels, prices, links, CTA fill */
+  --accent-pale: #B8D4E8;  /* large accent over photo scrims only */
+  --accent-eco: #2ECC71;   /* eco green accent */
+  --accent-eco-deep: #27AE60; /* eco green hover */
+  --photo-ink: #E8ECEF;    /* text over dark photo scrims */
+  --line: rgba(10, 26, 47, 0.16);
+  --scrim: 10, 26, 47;     /* deep navy near-black for photo washes */
   --serif: Georgia, serif; /* legacy fallback — unused */
   --sans: "Manrope", "Jost", system-ui, sans-serif;
   --display: "Tenor Sans", "Manrope", system-ui, sans-serif; /* fashion display — ALL CAPS, tracked */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
-  --logo-ink: invert(0.82) sepia(0.5) saturate(2) brightness(0.85); /* white logo → deep warm brown */
+  --logo-ink: invert(1) brightness(1.6) saturate(0.4); /* white logo over light/blue backgrounds */
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -34,13 +35,13 @@ body {
 }
 img { display: block; max-width: 100%; }
 a { color: inherit; text-decoration: none; }
-::selection { background: var(--clay-deep); color: var(--bg); }
+::selection { background: #0D3B66; color: var(--bg); }
 
 .wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 /* Amendment 1: label as h2 must not inherit serif/16em-max-width from h2 rule */
 .label {
   font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase;
-  color: var(--clay-deep); margin-bottom: 18px;
+  color: var(--accent-deep); margin-bottom: 18px;
   font-family: var(--sans); font-weight: 600; max-width: none;
 }
 /* Display headings — fashion-editorial: Tenor Sans, ALL CAPS, generous tracking.
@@ -104,7 +105,7 @@ h2 {
 .nav-links a { white-space: nowrap; }
 .nav-links a { opacity: 0.85; transition: opacity 0.3s; }
 .nav-links a:hover { opacity: 1; }
-.nav-cta { border: 1px solid var(--clay); border-radius: 999px; padding: 8px 18px; color: var(--clay-deep); opacity: 1 !important; }
+.nav-cta { border: 1px solid var(--accent-blue); border-radius: 999px; padding: 8px 18px; color: var(--accent-deep); opacity: 1 !important; }
 .nav-cta:hover { background: rgba(169, 116, 90, 0.1); }
 @media (max-width: 480px) {
   .nav { padding: 9px 14px; }
@@ -147,7 +148,7 @@ h2 {
 .hero-line { margin-top: 26px; font-family: var(--display); font-weight: 400; font-size: clamp(12px, 1.4vw, 15px); letter-spacing: 0.32em; text-indent: 0.32em; text-transform: uppercase; color: var(--photo-ink); text-shadow: 0 1px 12px rgba(26, 21, 17, 0.6); }
 .cta {
   display: inline-block; margin-top: 38px; padding: 16px 38px;
-  border: 1px solid var(--clay); border-radius: 999px;
+  border: 1px solid var(--accent-blue); border-radius: 999px;
   font-size: 13px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase;
   color: var(--ink); position: relative; overflow: hidden;
   transition: border-color 0.4s, color 0.4s, background-color 0.4s;
@@ -160,9 +161,9 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   transform: skewX(-18deg); transition: transform 0.7s var(--ease);
 }
 .cta:hover::after { transform: skewX(-18deg) translateX(330%); }
-.cta:hover { border-color: var(--clay-deep); }
-.hero .cta:hover { border-color: var(--clay-pale); }
-.cta-solid { background: var(--clay-deep); border-color: var(--clay-deep); color: var(--bg); }
+.cta:hover { border-color: var(--accent-deep); }
+.hero .cta:hover { border-color: var(--accent-pale); }
+.cta-solid { background: #0D3B66; border-color: var(--accent-deep); color: var(--bg); }
 .cta-solid:hover { background: #6F4029; border-color: #6F4029; }
 .scroll-cue { position: absolute; bottom: 34px; left: 50%; transform: translateX(-50%); z-index: 2; }
 .scroll-cue span {
@@ -201,7 +202,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 .cred-year {
   display: block;
   font-size: 11px; font-weight: 600; letter-spacing: 0.22em;
-  color: var(--clay-deep);
+  color: var(--accent-deep);
 }
 .cred-title {
   display: block; margin-top: 7px;
@@ -229,7 +230,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 .about-flourish span {
   display: block;
   font-family: var(--display); text-transform: uppercase; letter-spacing: 0.16em;
-  font-size: 19px; line-height: 1.5; color: var(--clay-deep);
+  font-size: 19px; line-height: 1.5; color: var(--accent-deep);
 }
 
 /* ===== Treatments — rows link through to booking ===== */
@@ -251,19 +252,19 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 .t-link { color: inherit; transition: color 0.3s; }
 .t-link::after { content: ""; position: absolute; inset: 0; }
 .t-link:focus-visible { outline: none; }
-.t-row:has(.t-link:focus-visible) { outline: 2px solid var(--clay-deep); outline-offset: 2px; }
+.t-row:has(.t-link:focus-visible) { outline: 2px solid var(--accent-deep); outline-offset: 2px; }
 /* Amendment 4: targets .t-name .t-sub (HTML uses <span class="t-sub">) */
 .t-name .t-sub { font-family: var(--sans); font-weight: 400; font-size: 13px; color: var(--ink-soft); margin-left: 10px; letter-spacing: 0.04em; text-transform: none; }
-.t-price { flex: none; margin-left: auto; color: var(--clay-deep); font-size: 15px; letter-spacing: 0.05em; }
+.t-price { flex: none; margin-left: auto; color: var(--accent-deep); font-size: 15px; letter-spacing: 0.05em; }
 .t-price small { color: var(--ink-soft); font-size: 12px; }
 /* Always-visible clickability cue (no hover needed on touch) */
 .t-arrow {
-  flex: none; align-self: center; color: var(--clay-deep); font-size: 17px; line-height: 1;
+  flex: none; align-self: center; color: var(--accent-deep); font-size: 17px; line-height: 1;
   transition: transform 0.3s var(--ease);
 }
 @media (hover: hover) {
   .t-row:hover { background: var(--card); }
-  .t-row:hover .t-link { color: var(--clay-deep); text-decoration: underline; text-decoration-color: var(--clay); text-underline-offset: 6px; text-decoration-thickness: 1px; }
+  .t-row:hover .t-link { color: var(--accent-deep); text-decoration: underline; text-decoration-color: var(--accent-blue); text-underline-offset: 6px; text-decoration-thickness: 1px; }
   .t-row:hover .t-arrow { transform: translateX(6px); }
 }
 @media (max-width: 560px) {
@@ -292,7 +293,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   color: var(--photo-ink); max-width: 16em;
   text-shadow: 0 1px 14px rgba(26, 21, 17, 0.45);
 }
-.setting-head em { font-style: normal; color: var(--clay-pale); }
+.setting-head em { font-style: normal; color: var(--accent-pale); }
 /* Supporting line — the proof in one breath */
 .setting-line {
   margin-top: 22px;
@@ -325,7 +326,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   display: block;
   font-family: var(--display);
   font-size: clamp(48px, 6.5vw, 84px); line-height: 1;
-  color: var(--clay-pale);
+  color: var(--accent-pale);
   text-shadow: 0 1px 14px rgba(26, 21, 17, 0.4);
 }
 .stat-cap {
@@ -344,7 +345,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   transition: color 0.4s, border-color 0.4s;
 }
 .setting-cta-arrow { transition: transform 0.4s var(--ease); }
-.setting-cta:hover { color: var(--clay-pale); border-color: #E8CB8F; }
+.setting-cta:hover { color: var(--accent-pale); border-color: #E8CB8F; }
 .setting-cta:hover .setting-cta-arrow { transform: translateX(5px); }
 @media (max-width: 640px) {
   .setting-content { padding-top: 14vh; padding-bottom: 12vh; }
@@ -362,17 +363,17 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 /* ===== Voice ===== */
 /* Amendment 3: HTML uses figure/figcaption — selectors kept as-is */
 .voice blockquote p { font-family: var(--display); text-transform: uppercase; letter-spacing: 0.1em; font-size: clamp(17px, 2.3vw, 27px); line-height: 1.6; max-width: 30em; color: var(--ink); }
-.voice figcaption { display: block; margin-top: 28px; font-style: normal; font-size: 13px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--clay-deep); }
+.voice figcaption { display: block; margin-top: 28px; font-style: normal; font-size: 13px; font-weight: 500; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent-deep); }
 
 /* ===== Reserve — deep sand band, light ===== */
 .reserve { background: var(--bg-3); padding: clamp(100px, 16vh, 180px) 0 0; text-align: center; }
 .reserve-logo { width: min(340px, 70vw); margin: 0 auto; }
 /* Amendment 2: h2.reserve-line must not be constrained by h2's max-width: 16em */
-.reserve-line { margin-top: 30px; font-family: var(--display); font-size: clamp(14px, 1.8vw, 19px); line-height: 1.6; letter-spacing: 0.2em; text-indent: 0.2em; text-transform: uppercase; color: var(--clay-deep); max-width: none; margin-left: auto; margin-right: auto; }
+.reserve-line { margin-top: 30px; font-family: var(--display); font-size: clamp(14px, 1.8vw, 19px); line-height: 1.6; letter-spacing: 0.2em; text-indent: 0.2em; text-transform: uppercase; color: var(--accent-deep); max-width: none; margin-left: auto; margin-right: auto; }
 .reserve-meta { margin-top: 34px; font-style: normal; font-size: 14px; color: var(--ink-soft); }
 .reserve-meta a { text-decoration: underline; text-underline-offset: 3px; }
-.reserve-meta a:hover { color: var(--clay-deep); }
-:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
+.reserve-meta a:hover { color: var(--accent-deep); }
+:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 3px; }
 .footer {
   margin-top: clamp(70px, 10vh, 120px); padding: 22px 28px;
   display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
@@ -410,7 +411,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   transform: translateY(-2px);
   box-shadow: 0 14px 36px rgba(58, 51, 44, 0.4), inset 0 1px 0 rgba(255, 253, 249, 0.28);
 }
-.chat-launcher:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
+.chat-launcher:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 3px; }
 .chat-launcher svg { display: block; }
 
 .chat-launcher .v-flare { transform-origin: 48px 11.5px; animation: v-twinkle 3.4s ease-in-out infinite; }
@@ -425,7 +426,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
 /* Breathing pulse ring — draws the eye until the chat is opened once */
 .chat-launcher::before {
   content: ""; position: absolute; inset: -2px; border-radius: 50%;
-  border: 2px solid var(--clay); pointer-events: none;
+  border: 2px solid var(--accent-blue); pointer-events: none;
   animation: chat-pulse 3.2s var(--ease) infinite;
 }
 @keyframes chat-pulse {
@@ -493,11 +494,11 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   padding: 14px 38px 14px 18px; border-radius: 14px;
   color: inherit;
 }
-.chat-teaser-body:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 2px; }
+.chat-teaser-body:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 2px; }
 .chat-teaser-name {
   display: block; font-family: var(--display); font-weight: 400;
   font-size: 13px; line-height: 1.5; letter-spacing: 0.16em;
-  text-transform: uppercase; color: var(--clay-deep);
+  text-transform: uppercase; color: var(--accent-deep);
   margin-bottom: 6px;
 }
 .chat-teaser-line {
@@ -511,7 +512,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   border-radius: 6px; transition: color 0.3s;
 }
 .chat-teaser-close:hover { color: var(--ink); }
-.chat-teaser-close:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 1px; }
+.chat-teaser-close:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 1px; }
 
 .chat-card {
   position: fixed; right: 24px; bottom: 102px; z-index: 80;
@@ -531,7 +532,7 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   padding: 14px 18px; border-bottom: 1px solid var(--line);
   background: var(--bg-2);
 }
-.chat-title { font-family: var(--display); font-weight: 400; font-size: 13.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--clay-deep); }
+.chat-title { font-family: var(--display); font-weight: 400; font-size: 13.5px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent-deep); }
 .chat-close {
   background: none; border: none; cursor: pointer; padding: 6px;
   color: var(--ink-soft); display: grid; place-items: center;
@@ -557,12 +558,12 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   background: rgba(169, 116, 90, 0.13); color: var(--ink);
   border: 1px solid rgba(169, 116, 90, 0.35);
 }
-.chat-link { color: var(--clay-deep); text-decoration: underline; text-underline-offset: 3px; }
+.chat-link { color: var(--accent-deep); text-decoration: underline; text-underline-offset: 3px; }
 .chat-link:hover { color: #6F4029; }
 
 .chat-typing { display: flex; gap: 5px; align-items: center; padding: 14px; }
 .chat-typing span {
-  width: 6px; height: 6px; border-radius: 50%; background: var(--clay-deep);
+  width: 6px; height: 6px; border-radius: 50%; background: #0D3B66;
   opacity: 0.4; animation: chat-dot 1.2s infinite;
 }
 .chat-typing span:nth-child(2) { animation-delay: 0.2s; }
@@ -580,10 +581,10 @@ button.cta { background: none; font-family: inherit; line-height: inherit; curso
   font-family: var(--sans); font-size: 14px; font-weight: 400;
 }
 .chat-input input::placeholder { color: var(--ink-soft); }
-.chat-input input:focus { outline: none; border-color: var(--clay-deep); }
+.chat-input input:focus { outline: none; border-color: var(--accent-deep); }
 .chat-send {
   flex: none; width: 40px; height: 40px; border-radius: 50%;
-  border: none; background: var(--clay-deep); color: var(--bg);
+  border: none; background: #0D3B66; color: var(--bg);
   cursor: pointer; display: grid; place-items: center; transition: background 0.3s;
 }
 .chat-send:hover { background: #6F4029; }
@@ -655,17 +656,17 @@ html.tmodal-open { overflow: hidden; }
   margin-top: 10px;
   font-size: 12px; font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--clay-deep);
+  color: var(--accent-deep);
 }
 .tmodal-body { margin-top: 18px; font-size: 15px; line-height: 1.8; color: var(--ink-soft); }
-.tmodal-detail { margin-top: 16px; font-size: 14px; letter-spacing: 0.04em; color: var(--clay-deep); }
+.tmodal-detail { margin-top: 16px; font-size: 14px; letter-spacing: 0.04em; color: var(--accent-deep); }
 .tmodal-actions {
   margin-top: 28px;
   display: flex; flex-direction: column; align-items: flex-start; gap: 16px;
 }
 .tmodal-book {
   display: inline-block; padding: 15px 34px; border-radius: 999px;
-  background: var(--clay-deep); color: var(--bg);
+  background: #0D3B66; color: var(--bg);
   font-size: 13px; font-weight: 500; letter-spacing: 0.22em; text-transform: uppercase;
   transition: background-color 0.3s;
 }
@@ -676,7 +677,7 @@ html.tmodal-open { overflow: hidden; }
   transition: color 0.3s;
   background: none; border: 0; padding: 0; font-family: inherit; cursor: pointer;
 }
-.tmodal-wa:hover { color: var(--clay-deep); }
+.tmodal-wa:hover { color: var(--accent-deep); }
 @media (max-width: 560px) {
   /* Bottom sheet on small screens */
   .tmodal-overlay { padding: 0; align-items: end; grid-template-columns: 1fr; place-items: end stretch; }
@@ -723,7 +724,7 @@ html.tmodal-open { overflow: hidden; }
   transition: transform 0.45s var(--ease), box-shadow 0.45s var(--ease);
 }
 .post-card:hover { transform: translateY(-5px); box-shadow: 0 16px 40px rgba(58, 51, 44, 0.14); }
-.post-card:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
+.post-card:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 3px; }
 
 /* --- Card/banner photography: fixed-ratio frame, cover crop. Per-image
    focal points are tuned inline via object-position on the img. --- */
@@ -750,7 +751,7 @@ html.tmodal-open { overflow: hidden; }
 .post-body { display: flex; flex-direction: column; flex: 1; padding: 22px 22px 24px; }
 .post-meta {
   font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--clay-deep);
+  text-transform: uppercase; color: var(--accent-deep);
 }
 .post-title {
   margin-top: 12px;
@@ -762,7 +763,7 @@ html.tmodal-open { overflow: hidden; }
 .post-read {
   margin-top: 20px;
   font-size: 11.5px; font-weight: 600; letter-spacing: 0.18em;
-  text-transform: uppercase; color: var(--clay-deep);
+  text-transform: uppercase; color: var(--accent-deep);
 }
 .post-card:hover .post-read { text-decoration: underline; text-underline-offset: 4px; }
 
@@ -771,7 +772,7 @@ html.tmodal-open { overflow: hidden; }
 .article-back {
   display: inline-block; margin-bottom: 28px;
   font-size: 11.5px; font-weight: 600; letter-spacing: 0.18em;
-  text-transform: uppercase; color: var(--clay-deep);
+  text-transform: uppercase; color: var(--accent-deep);
 }
 .article-back:hover { text-decoration: underline; text-underline-offset: 4px; }
 .article-art { aspect-ratio: 21 / 9; border-radius: 12px; }
@@ -838,10 +839,10 @@ html.tmodal-open { overflow: hidden; }
 .shop-trust {
   margin-top: 20px; display: flex; flex-wrap: wrap; align-items: baseline;
   font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--clay-deep);
+  color: var(--accent-deep);
 }
 .shop-trust span { white-space: nowrap; padding: 2px 0; }
-.shop-trust span + span::before { content: "·"; margin: 0 12px; color: var(--clay); font-weight: 400; }
+.shop-trust span + span::before { content: "·"; margin: 0 12px; color: var(--accent-blue); font-weight: 400; }
 
 .shop-grid {
   display: grid; grid-template-columns: repeat(4, 1fr);
@@ -896,7 +897,7 @@ html.tmodal-open { overflow: hidden; }
   position: relative;
   font-family: var(--display);
   font-size: clamp(72px, 8.5vw, 110px); line-height: 1;
-  color: var(--clay-deep); opacity: 0.32; /* decorative, aria-hidden */
+  color: var(--accent-deep); opacity: 0.32; /* decorative, aria-hidden */
   user-select: none; -webkit-user-select: none;
 }
 .shop-art img {
@@ -926,7 +927,7 @@ html.tmodal-open { overflow: hidden; }
 .shop-price {
   margin-top: 14px; flex: 1;
   display: flex; align-items: baseline; gap: 8px;
-  font-size: 17.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--clay-deep);
+  font-size: 17.5px; font-weight: 600; letter-spacing: 0.02em; color: var(--accent-deep);
 }
 .shop-price small { font-size: 12.5px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-soft); }
 
@@ -936,7 +937,7 @@ html.tmodal-open { overflow: hidden; }
   position: relative; isolation: isolate;
   width: 100%; min-height: 46px; padding: 12px 16px; border-radius: 999px; cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
-  border: none; background: var(--card); color: var(--clay-deep);
+  border: none; background: var(--card); color: var(--accent-deep);
   font-family: var(--sans); font-size: 11.5px; font-weight: 600;
   letter-spacing: 0.16em; text-transform: uppercase; white-space: nowrap;
   transition: background-color 0.3s, color 0.3s, transform 0.2s var(--ease);
@@ -961,20 +962,20 @@ html.tmodal-open { overflow: hidden; }
 }
 .shop-add:hover { background: #FFFAF0; color: #6F4029; }
 .shop-add:active { transform: scale(0.98); }
-.shop-add:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 4px; }
+.shop-add:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 4px; }
 .shop-stepper {
   display: flex; align-items: center; justify-content: space-between; width: 100%;
-  border: 1px solid var(--clay-deep); border-radius: 999px; overflow: hidden;
+  border: 1px solid var(--accent-deep); border-radius: 999px; overflow: hidden;
   background: var(--card); min-height: 46px;
 }
 .shop-step {
   width: 52px; min-height: 44px; align-self: stretch; border: none; background: none; cursor: pointer;
-  font-family: var(--sans); font-size: 20px; line-height: 1; color: var(--clay-deep);
+  font-family: var(--sans); font-size: 20px; line-height: 1; color: var(--accent-deep);
   display: grid; place-items: center;
   transition: background-color 0.3s;
 }
 .shop-step:hover { background: rgba(169, 116, 90, 0.14); }
-.shop-step:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: -3px; border-radius: 999px; }
+.shop-step:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: -3px; border-radius: 999px; }
 .shop-qty { min-width: 32px; text-align: center; font-size: 16px; font-weight: 600; color: var(--ink); }
 
 /* CSS-only entrance, mirrors the journal cards */
@@ -998,14 +999,14 @@ html.tmodal-open { overflow: hidden; }
   display: inline-flex; align-items: center; gap: 16px;
   max-width: min(560px, calc(100vw - 200px));
   padding: 16px 28px; border: none; border-radius: 999px; cursor: pointer;
-  background: var(--clay-deep); color: var(--bg);
+  background: #0D3B66; color: var(--bg);
   font-family: var(--sans); font-size: 13.5px; font-weight: 600; letter-spacing: 0.06em;
   box-shadow: 0 14px 36px rgba(33, 27, 22, 0.35), inset 0 1px 0 rgba(255, 253, 249, 0.22);
   transition: background-color 0.3s, box-shadow 0.3s;
   animation: cart-in 0.4s var(--ease);
 }
 .cart-bar:hover { background: #6F4029; box-shadow: 0 18px 42px rgba(33, 27, 22, 0.42), inset 0 1px 0 rgba(255, 253, 249, 0.22); }
-.cart-bar:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
+.cart-bar:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 3px; }
 .cart-bar[hidden] { display: none; }
 .cart-bar-sum { white-space: nowrap; }
 .cart-bar-cta {
@@ -1083,13 +1084,13 @@ html.pmodal-open .chat-card { display: none; }
   margin-top: 10px;
   font-size: 12px; font-weight: 600;
   letter-spacing: 0.18em; text-transform: uppercase;
-  color: var(--clay-deep);
+  color: var(--accent-deep);
 }
 .pmodal-desc { margin-top: 16px; font-size: 15px; line-height: 1.8; color: var(--ink-soft); }
 .pmodal-price {
   margin-top: 18px;
   display: flex; align-items: baseline; gap: 8px;
-  font-size: 20px; font-weight: 600; letter-spacing: 0.02em; color: var(--clay-deep);
+  font-size: 20px; font-weight: 600; letter-spacing: 0.02em; color: var(--accent-deep);
 }
 .pmodal-price small { font-size: 13px; font-weight: 500; letter-spacing: 0.04em; color: var(--ink-soft); }
 .pmodal-action { margin-top: 24px; display: flex; }
@@ -1154,20 +1155,20 @@ html.order-open .chat-card { display: none; }
 }
 .order-item-name { color: var(--ink); }
 .order-item-qty { color: var(--ink-soft); font-size: 13px; }
-.order-item-price { margin-left: auto; white-space: nowrap; color: var(--clay-deep); }
+.order-item-price { margin-left: auto; white-space: nowrap; color: var(--accent-deep); }
 .order-total {
   display: flex; justify-content: space-between; align-items: baseline; gap: 14px;
   padding-top: 14px; font-size: 15.5px; font-weight: 600;
 }
-.order-total-sum { color: var(--clay-deep); white-space: nowrap; }
+.order-total-sum { color: var(--accent-deep); white-space: nowrap; }
 .order-total-sum small { font-weight: 500; font-size: 12.5px; color: var(--ink-soft); }
 
 /* COD notice — bordered clay panel, same language as the booking policy panel */
 .cod-note {
   margin-top: 20px; padding: 14px 16px;
-  border: 1px solid var(--clay); border-radius: 10px;
+  border: 1px solid var(--accent-blue); border-radius: 10px;
   background: rgba(169, 116, 90, 0.08);
-  color: var(--clay-deep); font-size: 13.5px; line-height: 1.65;
+  color: var(--accent-deep); font-size: 13.5px; line-height: 1.65;
 }
 
 .order-form { margin-top: 10px; }
@@ -1175,7 +1176,7 @@ html.order-open .chat-card { display: none; }
 .order-field label {
   display: block; margin-bottom: 7px;
   font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase;
-  color: var(--clay-deep);
+  color: var(--accent-deep);
 }
 .order-field input, .order-field textarea {
   width: 100%; padding: 12px 14px;
@@ -1185,7 +1186,7 @@ html.order-open .chat-card { display: none; }
 }
 .order-field textarea { resize: vertical; min-height: 72px; }
 .order-field input::placeholder, .order-field textarea::placeholder { color: var(--ink-soft); opacity: 1; }
-.order-field input:focus, .order-field textarea:focus { outline: none; border-color: var(--clay-deep); }
+.order-field input:focus, .order-field textarea:focus { outline: none; border-color: var(--accent-deep); }
 .field-error { display: none; margin-top: 6px; font-size: 12.5px; color: #9C2F1D; }
 .order-field.invalid input, .order-field.invalid textarea { border-color: #9C2F1D; }
 .order-field.invalid .field-error { display: block; }
@@ -1193,13 +1194,13 @@ html.order-open .chat-card { display: none; }
 .order-submit {
   display: block; width: 100%; margin-top: 24px; min-height: 50px;
   padding: 15px 34px; border: none; border-radius: 999px; cursor: pointer;
-  background: var(--clay-deep); color: var(--bg);
+  background: #0D3B66; color: var(--bg);
   font-family: var(--sans); font-size: 13px; font-weight: 600;
   letter-spacing: 0.2em; text-transform: uppercase;
   transition: background-color 0.3s, opacity 0.3s;
 }
 .order-submit:hover { background: #6F4029; }
-.order-submit:focus-visible { outline: 2px solid var(--clay-deep); outline-offset: 3px; }
+.order-submit:focus-visible { outline: 2px solid var(--accent-deep); outline-offset: 3px; }
 .order-submit:disabled { opacity: 0.6; cursor: default; }
 
 /* Failure bubble — graceful mailto fallback when the order API is unreachable */
@@ -1216,7 +1217,7 @@ html.order-open .chat-card { display: none; }
 .order-success-mark {
   width: 56px; height: 56px; margin: 0 auto 20px; border-radius: 50%;
   display: grid; place-items: center;
-  background: rgba(169, 116, 90, 0.13); color: var(--clay-deep);
+  background: rgba(169, 116, 90, 0.13); color: var(--accent-deep);
   font-size: 24px;
 }
 .order-success-title {
@@ -1301,7 +1302,7 @@ html.has-navjs .nav-right a { white-space: nowrap; }
   }
   html.has-navjs .nav-toggle-line {
     display: block; height: 2px; border-radius: 2px;
-    background: linear-gradient(90deg, var(--clay), var(--clay-deep));
+    background: linear-gradient(90deg, var(--accent-blue), var(--accent-deep));
     transition: transform 0.35s var(--ease), width 0.35s var(--ease),
                 background-color 0.3s, box-shadow 0.3s;
   }
@@ -1350,12 +1351,12 @@ html.has-navjs .nav-right a { white-space: nowrap; }
   }
   html.has-navjs .nav-links a + a { border-top: 1px solid rgba(58, 51, 44, 0.07); }
   html.has-navjs .nav-links a:focus-visible {
-    outline: 2px solid var(--clay-deep); outline-offset: -2px;
+    outline: 2px solid var(--accent-deep); outline-offset: -2px;
   }
   /* Language switcher: quiet letterspaced Manrope, clay accent */
   html.has-navjs .nav-links a[hreflang] {
     font-family: var(--sans); font-weight: 600; font-size: 12px;
-    letter-spacing: 0.24em; text-transform: uppercase; color: var(--clay-deep);
+    letter-spacing: 0.24em; text-transform: uppercase; color: var(--accent-deep);
     padding-top: 17px; padding-bottom: 17px;
   }
   /* Staggered entrance */
@@ -1375,3 +1376,19 @@ html.has-navjs .nav-right a { white-space: nowrap; }
     transition: none !important; transition-delay: 0s !important;
   }
 }
+
+
+/* ===== RTL support for Arabic pages ===== */
+[dir="rtl"] { direction: rtl; text-align: right; }
+[dir="rtl"] .nav-links { direction: rtl; }
+[dir="rtl"] .nav { flex-direction: row-reverse; }
+[dir="rtl"] .t-row { flex-direction: row-reverse; }
+[dir="rtl"] .t-arrow { transform: scaleX(-1); }
+[dir="rtl"] .setting-content { text-align: right; }
+[dir="rtl"] .wrap { padding: 0 24px; }
+[dir="rtl"] .shop-card { text-align: right; }
+[dir="rtl"] .chat-card { right: auto; left: 20px; }
+[dir="rtl"] .chat-teaser { right: auto; left: 20px; }
+[dir="rtl"] .chat-launcher { right: auto; left: 20px; }
+[dir="rtl"] .reserve-meta { text-align: right; }
+[dir="rtl"] .footer { direction: rtl; }

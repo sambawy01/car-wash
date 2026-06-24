@@ -29,12 +29,11 @@ export interface ProductCopy {
 export interface Product {
   slug: string;
   en: ProductCopy;
-  ru: ProductCopy;
+  ar: ProductCopy;
   priceEgp: number;
-  priceRub: number;
   /** Absolute URL (blob upload) or site-relative path ("assets/img/…"). */
   photo: string;
-  alt: { en: string; ru: string };
+  alt: { en: string; ar: string };
   /** null = stock not tracked; 0 = auto sold-out. */
   quantity: number | null;
   /** Manual sold-out flag, independent of quantity. */
@@ -46,7 +45,7 @@ export interface Product {
    * Surfaced to the AI concierge and the public API so clients can be told
    * how to use what they bought — "according to the manufacturer".
    */
-  usage?: { en: string; ru: string };
+  usage?: { en: string; ar: string };
   createdAt: string;
   updatedAt: string;
 }
@@ -54,23 +53,22 @@ export interface Product {
 /** Shape served by the public GET /api/products — no internal fields. */
 export interface PublicProduct {
   slug: string;
-  name: { en: string; ru: string };
-  sub: { en: string; ru: string };
-  desc: { en: string; ru: string };
+  name: { en: string; ar: string };
+  sub: { en: string; ar: string };
+  desc: { en: string; ar: string };
   priceEgp: number;
-  priceRub: number;
   photo: string;
-  alt: { en: string; ru: string };
+  alt: { en: string; ar: string };
   soldOut: boolean;
-  /** Manufacturer usage directions, when Victoria has provided them. */
-  usage?: { en: string; ru: string };
+  /** Manufacturer usage directions, when provided. */
+  usage?: { en: string; ar: string };
 }
 
 export const CATALOG_PATHNAME = "catalog/products.json";
 
 // --- Seed --------------------------------------------------------------------
 
-const SEED_TIMESTAMP = "2026-06-11T00:00:00.000Z";
+const SEED_TIMESTAMP = "2026-06-24T00:00:00.000Z";
 const SEED_QUANTITY = 20;
 
 /**
@@ -80,123 +78,121 @@ const SEED_QUANTITY = 20;
  */
 const SEED_COPY: Record<
   string,
-  { sub: { en: string; ru: string }; desc: { en: string; ru: string }; photo: string; alt: { en: string; ru: string } }
+  { sub: { en: string; ar: string }; desc: { en: string; ar: string }; photo: string; alt: { en: string; ar: string } }
 > = {
-  "tohar-hamidbar-concentrate": {
-    sub: { en: "DM line · 150 ml", ru: "линия DM · 150 мл" },
+  "premium-car-shampoo": {
+    sub: { en: "1L bottle", ar: "عبوة 1 لتر" },
     desc: {
-      en: "Highly concentrated herbal formula for oily, porous and blemish-prone skin. Plant extracts and acids cleanse and tighten pores, mattify, and calm the skin with a strong antioxidant effect.",
-      ru: "Высококонцентрированное растительное средство для жирной, пористой и проблемной кожи. Экстракты растений и кислоты очищают и сужают поры, матируют и успокаивают кожу, обладая мощным антиоксидантным действием.",
+      en: "Premium pH-balanced car shampoo that lifts dirt and grime without stripping wax or sealant. High-foam formula for a streak-free finish, safe on all paint types.",
+      ar: "شامبو سيارات فاخر متوازن الحموضة يزيل الأوساخ دون إزالة طبقة الواكس أو السيلانت. تركيبة رغوية عالية للمعان بدون بقع، آمنة على جميع أنواع الطلاء.",
     },
-    photo: "assets/img/shop/tohar-hamidbar-concentrate.jpg",
+    photo: "assets/img/shop/premium-car-shampoo.jpg",
     alt: {
-      en: "Onmacabim DM Tohar Hamidbar No.2 — white pump bottle with a green leaf motif",
-      ru: "Onmacabim DM Tohar Hamidbar №2 — белый флакон с помпой и зелёным листом",
+      en: "Premium Car Shampoo — 1L bottle with a blue label",
+      ar: "شامبو سيارات فاخر — عبوة 1 لتر بملصق أزرق",
     },
   },
-  "nd-neck-decollete-cream": {
-    sub: { en: "Vivant line · 50 ml", ru: "линия Vivant · 50 мл" },
+  "ceramic-wax-spray": {
+    sub: { en: "500ml spray bottle", ar: "عبوة رش 500 مل" },
     desc: {
-      en: "A complex care cream for the delicate neck and décolleté zone combining natural and biotechnological components. Enzymes and lipopeptides support cell renewal and collagen synthesis for a natural firming effect.",
-      ru: "Комплексный крем для деликатной зоны шеи и декольте, сочетающий природные и биотехнологичные компоненты. Энзимы и липопептиды поддерживают обновление клеток и синтез коллагена, создавая естественный эффект лифтинга.",
+      en: "Ceramic-infused spray wax for instant gloss and hydrophobic protection. Spray on, wipe off — adds months of water-beading shine in minutes.",
+      ar: "واكس سيراميك سبراي لمعان فوري وحماية طاردة للماء. يُرش ويُمسح — يضيف أشهر من لمعان مقاوم للماء في دقائق.",
     },
-    photo: "assets/img/shop/nd-neck-decollete-cream.jpg",
+    photo: "assets/img/shop/ceramic-wax-spray.jpg",
     alt: {
-      en: "Onmacabim Vivant N.D Cream — white jar beside its olive-green box",
-      ru: "Onmacabim Vivant N.D Cream — белая банка рядом с оливковой коробкой",
+      en: "Ceramic Wax Spray — 500ml black spray bottle",
+      ar: "سيراميك وكس سبراي — عبوة رش سوداء 500 مل",
     },
   },
-  "vitamin-c-mask": {
-    sub: { en: "VC line · 50 ml", ru: "линия VC · 50 мл" },
+  "microfiber-cloth-set": {
+    sub: { en: "3 pack", ar: "عبوة 3 قطع" },
     desc: {
-      en: "Rich, antioxidant-packed nourishing mask with a brightening effect. Helps reduce hyperpigmentation and supports collagen production — well suited to dehydrated skin with signs of photoaging.",
-      ru: "Насыщенная питательная маска с антиоксидантами и осветляющим эффектом. Помогает уменьшить гиперпигментацию и поддерживает выработку коллагена — подходит обезвоженной коже с признаками фотостарения.",
+      en: "Ultra-soft microfiber detailing cloths — set of 3. Scratch-free, lint-free, highly absorbent. Perfect for drying, buffing, and applying products.",
+      ar: "أقمشة مايكروفايبر ناعمة جداً لتنظيف السيارات — طقم 3 قطع. خالية من الخدوش والوبر، عالية الامتصاص. مثالية للتجفيف والتلميع وتطبيق المنتجات.",
     },
-    photo: "assets/img/shop/vitamin-c-mask.jpg",
+    photo: "assets/img/shop/microfiber-cloth-set.jpg",
     alt: {
-      en: "Onmacabim Nourishing Skin Mask Vitamin C — white tube beside its box",
-      ru: "Onmacabim питательная маска с витамином C — белая туба рядом с коробкой",
+      en: "Microfiber Cloth Set — three folded cloths in blue, grey and green",
+      ar: "طقم أقمشة مايكروفايبر — ثلاث أقمشة مطوية باللون الأزرق والرمادي والأخضر",
     },
   },
-  "vitality-spf15-moisturizer": {
-    sub: { en: "Oxygen line · 50 ml", ru: "линия Oxygen · 50 мл" },
+  "tire-shine-gel": {
+    sub: { en: "500ml bottle", ar: "عبوة 500 مل" },
     desc: {
-      en: "A light, quickly absorbed cream-fluid with a delicate fresh scent. Restores the skin's natural moisture balance, improves elasticity and complexion, and protects against UV with SPF 15.",
-      ru: "Лёгкий, быстро впитывающийся крем-флюид с нежным свежим ароматом. Восстанавливает естественный баланс влаги, повышает упругость, улучшает цвет лица и защищает от ультрафиолета с SPF 15.",
+      en: "Long-lasting tire shine gel for a rich, satin-black finish. Repels water and road dust, keeps tires looking new for weeks.",
+      ar: "جل تلميع الإطارات يدوم طويلاً للمعان أسود حريري. يطرد الماء والأتربة، يحافظ على إطارات تبدو جديدة لأسابيع.",
     },
-    photo: "assets/img/shop/vitality-spf15-moisturizer.jpg",
+    photo: "assets/img/shop/tire-shine-gel.jpg",
     alt: {
-      en: "Onmacabim Oxygen Vitality Moisturizing Lotion SPF 15 — white pump bottle beside its box",
-      ru: "Onmacabim Oxygen Vitality увлажняющий лосьон SPF 15 — белый флакон с помпой рядом с коробкой",
+      en: "Tire Shine Gel — 500ml bottle with a black cap",
+      ar: "جل تلميع الإطارات — عبوة 500 مل بغطاء أسود",
     },
   },
-  "nomela-serum": {
-    sub: { en: "Luna whitening series · 50 ml", ru: "осветляющая серия Luna · 50 мл" },
+  "interior-cleaner-spray": {
+    sub: { en: "750ml spray bottle", ar: "عبوة رش 750 مل" },
     desc: {
-      en: "A delicate brightening serum that balances skin tone and helps prevent new pigmentation. Moisturizing polysaccharides and lightening extracts reduce melanin synthesis. For all skin types, year-round.",
-      ru: "Деликатная осветляющая сыворотка выравнивает тон кожи и помогает предотвратить появление новой пигментации. Увлажняющие полисахариды и осветляющие экстракты снижают синтез меланина. Для всех типов кожи, круглый год.",
+      en: "Multi-surface interior cleaner for dashboards, plastics, vinyl and leather. Removes dust, stains and fingerprints without leaving residue or greasiness.",
+      ar: "منظف داخلي متعدد الأسطح للطابلون والبلاستيك والفينيل والجلد. يزيل الأتربة والبقع وبصمات الأصابع دون ترك بقايا أو دهونية.",
     },
-    photo: "assets/img/shop/nomela-serum.jpg",
+    photo: "assets/img/shop/interior-cleaner-spray.jpg",
     alt: {
-      en: "Onmacabim Luna NoMela facial serum — white dropper bottle with a gold collar beside its box",
-      ru: "Onmacabim Luna NoMela сыворотка для лица — белый флакон с пипеткой и золотым ободком рядом с коробкой",
+      en: "Interior Cleaner Spray — 750ml spray bottle with a green label",
+      ar: "منظف الداخل سبراي — عبوة رش 750 مل بملصق أخضر",
     },
   },
-  "moisturizer-normal-dry": {
-    sub: { en: "ST Cells line · 50 ml", ru: "линия ST Cells · 50 мл" },
+  "waterless-wash-spray": {
+    sub: { en: "500ml spray bottle", ar: "عبوة رش 500 مل" },
     desc: {
-      en: "A stem-cell moisturizer that supports collagen production and hyaluronic acid renewal. Skin looks smoother, firmer and more rested, with better resistance to outside stressors.",
-      ru: "Увлажняющий крем с фитостволовыми клетками поддерживает выработку коллагена и обновление гиалуроновой кислоты. Кожа выглядит более гладкой, упругой и отдохнувшей, лучше противостоит внешним воздействиям.",
+      en: "Eco-friendly waterless wash spray — lifts and encapsulates dirt so you can wipe clean without a hose. Safe on paint, glass and trim. Saves up to 100 litres of water per wash.",
+      ar: "سبراي غسيل بدون مياه صديق للبيئة — يرفع ويحيط الأوساخ لمسحها بدون خرطوم. آمن على الطلاء والزجاج والبروفايل. يوفر حتى 100 لتر ماء لكل غسلة.",
     },
-    photo: "assets/img/shop/moisturizer-normal-dry.jpg",
+    photo: "assets/img/shop/waterless-wash-spray.jpg",
     alt: {
-      en: "Onmacabim ST Cells moisturizer for normal to dry skin — white pump bottle beside its box",
-      ru: "Onmacabim ST Cells увлажняющий крем для нормальной и сухой кожи — белый флакон с помпой рядом с коробкой",
+      en: "Waterless Wash Spray — 500ml spray bottle with a green and blue label",
+      ar: "سبراي غسيل بدون مياه — عبوة رش 500 مل بملصق أخضر وأزرق",
     },
   },
 };
 
 /**
- * Manufacturer "Application method" directions, condensed faithfully from
- * the Onmacabim product pages on onmacabim-prof.com/en/product/* (the same
- * origin as the seed catalog). No invented claims — wording stays within
- * what the manufacturer publishes; RU is a natural translation.
+ * Usage/application directions, condensed faithfully from the product pages.
+ * No invented claims — wording stays within what the manufacturer publishes.
  */
-const SEED_USAGE: Record<string, { en: string; ru: string }> = {
-  "tohar-hamidbar-concentrate": {
-    en: "Can be used year-round. In the evening, apply to cleansed face and do not rinse off. During periods of active sun exposure, sunscreen with at least SPF 15 is required. On problem skin a temporary tingling, itching, burning or redness is possible on application — per the manufacturer these reactions pass on their own.",
-    ru: "Можно использовать круглый год. Вечером нанесите на очищенную кожу лица и не смывайте. В период активного солнца обязательно пользуйтесь солнцезащитным средством с SPF не ниже 15. На проблемной коже при нанесении возможны временное покалывание, зуд, жжение или покраснение — по данным производителя, эти реакции проходят самостоятельно.",
+const SEED_USAGE: Record<string, { en: string; ar: string }> = {
+  "premium-car-shampoo": {
+    en: "Dilute 2–3 capfuls in a bucket of clean water. Wash from the top down with a microfiber mitt. Rinse thoroughly and dry with a microfiber cloth.",
+    ar: "أضف 2–3 أغطية إلى دلو من الماء النظيف. اغسل من أعلى إلى أسفل باستخدام قفاز مايكروفايبر. اشطف جيداً وجفف بقطعة مايكروفايبر.",
   },
-  "nd-neck-decollete-cream": {
-    en: "Apply to the cleansed skin of the neck and décolleté with light massaging movements until fully absorbed, for intensive moisturizing and nourishment.",
-    ru: "Наносите на очищенную кожу шеи и декольте лёгкими массирующими движениями до полного впитывания — для интенсивного увлажнения и питания.",
+  "ceramic-wax-spray": {
+    en: "Spray onto a clean, dry panel and immediately wipe with a microfiber cloth. Flip the cloth and buff lightly for a high-gloss finish. Apply every 4–6 weeks for best protection.",
+    ar: "رش على لوح نظيف وجاف وامسح فوراً بقطعة مايكروفايبر. اقلب القماش ولمع برفق للحصول على لمعان عالي. كرر كل 4–6 أسابيع للحماية المثلى.",
   },
-  "vitamin-c-mask": {
-    en: "Apply a thin layer onto cleansed skin and rinse off after 15–20 minutes. Use 2–3 times a week.",
-    ru: "Нанесите тонким слоем на очищенную кожу и смойте через 15–20 минут. Используйте 2–3 раза в неделю.",
+  "microfiber-cloth-set": {
+    en: "Wash before first use. Use separate cloths for dirty work and buffing. Machine wash warm, no fabric softener, tumble dry low.",
+    ar: "اغسل قبل أول استخدام. استخدم أقمشة منفصلة للأعمال المتسخة والتلميع. اغسل في الغسالة بماء دافئ بدون ملطف نسيج، جفف على حرارة منخفضة.",
   },
-  "vitality-spf15-moisturizer": {
-    en: "Apply in the morning to clean skin of the face and neck, spreading with light massaging movements. Ideally suited as a makeup base; the manufacturer also recommends it for use as a serum.",
-    ru: "Утром нанесите на чистую кожу лица и шеи, распределяя лёгкими массирующими движениями. Идеально подходит как база под макияж; производитель также рекомендует использовать его как сыворотку.",
+  "tire-shine-gel": {
+    en: "Apply a small amount to a sponge or applicator pad and spread evenly on a clean, dry tire sidewall. Allow to dry for 10–15 minutes before driving.",
+    ar: "ضع كمية صغيرة على إسفنجة أو وسادة تطبيق ووزّعها بالتساوي على جدار الإطار النظيف الجاف. اتركها تجف 10–15 دقيقة قبل القيادة.",
   },
-  "nomela-serum": {
-    en: "Apply morning and evening to thoroughly cleansed skin, before your cream. During the day, use a sunscreen with at least SPF 30. Suitable for daily use, all skin types, with no seasonal limitations.",
-    ru: "Наносите утром и вечером на тщательно очищенную кожу перед кремом. Днём используйте солнцезащитное средство с SPF не ниже 30. Подходит для ежедневного применения, для всех типов кожи, без сезонных ограничений.",
+  "interior-cleaner-spray": {
+    en: "Spray directly onto the surface or a microfiber cloth. Wipe clean, then buff with a dry side of the cloth. Test on an inconspicuous area first.",
+    ar: "رش مباشرة على السطح أو على قطعة مايكروفايبر. امسح نظيفاً ثم لمع بالجانب الجاف من القماش. اختبر على منطقة غير ظاهرة أولاً.",
   },
-  "moisturizer-normal-dry": {
-    en: "In the morning, after cleansing and toning, apply over the face, neck and décolleté area.",
-    ru: "Утром, после очищения и тонизирования, нанесите на лицо, шею и зону декольте.",
+  "waterless-wash-spray": {
+    en: "Spray generously onto one panel at a time. Let it soak for 30 seconds to encapsulate dirt. Wipe gently with a microfiber cloth in one direction, then buff dry with a clean side. Do not use on heavily soiled or muddy surfaces.",
+    ar: "رش بوفرة على لوح واحد في كل مرة. اتركه 30 ثانية لتحييط الأوساخ. امسح برفق بقطعة مايكروفايبر في اتجاه واحد، ثم جفف ولمع بجانب نظيف. لا تستخدم على أسطح متسخة جداً أو موحلة.",
   },
 };
 
-/** Short names for the catalog (without the line/size suffix that lives in `sub`). */
-const SEED_SHORT_NAMES: Record<string, { en: string; ru: string }> = {
-  "tohar-hamidbar-concentrate": { en: "Tohar Hamidbar No.2 Herbal Concentrate", ru: "Травяной концентрат Tohar Hamidbar №2" },
-  "nd-neck-decollete-cream": { en: "N.D Cream for Neck & Décolleté", ru: "Крем для шеи и декольте N.D" },
-  "vitamin-c-mask": { en: "Nourishing Skin Mask Vitamin C", ru: "Питательная маска с витамином C" },
-  "vitality-spf15-moisturizer": { en: "Vitality Moisturizer SPF 15", ru: "Увлажняющий крем Vitality SPF 15" },
-  "nomela-serum": { en: "NoMela Facial Serum", ru: "Сыворотка для лица NoMela" },
-  "moisturizer-normal-dry": { en: "Moisturizer for Normal to Dry Skin", ru: "Увлажняющий крем для нормальной и сухой кожи" },
+/** Short names for the catalog (without the size suffix that lives in `sub`). */
+const SEED_SHORT_NAMES: Record<string, { en: string; ar: string }> = {
+  "premium-car-shampoo": { en: "Premium Car Shampoo", ar: "شامبو سيارات فاخر" },
+  "ceramic-wax-spray": { en: "Ceramic Wax Spray", ar: "سيراميك وكس سبراي" },
+  "microfiber-cloth-set": { en: "Microfiber Cloth Set", ar: "طقم أقمشة مايكروفايبر" },
+  "tire-shine-gel": { en: "Tire Shine Gel", ar: "جل تلميع الإطارات" },
+  "interior-cleaner-spray": { en: "Interior Cleaner Spray", ar: "منظف الداخل سبراي" },
+  "waterless-wash-spray": { en: "Waterless Wash Spray", ar: "سبراي غسيل بدون مياه" },
 };
 
 export const SEED: readonly Product[] = SHOP_PRODUCTS.map((p) => {
@@ -209,15 +205,14 @@ export const SEED: readonly Product[] = SHOP_PRODUCTS.map((p) => {
       sub: copy?.sub.en ?? "",
       desc: copy?.desc.en ?? "",
     },
-    ru: {
-      name: names?.ru ?? p.nameRu,
-      sub: copy?.sub.ru ?? "",
-      desc: copy?.desc.ru ?? "",
+    ar: {
+      name: names?.ar ?? p.nameAr,
+      sub: copy?.sub.ar ?? "",
+      desc: copy?.desc.ar ?? "",
     },
     priceEgp: p.priceEgp,
-    priceRub: p.priceRub,
     photo: copy?.photo ?? "",
-    alt: copy?.alt ?? { en: "", ru: "" },
+    alt: copy?.alt ?? { en: "", ar: "" },
     ...(SEED_USAGE[p.slug] ? { usage: SEED_USAGE[p.slug] } : {}),
     quantity: SEED_QUANTITY,
     soldOut: false,
@@ -231,7 +226,7 @@ function cloneSeed(): Product[] {
   return SEED.map((p) => ({
     ...p,
     en: { ...p.en },
-    ru: { ...p.ru },
+    ar: { ...p.ar },
     alt: { ...p.alt },
     ...(p.usage ? { usage: { ...p.usage } } : {}),
   }));
@@ -247,15 +242,14 @@ export function effectiveSoldOut(p: Product): boolean {
 export function toPublicProduct(p: Product): PublicProduct {
   return {
     slug: p.slug,
-    name: { en: p.en.name, ru: p.ru.name },
-    sub: { en: p.en.sub, ru: p.ru.sub },
-    desc: { en: p.en.desc, ru: p.ru.desc },
+    name: { en: p.en.name, ar: p.ar.name },
+    sub: { en: p.en.sub, ar: p.ar.sub },
+    desc: { en: p.en.desc, ar: p.ar.desc },
     priceEgp: p.priceEgp,
-    priceRub: p.priceRub,
     photo: p.photo,
     alt: { ...p.alt },
     soldOut: effectiveSoldOut(p),
-    ...(p.usage && (p.usage.en || p.usage.ru)
+    ...(p.usage && (p.usage.en || p.usage.ar)
       ? { usage: { ...p.usage } }
       : {}),
   };
@@ -371,9 +365,4 @@ export function generateSlug(nameEn: string, existing: Set<string>): string {
 /** "3540" -> "E£3,540". */
 export function formatEgp(amount: number): string {
   return `E£${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
-}
-
-/** "4900" -> "4 900 ₽". */
-export function formatRub(amount: number): string {
-  return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ₽`;
 }

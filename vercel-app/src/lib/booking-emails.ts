@@ -3,10 +3,10 @@ import { brandedEmailHtml, escapeHtml } from "./branded-email";
 /**
  * All booking-related emails sent from /api/cal/webhook:
  *
- * 1. Owner notification to Victoria — "New booking request" with the admin
- *    inbox link (English only; Victoria's working language for the inbox).
+ * 1. Owner notification — "New booking request" with the admin
+ *    inbox link (English only; the owner's working language for the inbox).
  * 2. Attendee lifecycle emails (the branded replacement for Cal.com's generic
- *    ones) — bilingual EN/RU from the booking's `metadata.lang`:
+ *    ones) — bilingual EN/AR from the booking's `metadata.lang`:
  *      - requested   → "We received your booking request"
  *      - confirmed   → "Your appointment is confirmed"
  *      - rejected    → "About your booking request" (decline + rebook invite)
@@ -17,16 +17,16 @@ import { brandedEmailHtml, escapeHtml } from "./branded-email";
  * Text parts stay plain. Senders NEVER throw — the webhook must always 200.
  */
 
-const NOTIFY_EMAIL_DEFAULT = "victoria@victoriaholisticbeauty.com";
-const ADMIN_URL_BASE = "https://book.victoriaholisticbeauty.com/admin";
-const BOOK_URL = "https://book.victoriaholisticbeauty.com/book";
+const NOTIFY_EMAIL_DEFAULT = "info@eliteecocarwash.com";
+const ADMIN_URL_BASE = "https://book.eliteecocarwash.com/admin";
+const BOOK_URL = "https://book.eliteecocarwash.com/book";
 const OWNER_EMAIL_FROM =
-  "Victoria Holistic Beauty <bookings@victoriaholisticbeauty.com>";
+  "Elite Eco Car Wash <bookings@eliteecocarwash.com>";
 const ATTENDEE_EMAIL_FROM =
-  "Victoria Vasilyeva Holistic Beauty <bookings@victoriaholisticbeauty.com>";
-const ATTENDEE_REPLY_TO = "victoria@victoriaholisticbeauty.com";
+  "Elite Eco Car Wash <bookings@eliteecocarwash.com>";
+const ATTENDEE_REPLY_TO = "info@eliteecocarwash.com";
 
-export type BookingLang = "en" | "ru";
+export type BookingLang = "en" | "ar";
 
 export type AttendeeEmailKind =
   | "requested"
@@ -45,7 +45,7 @@ export interface BookingDetails {
   attendeeName: string;
   attendeeEmail: string;
   attendeePhone: string;
-  /** Client notes incl. the "Treatments: …" line for combined sessions. */
+  /** Client notes incl. the "Services: …" line for combined sessions. */
   notes: string;
   /** UI language recorded at booking time (metadata.lang); null = unknown. */
   lang: BookingLang | null;
@@ -59,14 +59,14 @@ export interface BookingDetails {
 }
 
 export function parseBookingLang(value: unknown): BookingLang | null {
-  return value === "ru" || value === "en" ? value : null;
+  return value === "ar" || value === "en" ? value : null;
 }
 
 export function formatCairoTime(iso: string, lang: BookingLang = "en"): string {
-  if (!iso) return lang === "ru" ? "время неизвестно" : "unknown time";
+  if (!iso) return lang === "ar" ? "وقت غير معروف" : "unknown time";
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat(lang === "ru" ? "ru-RU" : "en-GB", {
+  return new Intl.DateTimeFormat(lang === "ar" ? "ar-EG" : "en-GB", {
     timeZone: "Africa/Cairo",
     weekday: "short",
     day: "numeric",
@@ -81,19 +81,19 @@ export function formatCairoTime(iso: string, lang: BookingLang = "en"): string {
 // --- shared HTML fragments ---------------------------------------------------
 
 const detailRow = (label: string, value: string) =>
-  `<tr><td style="padding:6px 16px 6px 0;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#3A332C;font-size:15px;">${escapeHtml(value)}</td></tr>`;
+  `<tr><td style="padding:6px 16px 6px 0;color:#4A5568;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${escapeHtml(label)}</td><td style="padding:6px 0;color:#0A1A2F;font-size:15px;">${escapeHtml(value)}</td></tr>`;
 
 const paragraph = (text: string) =>
-  `<p style="margin:0 0 16px;color:#3A332C;font-size:15px;line-height:1.65;">${escapeHtml(text)}</p>`;
+  `<p style="margin:0 0 16px;color:#0A1A2F;font-size:15px;line-height:1.65;">${escapeHtml(text)}</p>`;
 
 const footnoteBox = (text: string) =>
-  `<div style="margin-top:28px;padding:14px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;"><p style="margin:0;color:#3A332C;font-size:14px;line-height:1.65;">${escapeHtml(text)}</p></div>`;
+  `<div style="margin-top:28px;padding:14px 16px;border:1px solid #D1D9E0;border-radius:10px;background-color:#F8FAFC;"><p style="margin:0;color:#0A1A2F;font-size:14px;line-height:1.65;">${escapeHtml(text)}</p></div>`;
 
 const buttonLink = (href: string, label: string) =>
-  `<a href="${href}" style="display:inline-block;background-color:#3A332C;color:#FFFDF9;text-decoration:none;padding:12px 28px;border-radius:9999px;font-size:15px;">${escapeHtml(label)}</a>`;
+  `<a href="${href}" style="display:inline-block;background-color:#0A1A2F;color:#F8FAFC;text-decoration:none;padding:12px 28px;border-radius:9999px;font-size:15px;">${escapeHtml(label)}</a>`;
 
 const signoffHtml = (signoff: string) =>
-  `<p style="margin:28px 0 0;color:#847866;font-size:14px;">${escapeHtml(signoff)}<br>Victoria Vasilyeva Holistic Beauty</p>`;
+  `<p style="margin:28px 0 0;color:#4A5568;font-size:14px;">${escapeHtml(signoff)}<br>Elite Eco Car Wash</p>`;
 
 // --- owner notification --------------------------------------------------------
 
@@ -134,7 +134,7 @@ export function buildOwnerNotificationEmail(details: BookingDetails): {
         ${detailRow("Phone", details.attendeePhone)}
         ${showNotes ? detailRow("Notes", details.notes) : ""}
       </table>
-      <p style="margin:28px 0 16px;color:#3A332C;font-size:15px;">Confirm, decline with a note, or suggest another time here:</p>
+      <p style="margin:28px 0 16px;color:#0A1A2F;font-size:15px;">Confirm, decline with a note, or suggest another time here:</p>
       ${buttonLink(reviewLink, "Open booking inbox")}`;
 
   const html = brandedEmailHtml({
@@ -172,17 +172,17 @@ function attendeeCopy(
   details: BookingDetails,
   lang: BookingLang
 ): AttendeeCopy {
-  const ru = lang === "ru";
+  const ar = lang === "ar";
   const name = details.attendeeName;
-  const base = ru
+  const base = ar
     ? {
-        greeting: `Здравствуйте, ${name}!`,
-        serviceLabel: "Услуга",
-        timeLabel: "Дата и время",
-        durationLabel: "Длительность",
-        durationUnit: "мин",
+        greeting: `مرحباً ${name}!`,
+        serviceLabel: "الخدمة",
+        timeLabel: "التاريخ والوقت",
+        durationLabel: "المدة",
+        durationUnit: "دقيقة",
         oldTimeLabel: null,
-        signoff: "С теплом,",
+        signoff: "مع أطيب التحيات،",
       }
     : {
         greeting: `Hello ${name},`,
@@ -195,16 +195,16 @@ function attendeeCopy(
       };
 
   if (kind === "rescheduled") {
-    return ru
+    return ar
       ? {
           ...base,
-          subject: `Ваша запись перенесена — ${details.service}`,
-          heading: "Ваша запись перенесена",
-          intro: "Время вашей записи изменилось. Новые детали:",
-          timeLabel: "Новое время",
-          oldTimeLabel: "Прежнее время",
+          subject: `تم نقل موعدك — ${details.service}`,
+          heading: "تم نقل موعدك",
+          intro: "لقد تغيير وقت موعدك. التفاصيل الجديدة:",
+          timeLabel: "الوقت الجديد",
+          oldTimeLabel: "الوقت السابق",
           paragraphs: [
-            "Если что-то изменится, наша команда свяжется с вами в WhatsApp.",
+            "إذا تغير أي شيء، سيتواصل معك فريقنا عبر واتساب.",
           ],
           reasonLabel: null,
           footnote: null,
@@ -229,18 +229,18 @@ function attendeeCopy(
   }
 
   if (kind === "requested") {
-    return ru
+    return ar
       ? {
           ...base,
-          subject: `Мы получили вашу заявку — ${details.service}`,
-          heading: "Мы получили вашу заявку",
-          intro: "Спасибо! Ваша заявка на запись получена. Детали:",
+          subject: `لقد استلمنا طلبك — ${details.service}`,
+          heading: "لقد استلمنا طلبك",
+          intro: "شكراً! لقد استلمنا طلب الحجز. التفاصيل:",
           paragraphs: [
-            "Виктория подтверждает каждую запись лично — вы получите подтверждение в ближайшее время.",
+            "يقوم فريقنا بتأكيد كل حجز شخصياً — ستصلك رسالة التأكيد قريباً.",
           ],
           reasonLabel: null,
           footnote:
-            "Напоминание о правилах записи: подтверждённую сессию можно перенести или отменить не позднее чем за 24 часа до её начала — при более поздней отмене, опоздании или неявке сессия оплачивается полностью.",
+            "تذكير بسياسة الحجز: يمكن إعادة جدولة أو إلغاء الحجز المؤكد حتى 24 ساعة قبل موعده — التغييرات المتأخرة أو التأخر أو عدم الحضور تخضع للرسوم كاملة.",
           rebookLead: null,
           rebookButton: null,
         }
@@ -250,7 +250,7 @@ function attendeeCopy(
           heading: "We received your booking request",
           intro: "Thank you! Your booking request has been received. The details:",
           paragraphs: [
-            "Victoria confirms every booking personally — you'll receive confirmation shortly.",
+            "Our team confirms every booking personally — you'll receive confirmation shortly.",
           ],
           reasonLabel: null,
           footnote:
@@ -261,14 +261,14 @@ function attendeeCopy(
   }
 
   if (kind === "confirmed") {
-    return ru
+    return ar
       ? {
           ...base,
-          subject: `Ваша запись подтверждена — ${details.service}`,
-          heading: "Ваша запись подтверждена",
-          intro: "Хорошие новости — Виктория подтвердила вашу запись:",
+          subject: `تم تأكيد موعدك — ${details.service}`,
+          heading: "تم تأكيد موعدك",
+          intro: "أخبار سارة — لقد تم تأكيد موعدك:",
           paragraphs: [
-            "Если что-то изменится, наша команда свяжется с вами в WhatsApp.",
+            "إذا تغير أي شيء، سيتواصل معك فريقنا عبر واتساب.",
           ],
           reasonLabel: null,
           footnote: null,
@@ -279,7 +279,7 @@ function attendeeCopy(
           ...base,
           subject: `Your appointment is confirmed — ${details.service}`,
           heading: "Your appointment is confirmed",
-          intro: "Good news — Victoria has confirmed your appointment:",
+          intro: "Good news — your appointment has been confirmed:",
           paragraphs: [
             "Our team will contact you via WhatsApp if anything changes.",
           ],
@@ -291,28 +291,28 @@ function attendeeCopy(
   }
 
   if (kind === "rejected") {
-    return ru
+    return ar
       ? {
           ...base,
-          subject: `О вашей заявке — ${details.service}`,
-          heading: "О вашей заявке",
+          subject: `بخصوص طلبك — ${details.service}`,
+          heading: "بخصوص طلبك",
           intro:
-            "К сожалению, Виктория не смогла принять вашу заявку на это время:",
+            "للأسف، لم يتمكن الفريق من قبول طلب الحجز لهذا الوقت:",
           paragraphs: [],
-          reasonLabel: "Сообщение от Виктории",
+          reasonLabel: "رسالة من الفريق",
           footnote: null,
           rebookLead:
-            "Мы будем рады видеть вас в другое время — выберите новый слот здесь:",
-          rebookButton: "Выбрать другое время",
+            "يسعدنا رؤيتك في وقت آخر — اختر موعداً جديداً هنا:",
+          rebookButton: "اختر وقتاً آخر",
         }
       : {
           ...base,
           subject: `About your booking request — ${details.service}`,
           heading: "About your booking request",
           intro:
-            "Unfortunately, Victoria couldn't accept your booking request for this time:",
+            "Unfortunately, we couldn't accept your booking request for this time:",
           paragraphs: [],
-          reasonLabel: "A note from Victoria",
+          reasonLabel: "A note from the team",
           footnote: null,
           rebookLead:
             "We'd love to welcome you another time — pick a new slot here:",
@@ -321,18 +321,18 @@ function attendeeCopy(
   }
 
   // cancelled
-  return ru
+  return ar
     ? {
         ...base,
-        subject: `О вашей записи — ${details.service}`,
-        heading: "О вашей записи",
-        intro: "Ваша запись была отменена:",
+        subject: `بخصوص حجزك — ${details.service}`,
+        heading: "بخصوص حجزك",
+        intro: "لقد تم إلغاء حجزك:",
         paragraphs: [],
-        reasonLabel: "Причина",
+        reasonLabel: "السبب",
         footnote: null,
         rebookLead:
-          "Мы будем рады видеть вас в другое время — выберите новый слот здесь:",
-        rebookButton: "Записаться снова",
+          "يسعدنا رؤيتك في وقت آخر — اختر موعداً جديداً هنا:",
+        rebookButton: "احجز مرة أخرى",
       }
     : {
         ...base,
@@ -353,16 +353,16 @@ export function buildAttendeeEmail(
   details: BookingDetails
 ): { subject: string; text: string; html: string } {
   const lang: BookingLang = details.lang ?? "en";
-  const ru = lang === "ru";
+  const ar = lang === "ar";
   const t = attendeeCopy(kind, details, lang);
   const cairoTime = formatCairoTime(details.start, lang);
-  const cairoSuffix = ru ? " (Каир)" : " (Cairo)";
+  const cairoSuffix = ar ? " (القاهرة)" : " (Cairo)";
   const duration =
     details.durationMinutes && details.durationMinutes > 0
       ? `${details.durationMinutes} ${t.durationUnit}`
       : null;
   const reason = details.reason.trim();
-  const rebookUrl = ru ? `${BOOK_URL}?lang=ru` : BOOK_URL;
+  const rebookUrl = ar ? `${BOOK_URL}?lang=ar` : BOOK_URL;
   // Previous time row — rescheduled emails only, and only when the old start
   // is actually known (payload field or Cal API backfill).
   const oldCairoTime =
@@ -387,14 +387,14 @@ export function buildAttendeeEmail(
     ...(t.footnote ? ["", t.footnote] : []),
     "",
     t.signoff,
-    "Victoria Vasilyeva Holistic Beauty",
+    "Elite Eco Car Wash",
   ].join("\n");
 
   const contentHtml = `${paragraph(t.greeting)}${paragraph(t.intro)}<table style="border-collapse:collapse;width:100%;margin-bottom:8px;">
         ${detailRow(t.serviceLabel, details.service)}
         ${
           t.oldTimeLabel && oldCairoTime
-            ? `<tr><td style="padding:6px 16px 6px 0;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${escapeHtml(t.oldTimeLabel)}</td><td style="padding:6px 0;color:#847866;font-size:15px;text-decoration:line-through;">${escapeHtml(`${oldCairoTime}${cairoSuffix}`)}</td></tr>`
+            ? `<tr><td style="padding:6px 16px 6px 0;color:#4A5568;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${escapeHtml(t.oldTimeLabel)}</td><td style="padding:6px 0;color:#4A5568;font-size:15px;text-decoration:line-through;">${escapeHtml(`${oldCairoTime}${cairoSuffix}`)}</td></tr>`
             : ""
         }
         ${detailRow(t.timeLabel, `${cairoTime}${cairoSuffix}`)}
@@ -403,7 +403,7 @@ export function buildAttendeeEmail(
       </table>
       ${t.paragraphs.map((p) => paragraph(p)).join("")}${
         t.rebookLead && t.rebookButton
-          ? `<p style="margin:12px 0 16px;color:#3A332C;font-size:15px;line-height:1.65;">${escapeHtml(t.rebookLead)}</p>${buttonLink(rebookUrl, t.rebookButton)}`
+          ? `<p style="margin:12px 0 16px;color:#0A1A2F;font-size:15px;line-height:1.65;">${escapeHtml(t.rebookLead)}</p>${buttonLink(rebookUrl, t.rebookButton)}`
           : ""
       }${t.footnote ? footnoteBox(t.footnote) : ""}
       ${signoffHtml(t.signoff)}`;
@@ -411,8 +411,8 @@ export function buildAttendeeEmail(
   const html = brandedEmailHtml({
     heading: t.heading,
     contentHtml,
-    belowCardHtml: ru
-      ? "Время указано по Каиру (Africa/Cairo)."
+    belowCardHtml: ar
+      ? "الأوقات بتوقيت القاهرة (Africa/Cairo)."
       : "Times shown in Cairo time (Africa/Cairo).",
   });
 

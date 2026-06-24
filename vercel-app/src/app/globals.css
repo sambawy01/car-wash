@@ -2,8 +2,8 @@
 @import "tw-animate-css";
 
 /*
- * Earthy light brand theme — Victoria Vasilyeva Holistic Beauty
- * background #FAF7F2 · text #3A332C · accent: muted clay/bronze #A9745A
+ * Blue/silver brand theme — Elite Eco Car Wash
+ * background #F8FAFC · text #0A1A2F · accent: deep blue #0D3B66
  * shadcn-style tokens for the booking-calendar components.
  */
 
@@ -38,24 +38,24 @@
 
 :root {
   --radius: 0.625rem;
-  --background: #faf7f2;
-  --foreground: #3a332c;
-  --card: #fffdf9;
-  --card-foreground: #3a332c;
-  --popover: #fffdf9;
-  --popover-foreground: #3a332c;
-  --primary: #a9745a;
-  --primary-foreground: #fdf9f3;
-  --secondary: #efe8dd;
-  --secondary-foreground: #3a332c;
-  --muted: #f1ece4;
-  --muted-foreground: #847866;
-  --accent: #a9745a;
-  --accent-foreground: #fdf9f3;
-  --destructive: #b5483a;
-  --border: rgba(58, 51, 44, 0.14);
-  --input: rgba(58, 51, 44, 0.18);
-  --ring: #a9745a;
+  --background: #F8FAFC;
+  --foreground: #0A1A2F;
+  --card: #FFFFFF;
+  --card-foreground: #0A1A2F;
+  --popover: #FFFFFF;
+  --popover-foreground: #0A1A2F;
+  --primary: #0D3B66;
+  --primary-foreground: #F8FAFC;
+  --secondary: #E8ECEF;
+  --secondary-foreground: #0A1A2F;
+  --muted: #F0F4F8;
+  --muted-foreground: #4A5568;
+  --accent: #0D3B66;
+  --accent-foreground: #F8FAFC;
+  --destructive: #B91C1C;
+  --border: rgba(10, 26, 47, 0.14);
+  --input: rgba(10, 26, 47, 0.18);
+  --ring: #0D3B66;
 }
 
 @layer base {

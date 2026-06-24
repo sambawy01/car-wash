@@ -1,22 +1,20 @@
-import { formatEgp, formatRub } from "./shop-products";
+import { formatEgp } from "./catalog";
 import { brandedEmailHtml, escapeHtml } from "./branded-email";
 
 /**
- * Email builders for /api/order — the owner notification to Victoria and the
+ * Email builders for /api/order — the owner notification and the
  * buyer confirmation. Pure functions (no env, no fetch) so they can be
  * rendered and inspected outside the route; the route owns sending.
  *
- * Both HTML bodies use the shared branded shell (dark logo band header) —
- * Victoria wants the brand on every email, her own notifications included.
+ * Both HTML bodies use the shared branded shell (dark logo band header).
  * Text parts stay plain.
  */
 
 export interface OrderEmailLine {
   nameEn: string;
-  nameRu: string;
+  nameAr: string;
   qty: number;
   lineEgp: number;
-  lineRub: number;
 }
 
 export interface OrderEmailInput {
@@ -28,14 +26,13 @@ export interface OrderEmailInput {
   address: string;
   /** "" when empty. */
   note: string;
-  lang: "en" | "ru";
+  lang: "en" | "ar";
   lines: OrderEmailLine[];
   totalEgp: number;
-  totalRub: number;
 }
 
 const detailRow = (label: string, value: string) =>
-  `<tr><td style="padding:6px 16px 6px 0;color:#847866;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 0;color:#3A332C;font-size:15px;">${escapeHtml(value)}</td></tr>`;
+  `<tr><td style="padding:6px 16px 6px 0;color:#4A5568;font-size:13px;text-transform:uppercase;letter-spacing:0.08em;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:6px 0;color:#0A1A2F;font-size:15px;">${escapeHtml(value)}</td></tr>`;
 
 function itemsTableHtml(
   order: OrderEmailInput,
@@ -46,23 +43,23 @@ function itemsTableHtml(
     .map(
       (l) =>
         `<tr>` +
-        `<td style="padding:8px 12px 8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;">${productCell(l)}</td>` +
-        `<td style="padding:8px 12px;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:center;">${l.qty}</td>` +
-        `<td style="padding:8px 0;color:#3A332C;font-size:14px;border-bottom:1px solid #E5DCCB;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(l.lineEgp))}<br><span style="color:#847866;font-size:13px;">${escapeHtml(formatRub(l.lineRub))}</span></td>` +
+        `<td style="padding:8px 12px 8px 0;color:#0A1A2F;font-size:14px;border-bottom:1px solid #D1D9E0;">${productCell(l)}</td>` +
+        `<td style="padding:8px 12px;color:#0A1A2F;font-size:14px;border-bottom:1px solid #D1D9E0;text-align:center;">${l.qty}</td>` +
+        `<td style="padding:8px 0;color:#0A1A2F;font-size:14px;border-bottom:1px solid #D1D9E0;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(l.lineEgp))}</td>` +
         `</tr>`
     )
     .join("");
 
   return `<table style="border-collapse:collapse;width:100%;">
         <tr>
-          <th style="padding:0 12px 8px 0;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:left;">${escapeHtml(labels.product)}</th>
-          <th style="padding:0 12px 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:center;">${escapeHtml(labels.qty)}</th>
-          <th style="padding:0 0 8px;color:#847866;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:right;">${escapeHtml(labels.lineTotal)}</th>
+          <th style="padding:0 12px 8px 0;color:#4A5568;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:left;">${escapeHtml(labels.product)}</th>
+          <th style="padding:0 12px 8px;color:#4A5568;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:center;">${escapeHtml(labels.qty)}</th>
+          <th style="padding:0 0 8px;color:#4A5568;font-size:12px;text-transform:uppercase;letter-spacing:0.08em;text-align:right;">${escapeHtml(labels.lineTotal)}</th>
         </tr>
         ${itemRows}
         <tr>
-          <td colspan="2" style="padding:12px 12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;">${escapeHtml(labels.total)}</td>
-          <td style="padding:12px 0 0;color:#3A332C;font-size:15px;font-weight:bold;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(order.totalEgp))}<br><span style="font-weight:normal;color:#847866;font-size:13px;">${escapeHtml(formatRub(order.totalRub))}</span></td>
+          <td colspan="2" style="padding:12px 12px 0 0;color:#0A1A2F;font-size:15px;font-weight:bold;">${escapeHtml(labels.total)}</td>
+          <td style="padding:12px 0 0;color:#0A1A2F;font-size:15px;font-weight:bold;text-align:right;white-space:nowrap;">${escapeHtml(formatEgp(order.totalEgp))}</td>
         </tr>
       </table>`;
 }
@@ -78,7 +75,7 @@ export function buildOwnerOrderEmail(order: OrderEmailInput): {
 
   const textItems = order.lines.map(
     (l) =>
-      `- ${l.nameEn} / ${l.nameRu} × ${l.qty} = ${formatEgp(l.lineEgp)} / ${formatRub(l.lineRub)}`
+      `- ${l.nameEn} / ${l.nameAr} × ${l.qty} = ${formatEgp(l.lineEgp)}`
   );
   const text = [
     "New shop order (cash on delivery)",
@@ -88,7 +85,7 @@ export function buildOwnerOrderEmail(order: OrderEmailInput): {
     "Items:",
     ...textItems,
     "",
-    `Total:    ${formatEgp(order.totalEgp)} / ${formatRub(order.totalRub)}`,
+    `Total:    ${formatEgp(order.totalEgp)}`,
     "",
     `Name:     ${order.name}`,
     `Phone:    ${order.phone}`,
@@ -100,12 +97,12 @@ export function buildOwnerOrderEmail(order: OrderEmailInput): {
     "Cash on delivery — contact the client on WhatsApp to confirm delivery time.",
   ].join("\n");
 
-  const contentHtml = `<p style="margin:0 0 24px;color:#3A332C;font-size:16px;font-weight:bold;">Order number: ${escapeHtml(order.orderNumber)}</p>
+  const contentHtml = `<p style="margin:0 0 24px;color:#0A1A2F;font-size:16px;font-weight:bold;">Order number: ${escapeHtml(order.orderNumber)}</p>
       ${itemsTableHtml(
         order,
         { product: "Product", qty: "Qty", lineTotal: "Line total", total: "Total" },
         (l) =>
-          `${escapeHtml(l.nameEn)}<br><span style="color:#847866;font-size:13px;">${escapeHtml(l.nameRu)}</span>`
+          `${escapeHtml(l.nameEn)}<br><span style="color:#4A5568;font-size:13px;">${escapeHtml(l.nameAr)}</span>`
       )}
       <table style="border-collapse:collapse;width:100%;margin-top:24px;">
         ${detailRow("Name", order.name)}
@@ -115,7 +112,7 @@ export function buildOwnerOrderEmail(order: OrderEmailInput): {
         ${detailRow("Note", order.note || "—")}
         ${detailRow("Language", order.lang)}
       </table>
-      <p style="margin:28px 0 0;color:#3A332C;font-size:15px;">Cash on delivery — contact the client on WhatsApp to confirm delivery time.</p>`;
+      <p style="margin:28px 0 0;color:#0A1A2F;font-size:15px;">Cash on delivery — contact the client on WhatsApp to confirm delivery time.</p>`;
 
   const html = brandedEmailHtml({ heading: "New shop order", contentHtml });
 
@@ -129,32 +126,32 @@ export function buildBuyerOrderEmail(order: OrderEmailInput): {
   text: string;
   html: string;
 } {
-  const ru = order.lang === "ru";
-  const subject = ru
-    ? `Ваш заказ ${order.orderNumber} — Victoria Vasilyeva Holistic Beauty`
-    : `Your order ${order.orderNumber} — Victoria Vasilyeva Holistic Beauty`;
+  const ar = order.lang === "ar";
+  const subject = ar
+    ? `طلبك ${order.orderNumber} — Elite Eco Car Wash`
+    : `Your order ${order.orderNumber} — Elite Eco Car Wash`;
 
-  const t = ru
+  const t = ar
     ? {
-        greeting: `Здравствуйте, ${order.name}!`,
-        orderNumber: `Номер заказа: ${order.orderNumber}`,
+        greeting: `مرحباً ${order.name}!`,
+        orderNumber: `رقم الطلب: ${order.orderNumber}`,
         thanks:
-          "Спасибо за ваш заказ в Victoria Vasilyeva Holistic Beauty. Вот его детали:",
-        heading: "Ваш заказ",
-        product: "Товар",
-        qty: "Кол-во",
-        lineTotal: "Сумма",
-        total: "Итого",
-        cod: "Оплата при получении (наличными).",
-        call: "Наша команда свяжется с вами в WhatsApp, чтобы подтвердить время доставки.",
-        delivery: "Доставка по Египту в течение 24–72 часов.",
-        signoff: "С теплом,",
+          "شكراً لطلبك من Elite Eco Car Wash. إليك التفاصيل:",
+        heading: "طلبك",
+        product: "المنتج",
+        qty: "الكمية",
+        lineTotal: "السعر",
+        total: "الإجمالي",
+        cod: "الدفع عند الاستلام (نقداً).",
+        call: "سيتواصل معك فريقنا عبر واتساب لتأكيد موعد التوصيل.",
+        delivery: "التوصيل خلال 24–72 ساعة في جميع أنحاء مصر.",
+        signoff: "مع أطيب التحيات،",
       }
     : {
         greeting: `Hello ${order.name},`,
         orderNumber: `Order number: ${order.orderNumber}`,
         thanks:
-          "Thank you for your order with Victoria Vasilyeva Holistic Beauty. Here are the details:",
+          "Thank you for your order with Elite Eco Car Wash. Here are the details:",
         heading: "Your order",
         product: "Product",
         qty: "Qty",
@@ -166,11 +163,11 @@ export function buildBuyerOrderEmail(order: OrderEmailInput): {
         signoff: "Warmly,",
       };
 
-  const productName = (l: OrderEmailLine) => (ru ? l.nameRu : l.nameEn);
+  const productName = (l: OrderEmailLine) => (ar ? l.nameAr : l.nameEn);
 
   const textItems = order.lines.map(
     (l) =>
-      `- ${productName(l)} × ${l.qty} = ${formatEgp(l.lineEgp)} / ${formatRub(l.lineRub)}`
+      `- ${productName(l)} × ${l.qty} = ${formatEgp(l.lineEgp)}`
   );
   const text = [
     t.greeting,
@@ -181,28 +178,28 @@ export function buildBuyerOrderEmail(order: OrderEmailInput): {
     "",
     ...textItems,
     "",
-    `${t.total}: ${formatEgp(order.totalEgp)} / ${formatRub(order.totalRub)}`,
+    `${t.total}: ${formatEgp(order.totalEgp)}`,
     "",
     t.cod,
     t.call,
     t.delivery,
     "",
     t.signoff,
-    "Victoria Vasilyeva Holistic Beauty",
+    "Elite Eco Car Wash",
   ].join("\n");
 
-  const contentHtml = `<p style="margin:0 0 8px;color:#3A332C;font-size:15px;">${escapeHtml(t.greeting)}</p>
-      <p style="margin:0 0 16px;color:#3A332C;font-size:16px;font-weight:bold;">${escapeHtml(t.orderNumber)}</p>
-      <p style="margin:0 0 24px;color:#3A332C;font-size:15px;">${escapeHtml(t.thanks)}</p>
+  const contentHtml = `<p style="margin:0 0 8px;color:#0A1A2F;font-size:15px;">${escapeHtml(t.greeting)}</p>
+      <p style="margin:0 0 16px;color:#0A1A2F;font-size:16px;font-weight:bold;">${escapeHtml(t.orderNumber)}</p>
+      <p style="margin:0 0 24px;color:#0A1A2F;font-size:15px;">${escapeHtml(t.thanks)}</p>
       ${itemsTableHtml(
         order,
         { product: t.product, qty: t.qty, lineTotal: t.lineTotal, total: t.total },
         (l) => escapeHtml(productName(l))
       )}
-      <div style="margin-top:28px;padding:14px 16px;border:1px solid #E5DCCB;border-radius:10px;background-color:#F4EFE7;">
-        <p style="margin:0;color:#3A332C;font-size:14px;line-height:1.65;">${escapeHtml(t.cod)}<br>${escapeHtml(t.call)}<br>${escapeHtml(t.delivery)}</p>
+      <div style="margin-top:28px;padding:14px 16px;border:1px solid #D1D9E0;border-radius:10px;background-color:#F8FAFC;">
+        <p style="margin:0;color:#0A1A2F;font-size:14px;line-height:1.65;">${escapeHtml(t.cod)}<br>${escapeHtml(t.call)}<br>${escapeHtml(t.delivery)}</p>
       </div>
-      <p style="margin:28px 0 0;color:#847866;font-size:14px;">${escapeHtml(t.signoff)}<br>Victoria Vasilyeva Holistic Beauty</p>`;
+      <p style="margin:28px 0 0;color:#4A5568;font-size:14px;">${escapeHtml(t.signoff)}<br>Elite Eco Car Wash</p>`;
 
   const html = brandedEmailHtml({ heading: t.heading, contentHtml });
 

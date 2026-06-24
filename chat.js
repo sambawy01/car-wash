@@ -1,4 +1,4 @@
-/* Amber Noir — Beauty Concierge chat widget (vanilla JS, no dependencies) */
+/* Aqua Blue — Elite Eco Car Wash chat widget (vanilla JS, no dependencies) */
 (() => {
   "use strict";
 
@@ -6,45 +6,45 @@
   const CHAT_ENDPOINT =
     (location.hostname === "localhost" || location.hostname === "127.0.0.1")
       ? "http://localhost:3000/api/chat"
-      : "https://book.victoriaholisticbeauty.com/api/chat";
+      : "https://book.eliteecocarwash.com/api/chat";
 
-  const RU = document.documentElement.lang === "ru";
-  const CONTACT_EMAIL = "victoria@victoriaholisticbeauty.com";
-  const BOOK_URL = RU
-    ? "https://book.victoriaholisticbeauty.com/book?lang=ru"
-    : "https://book.victoriaholisticbeauty.com/book";
+  const AR = document.documentElement.lang === "ar";
+  const CONTACT_EMAIL = "info@eliteecocarwash.com";
+  const BOOK_URL = AR
+    ? "https://book.eliteecocarwash.com/book?lang=ar"
+    : "https://book.eliteecocarwash.com/book";
 
-  const T = RU
+  const T = AR
     ? {
-        open: "Открыть чат с Василием — AI-ассистентом Виктории",
-        close: "Закрыть чат",
-        title: "Василий — AI-ассистент Виктории",
-        placeholder: "Ваш вопрос…",
-        send: "Отправить",
-        greeting: "Здравствуйте! Я Василий, AI-ассистент Виктории. Спросите меня о процедурах, ценах или уходе за кожей.",
-        teaserName: "Знакомьтесь: Василий",
-        teaserLine: "AI-ассистент Виктории — спросите о процедурах, ценах и уходе",
-        teaserDismiss: "Скрыть подсказку",
-        fallbackPre: "Я сейчас офлайн — напишите на ",
-        fallbackMid: " или ",
-        fallbackBook: "запишитесь онлайн",
+        open: "فتح الدردشة مع إيكو — مساعد الذكاء الاصطناعي",
+        close: "إغلاق الدردشة",
+        title: "إيكو — مساعد Elite Eco Car Wash",
+        placeholder: "سؤالك…",
+        send: "إرسال",
+        greeting: "مرحباً! أنا إيكو، مساعد Elite Eco Car Wash. اسألني عن خدماتنا، الأسعار، أو منتجات العناية بالسيارات.",
+        teaserName: "تعرّف على إيكو",
+        teaserLine: "مساعد الذكاء الاصطناعي — اسأل عن الخدمات والأسعار",
+        teaserDismiss: "إخفاء",
+        fallbackPre: "أنا غير متصل الآن — راسلنا على ",
+        fallbackMid: " أو ",
+        fallbackBook: "احجز مباشرة عبر الإنترنت",
       }
     : {
-        open: "Open chat with Vassili — Victoria's AI Assistant",
+        open: "Open chat with Eco — Elite Eco Car Wash AI Assistant",
         close: "Close chat",
-        title: "Vassili — Victoria's AI Assistant",
+        title: "Eco — Elite Eco Car Wash AI Assistant",
         placeholder: "Your question…",
         send: "Send",
-        greeting: "Hello! I'm Vassili, Victoria's AI assistant. Ask me anything about our treatments, prices, or skincare.",
-        teaserName: "Meet Vassili",
-        teaserLine: "Victoria's AI assistant — ask about treatments, prices & skincare",
+        greeting: "Hello! I'm Eco, Elite Eco Car Wash's AI assistant. Ask me anything about our services, prices, or car care products.",
+        teaserName: "Meet Eco",
+        teaserLine: "Elite Eco Car Wash AI assistant — ask about services, prices & car care",
         teaserDismiss: "Dismiss",
         fallbackPre: "I'm offline right now — email ",
         fallbackMid: " or ",
         fallbackBook: "book directly online",
       };
 
-  const STORE_KEY = "vv-chat-history";
+  const STORE_KEY = "eecw-chat-history";
   const MAX_HISTORY = 12;
 
   const loadHistory = () => {
@@ -67,35 +67,29 @@
     return n;
   };
 
-  // Launcher: 3D gold serif-italic "V" with a flare glint — Vassili's mark.
-  // Depth = stacked offset copies (deep bronze base → gold gradient face →
-  // specular highlight stroke); the flare is a bright gold star on the V's tip.
+  // Launcher: blue water drop icon — Eco's mark.
   const launcher = el("button", "chat-launcher", { type: "button", "aria-label": T.open, "aria-expanded": "false" });
   launcher.innerHTML =
     '<svg viewBox="0 0 64 64" width="50" height="50" aria-hidden="true" focusable="false">' +
       '<defs>' +
-        '<linearGradient id="vvGoldFace" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0" stop-color="#FFF0C8"/>' +
-          '<stop offset="0.38" stop-color="#E8C474"/>' +
-          '<stop offset="0.62" stop-color="#C99C45"/>' +
-          '<stop offset="1" stop-color="#A87B2D"/>' +
+        '<linearGradient id="ecoBlueFace" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#4FC3F7"/>' +
+          '<stop offset="0.38" stop-color="#1A5F9E"/>' +
+          '<stop offset="0.62" stop-color="#0D3B66"/>' +
+          '<stop offset="1" stop-color="#0A1A2F"/>' +
         '</linearGradient>' +
-        '<linearGradient id="vvGoldEdge" x1="0" y1="0" x2="0" y2="1">' +
-          '<stop offset="0" stop-color="#8A6420"/>' +
-          '<stop offset="1" stop-color="#5E430F"/>' +
+        '<linearGradient id="ecoBlueEdge" x1="0" y1="0" x2="0" y2="1">' +
+          '<stop offset="0" stop-color="#0A1A2F"/>' +
+          '<stop offset="1" stop-color="#061224"/>' +
         '</linearGradient>' +
       '</defs>' +
-      // extruded depth layers (deep bronze, offset down-right)
-      '<text x="32" y="53.6" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="56" fill="url(#vvGoldEdge)">V</text>' +
-      '<text x="31" y="52.3" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="56" fill="#6F4F14">V</text>' +
-      // gold face
-      '<text x="30" y="51" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="56" fill="url(#vvGoldFace)">V</text>' +
-      // specular sheen on the face
-      '<text x="30" y="51" text-anchor="middle" font-family="\'Cormorant Garamond\', Georgia, serif" font-style="italic" font-weight="500" font-size="56" fill="none" stroke="#FFF8E1" stroke-width="0.6" opacity="0.55">V</text>' +
-      // flare: bright gold star at the V tip + glint dot
-      '<path class="v-flare" d="M48 3.5c1.2 4.7 3.25 6.75 8 8-4.75 1.2-6.8 3.25-8 8-1.2-4.75-3.25-6.8-8-8 4.75-1.2 6.8-3.25 8-8z" fill="#FFE9A8"/>' +
-      '<path d="M48 7.2c0.75 2.9 2 4.15 4.9 4.9-2.9 0.75-4.15 2-4.9 4.9-0.75-2.9-2-4.15-4.9-4.9 2.9-0.75 4.15-2 4.9-4.9z" fill="#FFFDF9" opacity="0.9"/>' +
-      '<circle cx="40" cy="19" r="1.5" fill="#FFE9A8" opacity="0.9"/>' +
+      // water drop shape
+      '<path d="M32 4 C32 4, 14 28, 14 40 C14 52, 22 60, 32 60 C42 60, 50 52, 50 40 C50 28, 32 4, 32 4 Z" fill="url(#ecoBlueEdge)" />' +
+      '<path d="M31 3 C31 3, 13 27, 13 39 C13 51, 21 59, 31 59 C41 59, 49 51, 49 39 C49 27, 31 3, 31 3 Z" fill="url(#ecoBlueFace)" />' +
+      // specular highlight
+      '<path d="M31 3 C31 3, 13 27, 13 39 C13 51, 21 59, 31 59 C41 59, 49 51, 49 39 C49 27, 31 3, 31 3 Z" fill="none" stroke="#B8D4E8" stroke-width="0.8" opacity="0.5" />' +
+      // inner highlight
+      '<ellipse cx="26" cy="35" rx="4" ry="8" fill="#E8ECEF" opacity="0.35" transform="rotate(-20 26 35)" />' +
     '</svg>';
 
   const card = el("section", "chat-card", { role: "dialog", "aria-label": T.title, hidden: "" });
@@ -119,13 +113,11 @@
 
   card.append(header, list, form);
 
-  // ---- Intro teaser: greets on every new visit; once dismissed or the chat is
-  // opened it stays away for the rest of the browsing session (sessionStorage,
-  // not localStorage — the owner wants Vassili hard to miss for returning visitors). ----
-  const INTRO_KEY = "vv-vasili-intro-seen";
+  // ---- Intro teaser ----
+  const INTRO_KEY = "eecw-eco-intro-seen";
   const introSeen = () => {
     try { return sessionStorage.getItem(INTRO_KEY) === "1"; }
-    catch { return true; } // storage unavailable — stay quiet rather than nag on every load
+    catch { return true; }
   };
   const markIntroSeen = () => {
     try { sessionStorage.setItem(INTRO_KEY, "1"); } catch { /* ignore */ }
@@ -155,17 +147,17 @@
   const REDUCED = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   if (!introSeen()) {
     setTimeout(() => {
-      if (open) return; // chat already opened — no need to introduce
+      if (open) return;
       teaser.hidden = false;
       requestAnimationFrame(() => requestAnimationFrame(() => teaser.classList.add("show")));
     }, REDUCED ? 0 : 1500);
   } else {
-    launcher.classList.add("calm"); // returning visitor — no pulse ring
+    launcher.classList.add("calm");
   }
 
   teaserClose.addEventListener("click", hideTeaser);
 
-  // ---- Safe rendering: text nodes only, URLs linkified into real anchors ----
+  // ---- Safe rendering ----
   const URL_RE = /https?:\/\/[^\s<>"')\]]+/g;
   const renderText = (node, text) => {
     let last = 0;
@@ -187,7 +179,6 @@
     return b;
   };
 
-  // Offline fallback bubble: trusted local strings + labeled email/booking anchors.
   const addFallback = () => {
     const b = el("div", "chat-bubble chat-assistant");
     b.append(T.fallbackPre);
@@ -221,11 +212,11 @@
     if (v) {
       hideTeaser();
       markIntroSeen();
-      launcher.classList.add("calm"); // pulse ring retires after the first open
+      launcher.classList.add("calm");
       if (!greeted) {
         greeted = true;
         if (history.length) history.forEach((m) => addBubble(m.role, m.content));
-        else addBubble("assistant", T.greeting); // greeting only — never sent to the API
+        else addBubble("assistant", T.greeting);
       }
       input.focus();
       list.scrollTop = list.scrollHeight;
@@ -239,7 +230,6 @@
   closeBtn.addEventListener("click", () => setOpen(false));
   card.addEventListener("keydown", (e) => { if (e.key === "Escape") setOpen(false); });
 
-  // Public hook: any [data-open-chat] element opens the chat card.
   document.addEventListener("click", (e) => {
     const t = e.target.closest && e.target.closest("[data-open-chat]");
     if (!t) return;
@@ -267,7 +257,7 @@
       const res = await fetch(CHAT_ENDPOINT, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history.slice(-MAX_HISTORY), lang: RU ? "ru" : "en" }),
+        body: JSON.stringify({ messages: history.slice(-MAX_HISTORY), lang: AR ? "ar" : "en" }),
       });
       if (!res.ok) throw new Error("HTTP " + res.status);
       const reply = (await res.json()).reply;
@@ -278,7 +268,7 @@
       addBubble("assistant", reply);
     } catch {
       showTyping(false);
-      addFallback(); // graceful offline fallback — not stored in history
+      addFallback();
     }
 
     waiting = false;

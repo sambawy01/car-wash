@@ -1,126 +1,78 @@
 /**
- * Service catalogue for Victoria Vasilyeva Holistic Beauty.
- * eventTypeId values are the real Cal.com (api.cal.eu) event types created by
- * scripts/create-event-types.mjs — every one requires Victoria's confirmation.
+ * Service catalogue for Elite Eco Car Wash.
+ * eventTypeId values are the Cal.com event types created by
+ * scripts/create-event-types.mjs — every one requires confirmation.
  */
 
 export interface Service {
   slug: string;
   eventTypeId: number;
   en: { title: string };
-  ru: { title: string };
+  ar: { title: string };
   /** Available durations in minutes (ascending). Bookings default to the longest. */
   durations: number[];
-  priceLine: { en: string; ru: string };
+  priceLine: { en: string; ar: string };
   /** Numeric price at the LONGEST duration — used to sum combined sessions. */
-  price: { egp: number; rub: number };
+  price: { egp: number };
 }
 
 export const SERVICES: Service[] = [
   {
-    slug: "facial-massage",
-    eventTypeId: 327658,
-    en: { title: "Facial Massage" },
-    ru: { title: "Массаж лица" },
-    durations: [60, 90],
+    slug: "interior-exterior-wash",
+    eventTypeId: 0,
+    en: { title: "Interior & Exterior Wash" },
+    ar: { title: "غسيل داخلي وخارجي" },
+    durations: [60, 75],
     priceLine: {
-      en: "E£2,300–3,350 · 3 100–4 700 ₽",
-      ru: "E£2,300–3,350 · 3 100–4 700 ₽",
+      en: "E£320–370",
+      ar: "E£320–370",
     },
-    price: { egp: 3350, rub: 4700 },
+    price: { egp: 370 },
   },
   {
-    slug: "body-massage",
-    eventTypeId: 327662,
-    en: { title: "Medical Body Massage" },
-    ru: { title: "Медицинский массаж тела" },
-    durations: [40, 60],
-    priceLine: {
-      en: "E£2,500–3,350 · 3 500–4 700 ₽",
-      ru: "E£2,500–3,350 · 3 500–4 700 ₽",
-    },
-    price: { egp: 3350, rub: 4700 },
-  },
-  {
-    slug: "microcurrent-rf",
-    eventTypeId: 327663,
-    en: { title: "Microcurrent / RF Therapy" },
-    ru: { title: "Микротоки · RF-терапия" },
-    durations: [20],
-    priceLine: { en: "E£1,100 · 1 600 ₽", ru: "E£1,100 · 1 600 ₽" },
-    price: { egp: 1100, rub: 1600 },
-  },
-  {
-    slug: "hydrofacial",
-    eventTypeId: 327664,
-    en: { title: "HydroFacial + Ultrasonic Cleaning" },
-    ru: { title: "HydroFacial + ультразвуковая чистка" },
-    durations: [60, 90],
-    priceLine: { en: "E£3,700 · 5 200 ₽", ru: "E£3,700 · 5 200 ₽" },
-    price: { egp: 3700, rub: 5200 },
-  },
-  {
-    slug: "clear-skin-holy-land",
-    eventTypeId: 327665,
-    en: { title: "Clear Skin with HOLY LAND" },
-    ru: { title: "Чистая кожа с HOLY LAND" },
-    durations: [60],
-    priceLine: { en: "E£1,800 · 2 500 ₽", ru: "E£1,800 · 2 500 ₽" },
-    price: { egp: 1800, rub: 2500 },
-  },
-  {
-    slug: "carboxytherapy",
-    eventTypeId: 327666,
-    en: { title: "Non-Invasive Carboxytherapy" },
-    ru: { title: "Неинвазивная карбокситерапия" },
+    slug: "wheel-cleaning",
+    eventTypeId: 0,
+    en: { title: "Wheel Cleaning" },
+    ar: { title: "تنظيف الجنوط" },
     durations: [30],
-    priceLine: { en: "E£1,300 · 1 800 ₽", ru: "E£1,300 · 1 800 ₽" },
-    price: { egp: 1300, rub: 1800 },
+    priceLine: { en: "E£140", ar: "E£140" },
+    price: { egp: 140 },
   },
   {
-    slug: "mandelic-peel",
-    eventTypeId: 327667,
-    en: { title: "Mandelic Onmacabim Peel" },
-    ru: { title: "Миндальный пилинг Onmacabim" },
-    durations: [20],
-    priceLine: { en: "E£1,700 · 2 300 ₽", ru: "E£1,700 · 2 300 ₽" },
-    price: { egp: 1700, rub: 2300 },
-  },
-  {
-    slug: "alginate-mask",
-    eventTypeId: 327668,
-    en: { title: "Alginate Mask" },
-    ru: { title: "Альгинатная маска" },
+    slug: "engine-cleaning",
+    eventTypeId: 0,
+    en: { title: "Engine Cleaning" },
+    ar: { title: "تنظيف المحرك" },
     durations: [30],
-    priceLine: { en: "E£1,100 · 1 600 ₽", ru: "E£1,100 · 1 600 ₽" },
-    price: { egp: 1100, rub: 1600 },
+    priceLine: { en: "E£230", ar: "E£230" },
+    price: { egp: 230 },
   },
   {
-    slug: "dermapen-face-neck-decollete",
-    eventTypeId: 327669,
-    en: { title: "Derma Pen — Full Face + Neck + Décolletage" },
-    ru: { title: "Дермапен — лицо + шея + декольте" },
+    slug: "polishing-protection",
+    eventTypeId: 0,
+    en: { title: "Polishing & Protection" },
+    ar: { title: "تلميع وحماية الطلاء" },
     durations: [90],
-    priceLine: { en: "E£4,550 · 6 400 ₽", ru: "E£4,550 · 6 400 ₽" },
-    price: { egp: 4550, rub: 6400 },
+    priceLine: { en: "E£700", ar: "E£700" },
+    price: { egp: 700 },
   },
   {
-    slug: "dermapen-face-neck",
-    eventTypeId: 327670,
-    en: { title: "Derma Pen — Full Face + Neck" },
-    ru: { title: "Дермапен — лицо + шея" },
+    slug: "steam-cleaning",
+    eventTypeId: 0,
+    en: { title: "Steam Cleaning" },
+    ar: { title: "تنظيف وتعقيم بالبخار" },
     durations: [60],
-    priceLine: { en: "E£3,350 · 4 700 ₽", ru: "E£3,350 · 4 700 ₽" },
-    price: { egp: 3350, rub: 4700 },
+    priceLine: { en: "E£330", ar: "E£330" },
+    price: { egp: 330 },
   },
   {
-    slug: "dermapen-single-area",
-    eventTypeId: 327671,
-    en: { title: "Derma Pen — Single Area" },
-    ru: { title: "Дермапен — одна зона" },
-    durations: [30],
-    priceLine: { en: "E£2,500 · 3 500 ₽", ru: "E£2,500 · 3 500 ₽" },
-    price: { egp: 2500, rub: 3500 },
+    slug: "waterless-wash",
+    eventTypeId: 0,
+    en: { title: "Waterless Wash" },
+    ar: { title: "غسيل بدون مياه" },
+    durations: [45],
+    priceLine: { en: "E£220", ar: "E£220" },
+    price: { egp: 220 },
   },
 ];
 
@@ -130,23 +82,21 @@ export function getServiceBySlug(slug: string | undefined): Service | undefined 
 }
 
 /**
- * Multi-treatment sessions are booked on a single shared Cal.com event type
+ * Multi-service sessions are booked on a single shared Cal.com event type
  * created by scripts/create-combined-session.mjs. Its lengthInMinutesOptions
- * cover every achievable sum of 2–4 treatments (longest duration per service,
- * capped at 240 min) plus all single-service durations.
+ * cover every achievable sum of 2–4 services (longest duration per service,
+ * capped at 180 min) plus all single-service durations.
  */
 export const COMBINED_SESSION = {
   slug: "combined-session",
-  eventTypeId: 327902,
+  eventTypeId: 0,
 } as const;
 
-/** Verified against Cal (GET /event-types/327902 → lengthInMinutesOptions). */
 export const COMBINED_DURATION_OPTIONS: readonly number[] = [
-  20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180,
-  190, 200, 210, 220, 230, 240,
+  30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180,
 ];
 
-export const MAX_COMBINED_MINUTES = 240;
+export const MAX_COMBINED_MINUTES = 180;
 
 /** Longest duration of a service — combined sessions always use this. */
 export function longestDuration(service: Service): number {

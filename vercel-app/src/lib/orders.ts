@@ -63,8 +63,8 @@ export interface CancelReason {
 export interface StoredOrderItem {
   slug: string;
   qty: number;
-  names: { en: string; ru: string };
-  lineTotals: { egp: number; rub: number };
+  names: { en: string; ar: string };
+  lineTotals: { egp: number };
 }
 
 export interface StoredOrder {
@@ -72,14 +72,14 @@ export interface StoredOrder {
   createdAt: string; // ISO 8601
   status: OrderStatus;
   items: StoredOrderItem[];
-  totals: { egp: number; rub: number };
+  totals: { egp: number };
   name: string;
   phone: string;
   /** Optional — "" when the buyer left it blank. */
   email: string;
   address: string;
   note: string;
-  lang: "en" | "ru";
+  lang: "en" | "ar";
   statusHistory: { status: OrderStatus; at: string; reason?: CancelReason }[];
 }
 

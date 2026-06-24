@@ -114,7 +114,7 @@ export function buildEveningDigest(input: EveningDigestInput): EveningDigest {
   const subject = `Evening digest — ${subjectDate}: ${tomorrow.length} tomorrow, ${stalePending.length + staleOrders.length} need action`;
 
   const adminToken = process.env.ADMIN_TOKEN || "";
-  const adminBase = "https://book.victoriaholisticbeauty.com/admin";
+  const adminBase = "https://book.eliteecocarwash.com/admin";
   const adminLink = adminToken
     ? `${adminBase}?key=${encodeURIComponent(adminToken)}`
     : adminBase;

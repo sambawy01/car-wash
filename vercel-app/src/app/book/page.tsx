@@ -9,40 +9,38 @@ import {
 } from "@/lib/treatments";
 
 export const metadata = {
-  title: "Book — Victoria Vasilyeva Holistic Beauty",
+  title: "Book — Elite Eco Car Wash",
 };
 
-const WHATSAPP_LINK = "https://wa.me/79388883431";
-const MAIN_SITE_EN = "https://victoriaholisticbeauty.com/";
-const MAIN_SITE_RU = "https://victoriaholisticbeauty.com/ru.html";
+const WHATSAPP_LINK = "https://wa.me/201111147766";
+const MAIN_SITE_EN = "https://eliteecocarwash.com/";
+const MAIN_SITE_AR = "https://eliteecocarwash.com/ar.html";
 
-type Lang = "en" | "ru";
+type Lang = "en" | "ar";
 
 function withLang(path: string, lang: Lang) {
-  if (lang !== "ru") return path;
-  return path.includes("?") ? `${path}&lang=ru` : `${path}?lang=ru`;
+  if (lang !== "ar") return path;
+  return path.includes("?") ? `${path}&lang=ar` : `${path}?lang=ar`;
 }
 
 function durationLabel(durations: number[], lang: Lang) {
-  const unit = lang === "ru" ? "мин" : "min";
+  const unit = lang === "ar" ? "دقيقة" : "min";
   return `${durations.join(" / ")} ${unit}`;
 }
 
 /* ---------- live service list (treatments catalog → Service shape) ---------- */
 
-/** "E£3,700 · 5 200 ₽" — the single-price line style of the static SERVICES. */
-function priceLine(egp: number, rub: number): string {
-  const egpText = `E£${egp.toLocaleString("en-US")}`;
-  const rubText = `${String(rub).replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ₽`;
-  return `${egpText} · ${rubText}`;
+/** "E£370" — the single-price line style of the static SERVICES. */
+function priceLine(egp: number): string {
+  return `E£${egp.toLocaleString("en-US")}`;
 }
 
 /**
  * Map a catalog treatment onto the Service shape the booking flow uses.
  * While a treatment still matches its static SERVICES entry (the seed state),
  * the static entry is returned as-is — preserving multi-duration toggles and
- * range price lines for the services that have them. Once Victoria edits a
- * treatment, it becomes a single-duration service with her values.
+ * range price lines for the services that have them. Once the owner edits a
+ * treatment, it becomes a single-duration service with the new values.
  */
 function treatmentToService(t: Treatment): Service {
   const staticService = SERVICES.find((s) => s.slug === t.slug);
@@ -51,21 +49,20 @@ function treatmentToService(t: Treatment): Service {
     staticService.eventTypeId === t.eventTypeId &&
     Math.max(...staticService.durations) === t.durationMinutes &&
     staticService.price.egp === t.priceEgp &&
-    staticService.price.rub === t.priceRub &&
     staticService.en.title === t.name.en &&
-    staticService.ru.title === t.name.ru
+    staticService.ar.title === t.name.ar
   ) {
     return staticService;
   }
-  const line = priceLine(t.priceEgp, t.priceRub);
+  const line = priceLine(t.priceEgp);
   return {
     slug: t.slug,
     eventTypeId: t.eventTypeId,
     en: { title: t.name.en },
-    ru: { title: t.name.ru },
+    ar: { title: t.name.ar },
     durations: [t.durationMinutes],
-    priceLine: { en: line, ru: line },
-    price: { egp: t.priceEgp, rub: t.priceRub },
+    priceLine: { en: line, ar: line },
+    price: { egp: t.priceEgp },
   };
 }
 
@@ -91,16 +88,16 @@ async function loadServices(): Promise<Service[]> {
 
 function MissingConfigNotice({ lang }: { lang: Lang }) {
   const text =
-    lang === "ru"
-      ? "Онлайн-календарь скоро появится — запишитесь в WhatsApp"
+    lang === "ar"
+      ? "قريباً سيكون التقويم متاحاً — احجز فوراً عبر واتساب"
       : "Online calendar coming soon — book instantly on WhatsApp";
-  const cta = lang === "ru" ? "Написать в WhatsApp" : "Open WhatsApp";
+  const cta = lang === "ar" ? "افتح واتساب" : "Open WhatsApp";
   return (
-    <div className="mx-auto flex max-w-xl flex-col items-center gap-8 rounded-2xl border border-[#A9745A]/30 bg-[#FFFDF9] px-8 py-16 text-center shadow-sm">
-      <p className="font-serif text-2xl leading-snug text-[#3A332C]">{text}</p>
+    <div className="mx-auto flex max-w-xl flex-col items-center gap-8 rounded-2xl border border-[#0D3B66]/30 bg-[#FFFFFF] px-8 py-16 text-center shadow-sm">
+      <p className="font-serif text-2xl leading-snug text-[#0A1A2F]">{text}</p>
       <a
         href={WHATSAPP_LINK}
-        className="rounded-full bg-[#A9745A] px-8 py-3 font-medium text-[#FDF9F3] transition-opacity hover:opacity-90"
+        className="rounded-full bg-[#0D3B66] px-8 py-3 font-medium text-[#F8FAFC] transition-opacity hover:opacity-90"
       >
         {cta}
       </a>
@@ -111,27 +108,27 @@ function MissingConfigNotice({ lang }: { lang: Lang }) {
 function ServicePicker({ lang, services }: { lang: Lang; services: Service[] }) {
   return (
     <div className="mx-auto max-w-2xl">
-      <p className="mb-8 text-center text-[#847866]">
-        {lang === "ru"
-          ? "Выберите процедуру, чтобы посмотреть свободное время."
-          : "Choose a treatment to see available times."}
+      <p className="mb-8 text-center text-[#4A5568]">
+        {lang === "ar"
+          ? "اختر خدمة لرؤية المواعيد المتاحة."
+          : "Choose a service to see available times."}
       </p>
       <ul className="flex flex-col gap-3">
         {services.map((service) => (
           <li key={service.slug}>
             <Link
               href={withLang(`/book?service=${service.slug}`, lang)}
-              className="group flex items-baseline justify-between gap-4 rounded-xl border border-[#3A332C]/10 bg-[#FFFDF9] px-6 py-5 shadow-sm transition-colors hover:border-[#A9745A]/50"
+              className="group flex items-baseline justify-between gap-4 rounded-xl border border-[#0A1A2F]/10 bg-[#FFFFFF] px-6 py-5 shadow-sm transition-colors hover:border-[#0D3B66]/50"
             >
               <span>
-                <span className="block font-serif text-lg text-[#3A332C] transition-colors group-hover:text-[#A9745A]">
+                <span className="block font-serif text-lg text-[#0A1A2F] transition-colors group-hover:text-[#0D3B66]">
                   {service[lang].title}
                 </span>
-                <span className="mt-1 block text-sm text-[#847866]">
+                <span className="mt-1 block text-sm text-[#4A5568]">
                   {service.priceLine[lang]}
                 </span>
               </span>
-              <span className="shrink-0 text-sm text-[#A9745A]">
+              <span className="shrink-0 text-sm text-[#0D3B66]">
                 {durationLabel(service.durations, lang)}
               </span>
             </Link>
@@ -152,14 +149,14 @@ export default async function BookPage({
     service: serviceParam,
     duration: durationParam,
   } = await searchParams;
-  const lang: Lang = langParam === "ru" ? "ru" : "en";
+  const lang: Lang = langParam === "ar" ? "ar" : "en";
 
   const services = await loadServices();
   const service = serviceParam
     ? services.find((s) => s.slug === serviceParam)
     : undefined;
   const calcomConfigured = Boolean(process.env.CALCOM_API_KEY);
-  const mainSite = lang === "ru" ? MAIN_SITE_RU : MAIN_SITE_EN;
+  const mainSite = lang === "ar" ? MAIN_SITE_AR : MAIN_SITE_EN;
 
   // Resolve requested duration; fall back to the longest available.
   const requestedDuration = durationParam ? parseInt(durationParam, 10) : NaN;
@@ -177,28 +174,27 @@ export default async function BookPage({
           <a
             href={mainSite}
             className="mb-6 inline-block"
-            aria-label="Victoria Vasilyeva Holistic Beauty — main site"
+            aria-label="Elite Eco Car Wash — main site"
           >
-            {/* logo asset is white-on-transparent; recolor to deep warm brown */}
             <Image
               src="/logo-white.png"
-              alt="Victoria Vasilyeva Holistic Beauty"
+              alt="Elite Eco Car Wash"
               width={152}
               height={77}
               priority
-              className="mx-auto h-auto w-36 opacity-85 [filter:brightness(0)_sepia(0.25)]"
+              className="mx-auto h-auto w-36 opacity-85"
             />
           </a>
-          <p className="mb-3 text-sm uppercase tracking-[0.3em] text-[#A9745A]">
-            Holistic Beauty
+          <p className="mb-3 text-sm uppercase tracking-[0.3em] text-[#0D3B66]">
+            Elite Eco Car Wash
           </p>
-          <h1 className="font-serif text-3xl font-medium text-[#3A332C] sm:text-4xl">
-            {lang === "ru" ? "Запись на приём" : "Book an Appointment"}
+          <h1 className="font-serif text-3xl font-medium text-[#0A1A2F] sm:text-4xl">
+            {lang === "ar" ? "احجز موعداً" : "Book a Car Wash"}
           </h1>
-          <p className="mt-3 text-sm text-[#847866]">
-            {lang === "ru"
-              ? "Обратите внимание: Виктория принимает только женщин."
-              : "Please note: Victoria works with female clients only."}
+          <p className="mt-3 text-sm text-[#4A5568]">
+            {lang === "ar"
+              ? "نصل إليك أينما كنت في الغونة"
+              : "We bring the car wash to you — anywhere in El Gouna."}
           </p>
         </header>
 
@@ -215,9 +211,9 @@ export default async function BookPage({
           <ServicePicker lang={lang} services={services} />
         )}
 
-        <p className="mt-12 text-center text-sm text-[#847866]">
+        <p className="mt-12 text-center text-sm text-[#4A5568]">
           <a href={mainSite} className="underline-offset-4 hover:underline">
-            ← Victoria Vasilyeva Holistic Beauty
+            ← Elite Eco Car Wash
           </a>
         </p>
       </div>

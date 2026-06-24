@@ -8,11 +8,7 @@
  *
  * Do NOT import this module from the order path — use @/lib/catalog.
  *
- * Prices are in EGP and RUB (integer units, no cents). Two products carry
- * prices converted from onmacabim-prof.com USD list prices (rates of
- * 2026-06-11, EGP rounded to nearest 50, RUB to nearest 100); the other
- * four had no listed price and keep placeholder values pending the
- * owner's confirmation.
+ * Prices are in EGP only (integer units, no cents).
  *
  * Slugs and prices MUST stay identical to the PRODUCTS array in /shop.js
  * (static site) — drift breaks order submission.
@@ -21,53 +17,46 @@
 export interface ShopProduct {
   slug: string;
   nameEn: string;
-  nameRu: string;
+  nameAr: string;
   priceEgp: number;
-  priceRub: number;
 }
 
 export const SHOP_PRODUCTS: readonly ShopProduct[] = [
   {
-    slug: "tohar-hamidbar-concentrate",
-    nameEn: "Tohar Hamidbar No.2 Herbal Concentrate — DM line 150ml",
-    nameRu: "Травяной концентрат Tohar Hamidbar №2 (линия DM, 150 мл)",
-    priceEgp: 1450,
-    priceRub: 2000,
+    slug: "premium-car-shampoo",
+    nameEn: "Premium Car Shampoo — 1L",
+    nameAr: "شامبو سيارات فاخر — 1 لتر",
+    priceEgp: 180,
   },
   {
-    slug: "nd-neck-decollete-cream",
-    nameEn: "N.D Cream for Neck & Décolleté — Vivant line 50ml",
-    nameRu: "Крем для шеи и декольте N.D (линия Vivant, 50 мл)",
-    priceEgp: 1250,
-    priceRub: 1750,
+    slug: "ceramic-wax-spray",
+    nameEn: "Ceramic Wax Spray — 500ml",
+    nameAr: "سيراميك وكس سبراي — 500 مل",
+    priceEgp: 250,
   },
   {
-    slug: "vitamin-c-mask",
-    nameEn: "Nourishing Skin Mask Vitamin C — VC line 50ml",
-    nameRu: "Питательная маска с витамином C (линия VC, 50 мл)",
-    priceEgp: 2300,
-    priceRub: 3200,
+    slug: "microfiber-cloth-set",
+    nameEn: "Microfiber Cloth Set — 3 pack",
+    nameAr: "طقم أقمشة مايكروفايبر — 3 قطع",
+    priceEgp: 120,
   },
   {
-    slug: "vitality-spf15-moisturizer",
-    nameEn: "Vitality Moisturizer SPF 15 — Oxygen line 50ml",
-    nameRu: "Увлажняющий крем Vitality SPF 15 (линия Oxygen, 50 мл)",
-    priceEgp: 1150,
-    priceRub: 1600,
+    slug: "tire-shine-gel",
+    nameEn: "Tire Shine Gel — 500ml",
+    nameAr: "جل تلميع الإطارات — 500 مل",
+    priceEgp: 150,
   },
   {
-    slug: "nomela-serum",
-    nameEn: "NoMela Facial Serum — Luna whitening series 50ml",
-    nameRu: "Сыворотка для лица NoMela (серия Luna, 50 мл)",
-    priceEgp: 1350,
-    priceRub: 1900,
+    slug: "interior-cleaner-spray",
+    nameEn: "Interior Cleaner Spray — 750ml",
+    nameAr: "منظف الداخل سبراي — 750 مل",
+    priceEgp: 130,
   },
   {
-    slug: "moisturizer-normal-dry",
-    nameEn: "Moisturizer for Normal to Dry Skin — ST Cells line 50ml",
-    nameRu: "Увлажняющий крем для нормальной и сухой кожи (линия ST Cells, 50 мл)",
-    priceEgp: 4850,
-    priceRub: 6700,
+    slug: "waterless-wash-spray",
+    nameEn: "Waterless Wash Spray — 500ml",
+    nameAr: "سبراي غسيل بدون مياه — 500 مل",
+    priceEgp: 220,
   },
 ] as const;
 
@@ -75,12 +64,7 @@ export const PRODUCTS_BY_SLUG: ReadonlyMap<string, ShopProduct> = new Map(
   SHOP_PRODUCTS.map((p) => [p.slug, p])
 );
 
-/** "3540" -> "3,540" (EGP style). */
+/** "3540" -> "E£3,540" (EGP style). */
 export function formatEgp(amount: number): string {
   return `E£${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
-}
-
-/** "4900" -> "4 900 ₽" (RUB style, space-grouped). */
-export function formatRub(amount: number): string {
-  return `${amount.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " ")} ₽`;
 }

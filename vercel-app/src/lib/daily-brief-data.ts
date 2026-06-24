@@ -4,8 +4,8 @@ import { rebookingRadar } from "./crm";
 import type { BriefRebookingClient } from "./daily-brief-email";
 
 /**
- * Shared data gathering for Victoria's daily brief — used by both the
- * 8am-Cairo cron email (/api/cron/daily-brief) and Vassili's `daily_brief`
+ * Shared data gathering for the daily brief — used by both the
+ * 8am-Cairo cron email (/api/cron/daily-brief) and Eco's `daily_brief`
  * Telegram tool, so the two views can never drift.
  *
  * Fail-soft per source: if Cal or Blob is down, the brief still renders with

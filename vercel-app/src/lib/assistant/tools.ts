@@ -65,7 +65,7 @@ import {
 } from "./ollama-search";
 
 /**
- * Vassili's tool belt.
+ * Eco's tool belt.
  *
  * Two classes of tools:
  * - READ-ONLY (bookings_*, orders_list, order_lookup, catalog_list,
@@ -74,7 +74,7 @@ import {
  * - MUTATING (booking_confirm/decline/move, order_set_status,
  *   product_update/add/remove, block_time, email_send to non-owner
  *   recipients) are NEVER executed by the model directly. The agent loop
- *   intercepts them, stores a pending action on Blob, and Victoria gets a
+ *   intercepts them, stores a pending action on Blob, and the owner gets a
  *   [Confirm | Cancel] inline keyboard. Only the callback handler calls
  *   `executeTool` for these. Every confirmation summary spells out the
  *   third-party side effects (client emails, public-site changes, calendar
@@ -82,7 +82,7 @@ import {
  *   structurally so disclosure cannot depend on the model's mood.
  *
  * `document_create` sends the PDF straight to the owner chat — it creates
- * nothing outside Telegram, so it counts as read-only.
+ *   nothing outside Telegram, so it counts as read-only.
  */
 
 export interface ToolContext {
@@ -140,11 +140,11 @@ export const TOOLS: OllamaTool[] = [
   ),
   tool(
     "bookings_pending",
-    "List PENDING booking requests awaiting Victoria's confirmation. Returns each booking's uid — needed for booking_confirm / booking_decline / booking_move."
+    "List PENDING booking requests awaiting confirmation. Returns each booking's uid — needed for booking_confirm / booking_decline / booking_move."
   ),
   tool(
     "booking_confirm",
-    "Confirm (accept) a pending booking request. MUTATING — Victoria will be asked to confirm with a button. Look up the uid via bookings_pending first.",
+    "Confirm (accept) a pending booking request. MUTATING — the owner will be asked to confirm with a button. Look up the uid via bookings_pending first.",
     { uid: { type: "string", description: "Cal booking uid" } },
     ["uid"]
   ),

@@ -5,36 +5,28 @@ import { get, put } from "@vercel/blob";
  * mirroring the shop catalog in @/lib/catalog.
  *
  * Layout: ONE JSON document at `catalog/treatments.json` holding the full
- * treatment array (11 services — a single read-modify-write document).
+ * treatment array (6 services — a single read-modify-write document).
  *
  * Lifecycle:
  * - When the blob does not exist yet, `getTreatmentsCatalog()` returns SEED —
- *   the 11 live treatments exactly as rendered on the static site and /book
- *   today, each linked to its real Cal.com (api.cal.eu) event type. The blob
- *   is written lazily on the first admin save, so a fresh deployment works
- *   with zero setup.
+ *   the 6 live services exactly as rendered on the static site and /book
+ *   today, each linked to its Cal.com event type. The blob is written lazily
+ *   on the first admin save, so a fresh deployment works with zero setup.
  * - A treatment's PRICE lives only here — Cal.com event types carry no price
  *   today and that stays the case. Name/duration changes are best-effort
  *   synced to the linked Cal event type by the admin routes.
  * - Deactivating (active: false) hides the treatment from the public API and
  *   best-effort hides the Cal event type (hidden: true).
- *
- * NOTE on single duration/price: services with a duration range on the site
- * (e.g. Facial Massage 60/90) are seeded at their LONGEST duration and that
- * duration's price — the same canonical price `@/lib/services` uses for
- * combined-session sums. The static pages keep their richer server-rendered
- * multi-duration price rows as long as the catalog entry still matches SEED.
  */
 
 export interface Treatment {
   slug: string;
-  /** Linked Cal.com event type (api.cal.eu). 0 = no linked event type. */
+  /** Linked Cal.com event type. 0 = no linked event type. */
   eventTypeId: number;
-  name: { en: string; ru: string };
-  description: { en: string; ru: string };
+  name: { en: string; ar: string };
+  description: { en: string; ar: string };
   durationMinutes: number;
   priceEgp: number;
-  priceRub: number;
   /** Deactivated treatments stay in the catalog but never reach the public API. */
   active: boolean;
   createdAt: string;
@@ -45,175 +37,121 @@ export interface Treatment {
 export interface PublicTreatment {
   slug: string;
   eventTypeId: number;
-  name: { en: string; ru: string };
-  description: { en: string; ru: string };
+  name: { en: string; ar: string };
+  description: { en: string; ar: string };
   durationMinutes: number;
   priceEgp: number;
-  priceRub: number;
 }
 
 export const TREATMENTS_PATHNAME = "catalog/treatments.json";
 
 // --- Seed --------------------------------------------------------------------
 
-const SEED_TIMESTAMP = "2026-06-12T00:00:00.000Z";
+const SEED_TIMESTAMP = "2026-06-24T00:00:00.000Z";
 
 /**
- * The 11 live treatments. Verified against:
- * - Cal.com event types (GET api.cal.eu/v2/event-types, 2026-06-12):
- *   ids 327658–327671, slugs/titles/lengths match below.
- * - index.html / ru.html treatment rows (prices already include the +20%).
- * - /book service definitions in @/lib/services (canonical names + the price
- *   at the longest duration).
- * Descriptions are the t-sub lines from the static pages.
+ * The 6 live car wash services. Prices include the current rate.
+ * Descriptions are the sub-lines from the static pages.
  */
 export const SEED: readonly Treatment[] = [
   {
-    slug: "facial-massage",
-    eventTypeId: 327658,
-    name: { en: "Facial Massage", ru: "Массаж лица" },
+    slug: "interior-exterior-wash",
+    eventTypeId: 0,
+    name: {
+      en: "Interior & Exterior Wash",
+      ar: "غسيل داخلي وخارجي",
+    },
     description: {
-      en: "Plastic / Myofascial / Buccal",
-      ru: "пластический / миофасциальный / буккальный",
+      en: "Complete interior vacuum, dashboard cleaning, and exterior foam wash with hot wax",
+      ar: "تنظيف داخلي شامل بالمكنسة الكهربائية وتنظيف الطابلون وغسيل خارجي بالرغوة مع واكس ساخن",
     },
-    durationMinutes: 90,
-    priceEgp: 3350,
-    priceRub: 4700,
+    durationMinutes: 75,
+    priceEgp: 370,
     active: true,
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
   },
   {
-    slug: "body-massage",
-    eventTypeId: 327662,
-    name: { en: "Medical Body Massage", ru: "Медицинский массаж тела" },
-    description: { en: "", ru: "" },
-    durationMinutes: 60,
-    priceEgp: 3350,
-    priceRub: 4700,
-    active: true,
-    createdAt: SEED_TIMESTAMP,
-    updatedAt: SEED_TIMESTAMP,
-  },
-  {
-    slug: "microcurrent-rf",
-    eventTypeId: 327663,
-    name: { en: "Microcurrent / RF Therapy", ru: "Микротоки · RF-терапия" },
-    description: { en: "", ru: "" },
-    durationMinutes: 20,
-    priceEgp: 1100,
-    priceRub: 1600,
-    active: true,
-    createdAt: SEED_TIMESTAMP,
-    updatedAt: SEED_TIMESTAMP,
-  },
-  {
-    slug: "hydrofacial",
-    eventTypeId: 327664,
+    slug: "wheel-cleaning",
+    eventTypeId: 0,
     name: {
-      en: "HydroFacial + Ultrasonic Cleaning",
-      ru: "HydroFacial + ультразвуковая чистка",
+      en: "Wheel Cleaning",
+      ar: "تنظيف الجنوط",
     },
-    description: { en: "Onmacabim", ru: "Onmacabim" },
-    durationMinutes: 90,
-    priceEgp: 3700,
-    priceRub: 5200,
-    active: true,
-    createdAt: SEED_TIMESTAMP,
-    updatedAt: SEED_TIMESTAMP,
-  },
-  {
-    slug: "clear-skin-holy-land",
-    eventTypeId: 327665,
-    name: { en: "Clear Skin with HOLY LAND", ru: "Чистая кожа с HOLY LAND" },
     description: {
-      en: "Fruit Peel & Hydro Mask",
-      ru: "фруктовый пилинг и гидромаска",
+      en: "Deep cleaning for alloy wheels, tires, and wheel arches",
+      ar: "تنظيف عميق للجنوط والإطارات وأقواس العجلات",
     },
-    durationMinutes: 60,
-    priceEgp: 1800,
-    priceRub: 2500,
-    active: true,
-    createdAt: SEED_TIMESTAMP,
-    updatedAt: SEED_TIMESTAMP,
-  },
-  {
-    slug: "carboxytherapy",
-    eventTypeId: 327666,
-    name: {
-      en: "Non-Invasive Carboxytherapy",
-      ru: "Неинвазивная карбокситерапия",
-    },
-    description: { en: "", ru: "" },
     durationMinutes: 30,
-    priceEgp: 1300,
-    priceRub: 1800,
+    priceEgp: 140,
     active: true,
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
   },
   {
-    slug: "mandelic-peel",
-    eventTypeId: 327667,
-    name: { en: "Mandelic Onmacabim Peel", ru: "Миндальный пилинг Onmacabim" },
-    description: { en: "All-Season Lifting", ru: "всесезонный лифтинг" },
-    durationMinutes: 20,
-    priceEgp: 1700,
-    priceRub: 2300,
-    active: true,
-    createdAt: SEED_TIMESTAMP,
-    updatedAt: SEED_TIMESTAMP,
-  },
-  {
-    slug: "alginate-mask",
-    eventTypeId: 327668,
-    name: { en: "Alginate Mask", ru: "Альгинатная маска" },
-    description: { en: "", ru: "" },
-    durationMinutes: 30,
-    priceEgp: 1100,
-    priceRub: 1600,
-    active: true,
-    createdAt: SEED_TIMESTAMP,
-    updatedAt: SEED_TIMESTAMP,
-  },
-  {
-    slug: "dermapen-face-neck-decollete",
-    eventTypeId: 327669,
+    slug: "engine-cleaning",
+    eventTypeId: 0,
     name: {
-      en: "Derma Pen — Full Face + Neck + Décolletage",
-      ru: "Дермапен — лицо + шея + декольте",
+      en: "Engine Cleaning",
+      ar: "تنظيف المحرك",
     },
-    description: { en: "", ru: "" },
+    description: {
+      en: "Safe engine bay degreasing and dressing",
+      ar: "إزالة الشحوم من حوض المحرك بأمان وتلميعه",
+    },
+    durationMinutes: 30,
+    priceEgp: 230,
+    active: true,
+    createdAt: SEED_TIMESTAMP,
+    updatedAt: SEED_TIMESTAMP,
+  },
+  {
+    slug: "polishing-protection",
+    eventTypeId: 0,
+    name: {
+      en: "Polishing & Protection",
+      ar: "تلميع وحماية الطلاء",
+    },
+    description: {
+      en: "Machine polishing with protective wax coating for long-lasting shine",
+      ar: "تلميع بالماكينة مع طبقة حماية بالواكس لبريق يدوم طويلاً",
+    },
     durationMinutes: 90,
-    priceEgp: 4550,
-    priceRub: 6400,
+    priceEgp: 700,
     active: true,
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
   },
   {
-    slug: "dermapen-face-neck",
-    eventTypeId: 327670,
+    slug: "steam-cleaning",
+    eventTypeId: 0,
     name: {
-      en: "Derma Pen — Full Face + Neck",
-      ru: "Дермапен — лицо + шея",
+      en: "Steam Cleaning",
+      ar: "تنظيف وتعقيم بالبخار",
     },
-    description: { en: "", ru: "" },
+    description: {
+      en: "Sanitizing steam clean for interior surfaces and upholstery",
+      ar: "تنظيف وتعقيم بالبخار للأسطح الداخلية والتنجيد",
+    },
     durationMinutes: 60,
-    priceEgp: 3350,
-    priceRub: 4700,
+    priceEgp: 330,
     active: true,
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
   },
   {
-    slug: "dermapen-single-area",
-    eventTypeId: 327671,
-    name: { en: "Derma Pen — Single Area", ru: "Дермапен — одна зона" },
-    description: { en: "", ru: "" },
-    durationMinutes: 30,
-    priceEgp: 2500,
-    priceRub: 3500,
+    slug: "waterless-wash",
+    eventTypeId: 0,
+    name: {
+      en: "Waterless Wash",
+      ar: "غسيل بدون مياه",
+    },
+    description: {
+      en: "Eco-friendly waterless wash using premium spray products",
+      ar: "غسيل صديق للبيئة بدون مياه باستخدام منتجات رش فاخرة",
+    },
+    durationMinutes: 45,
+    priceEgp: 220,
     active: true,
     createdAt: SEED_TIMESTAMP,
     updatedAt: SEED_TIMESTAMP,
@@ -236,7 +174,6 @@ export function toPublicTreatment(t: Treatment): PublicTreatment {
     description: { ...t.description },
     durationMinutes: t.durationMinutes,
     priceEgp: t.priceEgp,
-    priceRub: t.priceRub,
   };
 }
 
@@ -256,17 +193,15 @@ function isValidTreatment(value: unknown): value is Treatment {
     t.name !== null &&
     typeof t.name.en === "string" &&
     t.name.en.length > 0 &&
-    typeof t.name.ru === "string" &&
+    typeof t.name.ar === "string" &&
     typeof t.description === "object" &&
     t.description !== null &&
     typeof t.description.en === "string" &&
-    typeof t.description.ru === "string" &&
+    typeof t.description.ar === "string" &&
     typeof t.durationMinutes === "number" &&
     Number.isFinite(t.durationMinutes) &&
     typeof t.priceEgp === "number" &&
     Number.isFinite(t.priceEgp) &&
-    typeof t.priceRub === "number" &&
-    Number.isFinite(t.priceRub) &&
     typeof t.active === "boolean" &&
     typeof t.createdAt === "string" &&
     typeof t.updatedAt === "string"

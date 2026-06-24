@@ -1,9 +1,9 @@
-/* Earthen Calm — mobile navigation (vanilla JS, no dependencies).
+/* Elite Eco Car Wash — mobile navigation (vanilla JS, no dependencies).
    One file serves every page, same pattern as chat.js.
 
    On phones (≤ 700px) the inline nav links collapse behind a hamburger toggle;
-   the bar keeps the logo and the Book Now / Записаться CTA. The menu panel is
-   a full-width dropdown under the bar: card surface, gold hairline, serif list.
+   the bar keeps the logo and the Book Now CTA. The menu panel is a
+   full-width dropdown under the bar: card surface, blue hairline, serif list.
 
    Progressive enhancement: this script tags <html> with .has-navjs — every
    collapsed-state style in styles.css is gated behind that class, so without
@@ -17,9 +17,9 @@
 
   document.documentElement.classList.add("has-navjs");
 
-  const RU = document.documentElement.lang === "ru";
-  const T = RU
-    ? { open: "Открыть меню", close: "Закрыть меню" }
+  const AR = document.documentElement.lang === "ar";
+  const T = AR
+    ? { open: "فتح القائمة", close: "إغلاق القائمة" }
     : { open: "Open menu", close: "Close menu" };
 
   /* ---- Restructure the bar: brand | [ links · CTA · toggle ] ----
@@ -92,11 +92,6 @@
   toggle.addEventListener("click", () => (open ? closeMenu() : openMenu()));
 
   // Close on link tap (capture phase, so we run before other handlers).
-  // Same-page anchors need special care: main.js's Lenis handler caches the
-  // page height, which the scroll lock collapses to one viewport — calling
-  // lenis.scrollTo synchronously would clamp the scroll to 0. So for "#..."
-  // links we stop Lenis's handler and scroll natively after unlocking, when
-  // the layout is fresh again.
   links.addEventListener(
     "click",
     (e) => {

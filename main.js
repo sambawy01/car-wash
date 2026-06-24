@@ -1,4 +1,4 @@
-/* Amber Noir — motion choreography
+/* Elite Eco Car Wash — motion choreography
    Progressive enhancement: page is fully readable with JS off or reduced motion. */
 (() => {
   // CSS gates the nav's hidden state behind .has-js so no-JS users always see it.

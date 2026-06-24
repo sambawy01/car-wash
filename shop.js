@@ -1,5 +1,5 @@
-/* ===== Studio Shop — products, cart, cash-on-delivery order flow =====
-   Vanilla IIFE, no dependencies. Cart persists in localStorage ("vv-cart").
+/* ===== Elite Eco Car Wash Shop — products, cart, cash-on-delivery order flow =====
+   Vanilla IIFE, no dependencies. Cart persists in localStorage ("eecw-cart").
    Order POSTs { items:[{slug, qty}], name, phone, email?, address, note, lang }
    to /api/order on the booking host. `email` is optional — when provided the
    server sends the buyer an order-confirmation email. */
@@ -8,8 +8,8 @@
 
   /* =====================================================================
      EMBEDDED PRODUCT DATA — OFFLINE FALLBACK ONLY.
-     The live catalog is fetched from GET <API_BASE>/api/products (Victoria
-     edits it from her admin panel); this embedded copy renders only when
+     The live catalog is fetched from GET <API_BASE>/api/products (admin
+     edits it from the admin panel); this embedded copy renders only when
      that fetch fails, so the shop never goes blank. It mirrors the SEED
      catalog in vercel-app/src/lib/catalog.ts.
      `photo` points at a 900×900 JPEG in assets/img/shop/ (the API may also
@@ -17,103 +17,103 @@
      `alt` is the per-language image description. If `photo` is null the
      card falls back to the tinted-gradient-and-initial placeholder art.
      `desc` is short marketing copy, rendered in the product detail modal.
-     Prices: `egp` in Egyptian pounds, `rub` in roubles.
+     Prices: `egp` in Egyptian pounds only.
      ===================================================================== */
   var EMBEDDED_PRODUCTS = [
     {
-      slug: "tohar-hamidbar-concentrate",
-      name: { en: "Tohar Hamidbar No.2 Herbal Concentrate", ru: "Травяной концентрат Tohar Hamidbar №2" },
-      sub: { en: "DM line · 150 ml", ru: "линия DM · 150 мл" },
-      egp: 1450, rub: 2000,
-      initial: { en: "T", ru: "Т" }, tintA: "#F0DAD4", tintB: "#DBB0A4",
-      photo: "assets/img/shop/tohar-hamidbar-concentrate.jpg",
+      slug: "premium-car-shampoo",
+      name: { en: "Premium Car Shampoo", ar: "شامبو سيارات فاخر" },
+      sub: { en: "1L", ar: "1 لتر" },
+      egp: 180,
+      initial: { en: "S", ar: "ش" }, tintA: "#DCE4EC", tintB: "#B7C6D6",
+      photo: "assets/img/shop/premium-car-shampoo.jpg",
       alt: {
-        en: "Onmacabim DM Tohar Hamidbar No.2 — white pump bottle with a green leaf motif",
-        ru: "Onmacabim DM Tohar Hamidbar №2 — белый флакон с помпой и зелёным листом"
+        en: "Premium car shampoo bottle — deep blue with silver cap",
+        ar: "زجاجة شامبو سيارات فاخر — أزرق داكن بغطاء فضي"
       },
       desc: {
-        en: "Highly concentrated herbal formula for oily, porous and blemish-prone skin. Plant extracts and acids cleanse and tighten pores, mattify, and calm the skin with a strong antioxidant effect.",
-        ru: "Высококонцентрированное растительное средство для жирной, пористой и проблемной кожи. Экстракты растений и кислоты очищают и сужают поры, матируют и успокаивают кожу, обладая мощным антиоксидантным действием."
+        en: "pH-neutral, high-foam shampoo that lifts dirt gently without stripping wax or sealant. Safe for all paint types, biodegradable formula.",
+        ar: "شامبو متعادل الحموضة برغوة عالية يرفع الأوساخ بلطف دون إزالة الشمع أو السيراميك. آمن لجميع أنواع الطلاء، صديق للبيئة."
       }
     },
     {
-      slug: "nd-neck-decollete-cream",
-      name: { en: "N.D Cream for Neck & Décolleté", ru: "Крем для шеи и декольте N.D" },
-      sub: { en: "Vivant line · 50 ml", ru: "линия Vivant · 50 мл" },
-      egp: 1250, rub: 1750,
-      initial: { en: "N", ru: "Н" }, tintA: "#E3E4D4", tintB: "#C9CCB0",
-      photo: "assets/img/shop/nd-neck-decollete-cream.jpg",
+      slug: "ceramic-wax-spray",
+      name: { en: "Ceramic Wax Spray", ar: "سيراميك وكس سبراي" },
+      sub: { en: "500ml", ar: "500 مل" },
+      egp: 250,
+      initial: { en: "C", ar: "س" }, tintA: "#E0D8CE", tintB: "#BFB1A2",
+      photo: "assets/img/shop/ceramic-wax-spray.jpg",
       alt: {
-        en: "Onmacabim Vivant N.D Cream — white jar beside its olive-green box",
-        ru: "Onmacabim Vivant N.D Cream — белая банка рядом с оливковой коробкой"
+        en: "Ceramic wax spray bottle — silver with blue label",
+        ar: "زجاجة سيراميك وكس سبراي — فضية بملصق أزرق"
       },
       desc: {
-        en: "A complex care cream for the delicate neck and décolleté zone combining natural and biotechnological components. Enzymes and lipopeptides support cell renewal and collagen synthesis for a natural firming effect.",
-        ru: "Комплексный крем для деликатной зоны шеи и декольте, сочетающий природные и биотехнологичные компоненты. Энзимы и липопептиды поддерживают обновление клеток и синтез коллагена, создавая естественный эффект лифтинга."
+        en: "Spray-on ceramic protection that bonds to paint for months of water-beading shine. Quick application, no machine needed. UV-resistant.",
+        ar: "حماية سيراميك بالبخاخ ترتبط بالطلاء لأشهر من لمعان يصد الماء. تطبيق سريع، لا يحتاج ماكينة. مقاوم للأشعة فوق البنفسجية."
       }
     },
     {
-      slug: "vitamin-c-mask",
-      name: { en: "Nourishing Skin Mask Vitamin C", ru: "Питательная маска с витамином C" },
-      sub: { en: "VC line · 50 ml", ru: "линия VC · 50 мл" },
-      egp: 2300, rub: 3200,
-      initial: { en: "C", ru: "С" }, tintA: "#F4E6C4", tintB: "#E2CC98",
-      photo: "assets/img/shop/vitamin-c-mask.jpg",
+      slug: "microfiber-cloth-set",
+      name: { en: "Microfiber Cloth Set", ar: "طقم أقمشة مايكروفايبر" },
+      sub: { en: "3 pack", ar: "3 قطع" },
+      egp: 120,
+      initial: { en: "M", ar: "م" }, tintA: "#F4E6C4", tintB: "#E2CC98",
+      photo: "assets/img/shop/microfiber-cloth-set.jpg",
       alt: {
-        en: "Onmacabim Nourishing Skin Mask Vitamin C — white tube beside its box",
-        ru: "Onmacabim питательная маска с витамином C — белая туба рядом с коробкой"
+        en: "Pack of three microfiber cloths — blue, grey, and white",
+        ar: "طقم ثلاث أقمشة مايكروفايبر — أزرق ورمادي وأبيض"
       },
       desc: {
-        en: "Rich, antioxidant-packed nourishing mask with a brightening effect. Helps reduce hyperpigmentation and supports collagen production — well suited to dehydrated skin with signs of photoaging.",
-        ru: "Насыщенная питательная маска с антиоксидантами и осветляющим эффектом. Помогает уменьшить гиперпигментацию и поддерживает выработку коллагена — подходит обезвоженной коже с признаками фотостарения."
+        en: "Ultra-soft, lint-free microfiber cloths for streak-free drying and polishing. 350 GSM, machine washable, scratch-safe on all surfaces.",
+        ar: "أقمشة مايكروفايبر ناعمة فائقة خالية من الوبر لتجفيف وتلميع بدون خطوط. 350 جرام، قابلة للغسل في الغسالة، آمنة على جميع الأسطح."
       }
     },
     {
-      slug: "vitality-spf15-moisturizer",
-      name: { en: "Vitality Moisturizer SPF 15", ru: "Увлажняющий крем Vitality SPF 15" },
-      sub: { en: "Oxygen line · 50 ml", ru: "линия Oxygen · 50 мл" },
-      egp: 1150, rub: 1600,
-      initial: { en: "V", ru: "В" }, tintA: "#DCE4EC", tintB: "#B7C6D6",
-      photo: "assets/img/shop/vitality-spf15-moisturizer.jpg",
+      slug: "tire-shine-gel",
+      name: { en: "Tire Shine Gel", ar: "جل تلميع الإطارات" },
+      sub: { en: "500ml", ar: "500 مل" },
+      egp: 150,
+      initial: { en: "T", ar: "إ" }, tintA: "#EFE0C8", tintB: "#DCC29B",
+      photo: "assets/img/shop/tire-shine-gel.jpg",
       alt: {
-        en: "Onmacabim Oxygen Vitality Moisturizing Lotion SPF 15 — white pump bottle beside its box",
-        ru: "Onmacabim Oxygen Vitality увлажняющий лосьон SPF 15 — белый флакон с помпой рядом с коробкой"
+        en: "Tire shine gel bottle — black with blue accent",
+        ar: "زجاجة جل تلميع الإطارات — أسود بلمسة زرقاء"
       },
       desc: {
-        en: "A light, quickly absorbed cream-fluid with a delicate fresh scent. Restores the skin's natural moisture balance, improves elasticity and complexion, and protects against UV with SPF 15.",
-        ru: "Лёгкий, быстро впитывающийся крем-флюид с нежным свежим ароматом. Восстанавливает естественный баланс влаги, повышает упругость, улучшает цвет лица и защищает от ультрафиолета с SPF 15."
+        en: "Long-lasting gel that gives tires a rich, satin-black finish. Water-resistant, no sling formula. Lasts up to 2 weeks per application.",
+        ar: "جل طويل الأمد يعطي الإطارات لمعة ساتان سوداء غنية. مقاوم للماء، بدون تطاير. يدوم حتى أسبوعين لكل تطبيق."
       }
     },
     {
-      slug: "nomela-serum",
-      name: { en: "NoMela Facial Serum", ru: "Сыворотка для лица NoMela" },
-      sub: { en: "Luna whitening series · 50 ml", ru: "осветляющая серия Luna · 50 мл" },
-      egp: 1350, rub: 1900,
-      initial: { en: "L", ru: "Л" }, tintA: "#EFE0C8", tintB: "#DCC29B",
-      photo: "assets/img/shop/nomela-serum.jpg",
+      slug: "interior-cleaner-spray",
+      name: { en: "Interior Cleaner Spray", ar: "منظف الداخل سبراي" },
+      sub: { en: "750ml", ar: "750 مل" },
+      egp: 130,
+      initial: { en: "I", ar: "د" }, tintA: "#DCE4EC", tintB: "#B7C6D6",
+      photo: "assets/img/shop/interior-cleaner-spray.jpg",
       alt: {
-        en: "Onmacabim Luna NoMela facial serum — white dropper bottle with a gold collar beside its box",
-        ru: "Onmacabim Luna NoMela сыворотка для лица — белый флакон с пипеткой и золотым ободком рядом с коробкой"
+        en: "Interior cleaner spray — white bottle with blue trigger",
+        ar: "سبراي منظف الداخل — زجاجة بيضاء بزر أزرق"
       },
       desc: {
-        en: "A delicate brightening serum that balances skin tone and helps prevent new pigmentation. Moisturizing polysaccharides and lightening extracts reduce melanin synthesis. For all skin types, year-round.",
-        ru: "Деликатная осветляющая сыворотка выравнивает тон кожи и помогает предотвратить появление новой пигментации. Увлажняющие полисахариды и осветляющие экстракты снижают синтез меланина. Для всех типов кожи, круглый год."
+        en: "Multi-surface cleaner for dashboard, doors, leather, and plastic. Lifts dust and oils without leaving residue or greasy film. Fresh scent.",
+        ar: "منظف متعدد الأسطح للوحة القيادة والأبواب والجلد والبلاستيك. يرفع الغبار والزيوت دون ترك بقايا أو طبقة دهنية. رائحة منعشة."
       }
     },
     {
-      slug: "moisturizer-normal-dry",
-      name: { en: "Moisturizer for Normal to Dry Skin", ru: "Увлажняющий крем для нормальной и сухой кожи" },
-      sub: { en: "ST Cells line · 50 ml", ru: "линия ST Cells · 50 мл" },
-      egp: 4850, rub: 6700,
-      initial: { en: "M", ru: "М" }, tintA: "#E0D8CE", tintB: "#BFB1A2",
-      photo: "assets/img/shop/moisturizer-normal-dry.jpg",
+      slug: "waterless-wash-spray",
+      name: { en: "Waterless Wash Spray", ar: "سبراي غسيل بدون مياه" },
+      sub: { en: "500ml", ar: "500 مل" },
+      egp: 220,
+      initial: { en: "W", ar: "غ" }, tintA: "#E0D8CE", tintB: "#BFB1A2",
+      photo: "assets/img/shop/waterless-wash-spray.jpg",
       alt: {
-        en: "Onmacabim ST Cells moisturizer for normal to dry skin — white pump bottle beside its box",
-        ru: "Onmacabim ST Cells увлажняющий крем для нормальной и сухой кожи — белый флакон с помпой рядом с коробкой"
+        en: "Waterless wash spray — blue bottle with spray nozzle",
+        ar: "سبراي غسيل بدون مياه — زجاجة زرقاء بفوهة بخاخ"
       },
       desc: {
-        en: "A stem-cell moisturizer that supports collagen production and hyaluronic acid renewal. Skin looks smoother, firmer and more rested, with better resistance to outside stressors.",
-        ru: "Увлажняющий крем с фитостволовыми клетками поддерживает выработку коллагена и обновление гиалуроновой кислоты. Кожа выглядит более гладкой, упругой и отдохнувшей, лучше противостоит внешним воздействиям."
+        en: "Eco-friendly waterless wash that encapsulates dirt for scratch-free removal. Leaves a glossy protective layer. Saves up to 150 litres per wash.",
+        ar: "غسيل صديق للبيئة بدون مياه يحاصر الأوساخ للإزالة بدون خدش. يترك طبقة واقية لامعة. يوفر حتى 150 لتر لكل غسلة."
       }
     }
   ];
@@ -123,17 +123,17 @@
      replaced by the live API catalog before first render when available. */
   var PRODUCTS = EMBEDDED_PRODUCTS;
 
-  var LANG = (document.documentElement.lang || "en").toLowerCase().indexOf("ru") === 0 ? "ru" : "en";
-  var STORAGE_KEY = "vv-cart";
+  var LANG = (document.documentElement.lang || "en").toLowerCase().indexOf("ar") === 0 ? "ar" : "en";
+  var STORAGE_KEY = "eecw-cart";
   var PHONE_RE = /^\+?[0-9\s\-()]{8,17}$/;
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var IS_LOCAL = location.hostname === "localhost" || location.hostname === "127.0.0.1";
   var API_BASE = IS_LOCAL
     ? "http://localhost:3000"
-    : "https://book.victoriaholisticbeauty.com";
+    : "https://book.eliteecocarwash.com";
   var API_URL = API_BASE + "/api/order";
   var PRODUCTS_URL = API_BASE + "/api/products";
-  var MAIL_TO = "victoria@victoriaholisticbeauty.com";
+  var MAIL_TO = "info@eliteecocarwash.com";
 
   var T = {
     en: {
@@ -149,22 +149,22 @@
       panelTitle: "Your order",
       close: "Close",
       total: "Total",
-      cod: "Payment: cash on delivery. Victoria will contact you to confirm your order, delivery time and address.",
+      cod: "Payment: cash on delivery. Our team will contact you to confirm your order and delivery time.",
       delivery: "Delivery within 24–72 hours across Egypt.",
       name: "Your name",
-      namePh: "Anna",
+      namePh: "Ahmed",
       nameErr: "Please tell us your name.",
       phone: "Mobile",
       phonePh: "+20 100 123 4567",
       phoneErr: "Please enter a valid phone number with country code, e.g. +20 100 123 4567.",
       email: "Email (for order confirmation)",
-      emailPh: "anna@example.com",
-      emailErr: "Please enter a valid email address, e.g. anna@example.com.",
+      emailPh: "ahmed@example.com",
+      emailErr: "Please enter a valid email address, e.g. ahmed@example.com.",
       address: "City & address",
       addressPh: "City, street, building…",
       addressErr: "Please tell us where to deliver.",
       note: "Note (optional)",
-      notePh: "Anything Victoria should know",
+      notePh: "Anything we should know",
       submit: "Place order",
       sending: "Sending…",
       successTitle: "Thank you — order placed!",
@@ -172,9 +172,9 @@
       successLine: "Our team will get in touch via WhatsApp to confirm your delivery time. Payment on delivery.",
       done: "Done",
       failLead: "We couldn't send your order right now.",
-      failLink: "Email it to Victoria instead",
+      failLink: "Email it to us instead",
       failTail: "— your cart is kept safe on this device.",
-      mailSubject: "Order request — Studio Shop",
+      mailSubject: "Order request — Elite Eco Car Wash Shop",
       mailOrder: "Order:",
       mailName: "Name:",
       mailPhone: "Phone:",
@@ -183,52 +183,52 @@
       mailNote: "Note:",
       mailTotal: "Total:"
     },
-    ru: {
-      add: "Добавить в заказ",
-      soldOut: "Нет в наличии",
-      view: "Подробнее",
-      decrease: "Уменьшить количество",
-      increase: "Увеличить количество",
-      qtyOf: "Количество:",
-      inCart: "в корзине",
-      itemOne: "товар",
-      reviewOrder: "Оформить",
-      panelTitle: "Ваш заказ",
-      close: "Закрыть",
-      total: "Итого",
-      cod: "Оплата при получении. Виктория свяжется с вами для подтверждения заказа, времени и адреса доставки.",
-      delivery: "Доставка по Египту в течение 24–72 часов.",
-      name: "Ваше имя",
-      namePh: "Анна",
-      nameErr: "Пожалуйста, представьтесь.",
-      phone: "Телефон",
-      phonePh: "+7 900 123-45-67",
-      phoneErr: "Введите корректный номер с кодом страны, например +7 900 123-45-67.",
-      email: "Эл. почта (для подтверждения заказа)",
-      emailPh: "anna@example.com",
-      emailErr: "Введите корректный адрес эл. почты, например anna@example.com.",
-      address: "Город и адрес",
-      addressPh: "Город, улица, дом…",
-      addressErr: "Укажите, куда доставить заказ.",
-      note: "Комментарий (необязательно)",
-      notePh: "Что Виктории стоит знать",
-      submit: "Оформить заказ",
-      sending: "Отправляем…",
-      successTitle: "Спасибо — заказ оформлен!",
-      orderNumberLabel: "Номер заказа: ",
-      successLine: "Наша команда свяжется с вами в WhatsApp, чтобы подтвердить время доставки. Оплата при получении.",
-      done: "Готово",
-      failLead: "Не получилось отправить заказ прямо сейчас.",
-      failLink: "Отправьте его Виктории по почте",
-      failTail: "— корзина сохранена на этом устройстве.",
-      mailSubject: "Заказ — Магазин студии",
-      mailOrder: "Заказ:",
-      mailName: "Имя:",
-      mailPhone: "Телефон:",
-      mailEmail: "Эл. почта:",
-      mailAddress: "Адрес:",
-      mailNote: "Комментарий:",
-      mailTotal: "Итого:"
+    ar: {
+      add: "أضف للطلب",
+      soldOut: "غير متوفر",
+      view: "عرض التفاصيل",
+      decrease: "إنقاص الكمية",
+      increase: "زيادة الكمية",
+      qtyOf: "كمية:",
+      inCart: "في السلة",
+      itemOne: "منتج",
+      reviewOrder: "مراجعة الطلب",
+      panelTitle: "طلبك",
+      close: "إغلاق",
+      total: "المجموع",
+      cod: "الدفع عند الاستلام. سيتواصل معك فريقنا لتأكيد طلبك ووقت التوصيل.",
+      delivery: "التوصيل خلال 24–72 ساعة في جميع أنحاء مصر.",
+      name: "اسمك",
+      namePh: "أحمد",
+      nameErr: "يرجى إخبارنا باسمك.",
+      phone: "رقم الهاتف",
+      phonePh: "+20 100 123 4567",
+      phoneErr: "يرجى إدخال رقم هاتف صحيح مع رمز الدولة، مثلاً +20 100 123 4567.",
+      email: "البريد الإلكتروني (لتأكيد الطلب)",
+      emailPh: "ahmed@example.com",
+      emailErr: "يرجى إدخال بريد إلكتروني صحيح، مثلاً ahmed@example.com.",
+      address: "المدينة والعنوان",
+      addressPh: "المدينة، الشارع، المبنى…",
+      addressErr: "يرجى إخبارنا أين نوصّل.",
+      note: "ملاحظة (اختياري)",
+      notePh: "أي شيء يجب أن نعرفه",
+      submit: "تقديم الطلب",
+      sending: "جارٍ الإرسال…",
+      successTitle: "شكراً — تم تقديم الطلب!",
+      orderNumberLabel: "رقم الطلب: ",
+      successLine: "سيتواصل معك فريقنا عبر واتساب لتأكيد وقت التوصيل. الدفع عند الاستلام.",
+      done: "تم",
+      failLead: "تعذّر إرسال طلبك في الوقت الحالي.",
+      failLink: "أرسله بالبريد الإلكتروني بدلاً من ذلك",
+      failTail: "— سلتك محفوظة على هذا الجهاز.",
+      mailSubject: "طلب — متجر Elite Eco Car Wash",
+      mailOrder: "الطلب:",
+      mailName: "الاسم:",
+      mailPhone: "الهاتف:",
+      mailEmail: "البريد:",
+      mailAddress: "العنوان:",
+      mailNote: "ملاحظة:",
+      mailTotal: "المجموع:"
     }
   }[LANG];
 
@@ -243,9 +243,9 @@
   }
   function langPair(obj) {
     obj = obj || {};
-    return { en: typeof obj.en === "string" ? obj.en : "", ru: typeof obj.ru === "string" ? obj.ru : "" };
+    return { en: typeof obj.en === "string" ? obj.en : "", ar: typeof obj.ar === "string" ? obj.ar : "" };
   }
-  /* Map the public API catalog ({slug, name, sub, desc, priceEgp, priceRub,
+  /* Map the public API catalog ({slug, name, sub, desc, priceEgp,
      photo, alt, soldOut}) onto the renderer's product shape. Tints and the
      placeholder initial are reused from the embedded copy when the slug is
      known, otherwise derived/defaulted. `photo` may be a site-relative path
@@ -255,12 +255,12 @@
     for (var i = 0; i < list.length; i++) {
       var ap = list[i] || {};
       if (typeof ap.slug !== "string" || !ap.slug) continue;
-      if (typeof ap.priceEgp !== "number" || typeof ap.priceRub !== "number") continue;
+      if (typeof ap.priceEgp !== "number") continue;
       var base = embeddedBySlug(ap.slug);
       var name = langPair(ap.name);
-      if (!name.en && !name.ru) continue;
-      if (!name.en) name.en = name.ru;
-      if (!name.ru) name.ru = name.en;
+      if (!name.en && !name.ar) continue;
+      if (!name.en) name.en = name.ar;
+      if (!name.ar) name.ar = name.en;
       mapped.push({
         slug: ap.slug,
         name: name,
@@ -268,24 +268,19 @@
         desc: langPair(ap.desc),
         alt: langPair(ap.alt),
         egp: ap.priceEgp,
-        rub: ap.priceRub,
         photo: typeof ap.photo === "string" && ap.photo ? ap.photo : null,
         soldOut: !!ap.soldOut,
-        initial: base ? base.initial : { en: (name.en.charAt(0) || "·").toUpperCase(), ru: (name.ru.charAt(0) || "·").toUpperCase() },
-        tintA: base ? base.tintA : "#E0D8CE",
-        tintB: base ? base.tintB : "#BFB1A2"
+        initial: base ? base.initial : { en: (name.en.charAt(0) || "·").toUpperCase(), ar: (name.ar.charAt(0) || "·") },
+        tintA: base ? base.tintA : "#DCE4EC",
+        tintB: base ? base.tintB : "#B7C6D6"
       });
     }
     return mapped;
   }
   function fmtEgp(n) { return "E£" + n.toLocaleString("en-US"); }
-  function fmtRub(n) { return n.toLocaleString("ru-RU").replace(/ |\s/g, " ") + " ₽"; }
   function itemsWord(n) {
-    if (LANG === "ru") {
-      var m10 = n % 10, m100 = n % 100;
-      if (m10 === 1 && m100 !== 11) return "товар";
-      if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return "товара";
-      return "товаров";
+    if (LANG === "ar") {
+      return n === 1 ? "منتج" : "منتجات";
     }
     return n === 1 ? "item" : "items";
   }
@@ -296,8 +291,6 @@
       var raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
       for (var slug in raw) {
         var product = bySlug(slug);
-        /* Unknown (removed) and sold-out products are silently dropped —
-           the cart only ever holds currently orderable items. */
         if (product && !product.soldOut && typeof raw[slug] === "number") {
           var q = Math.floor(raw[slug]);
           if (q >= 1) cart[slug] = Math.min(q, 99);
@@ -310,13 +303,13 @@
   }
   function cartCount() { var n = 0; for (var s in cart) n += cart[s]; return n; }
   function cartTotals() {
-    var egp = 0, rub = 0;
-    for (var s in cart) { var p = bySlug(s); egp += p.egp * cart[s]; rub += p.rub * cart[s]; }
-    return { egp: egp, rub: rub };
+    var egp = 0;
+    for (var s in cart) { var p = bySlug(s); egp += p.egp * cart[s]; }
+    return { egp: egp };
   }
   function setQty(slug, qty) {
     var product = bySlug(slug);
-    if (!product || product.soldOut) return; /* sold-out: never enters the cart */
+    if (!product || product.soldOut) return;
     if (qty <= 0) delete cart[slug]; else cart[slug] = Math.min(qty, 99);
     saveCart();
     renderAction(slug);
@@ -339,14 +332,10 @@
   var grid = document.getElementById("shop-grid");
   var actionEls = {}; // slug -> .shop-action element
 
-  /* Fills any holder (card action area or product-modal action area) with the
-     Add button / qty stepper pair for a product. */
   function fillAction(holder, slug) {
     var p = bySlug(slug);
     holder.textContent = "";
     if (p.soldOut) {
-      /* Sold out: the Add button becomes a disabled state (price stays
-         visible on the card/modal as usual). */
       var so = document.createElement("button");
       so.type = "button";
       so.className = "shop-add shop-add-soldout";
@@ -394,15 +383,10 @@
     }
   }
 
-  /* Re-render the action area for a product on its card AND, when the product
-     detail modal is open on the same product, inside the modal — both views
-     stay in sync as quantities change. */
   function renderAction(slug) {
     if (actionEls[slug]) fillAction(actionEls[slug], slug);
     if (pActionHolder && pSlug === slug) {
       fillAction(pActionHolder, slug);
-      /* The re-render swaps Add ↔ stepper; if focus was on the removed
-         control, restore it inside the modal so the trap keeps working. */
       if (pPanel && !pPanel.contains(document.activeElement)) {
         var next = pActionHolder.querySelector("button");
         if (next) next.focus();
@@ -410,8 +394,6 @@
     }
   }
 
-  /* Shared art builder — product photo over its tinted gradient (or the
-     serif-initial placeholder when no photo exists). */
   function buildArt(p, cls, eager) {
     var art = document.createElement("div");
     art.className = cls;
@@ -434,8 +416,6 @@
       art.appendChild(ini);
     }
     if (p.soldOut) {
-      /* Tasteful badge over the photo. Styled inline so the static
-         stylesheet needs no changes for this API-driven state. */
       art.style.position = "relative";
       var badge = document.createElement("span");
       badge.className = "shop-soldout-badge";
@@ -443,7 +423,7 @@
       badge.style.cssText =
         "position:absolute;top:12px;left:12px;z-index:2;" +
         "padding:5px 12px;border-radius:999px;" +
-        "background:rgba(58,51,44,0.82);color:#FDF9F3;" +
+        "background:rgba(10,26,47,0.82);color:#F8FAFC;" +
         "font-size:12px;letter-spacing:0.08em;text-transform:uppercase;" +
         "pointer-events:none;";
       art.appendChild(badge);
@@ -460,8 +440,6 @@
     PRODUCTS.forEach(function (p) {
       var card = document.createElement("article");
       card.className = "shop-card";
-      /* Whole card opens the product detail modal; the Add button / stepper
-         stays independently clickable (its holder stops propagation). */
       card.tabIndex = 0;
       card.setAttribute("role", "button");
       card.setAttribute("aria-haspopup", "dialog");
@@ -487,13 +465,9 @@
       sub.textContent = p.sub[LANG];
       var price = document.createElement("p");
       price.className = "shop-price";
-      price.appendChild(document.createTextNode(fmtEgp(p.egp) + " "));
-      var small = document.createElement("small");
-      small.textContent = "· " + fmtRub(p.rub);
-      price.appendChild(small);
+      price.appendChild(document.createTextNode(fmtEgp(p.egp)));
       var action = document.createElement("div");
       action.className = "shop-action";
-      /* Cart controls must not bubble up into the card's open-modal click. */
       action.addEventListener("click", function (ev) { ev.stopPropagation(); });
       actionEls[p.slug] = action;
 
@@ -508,10 +482,7 @@
     });
   }
 
-  /* ---------- product detail modal ----------
-     Opened by clicking/keying a product card. Reuses the treatment-modal
-     visual language (scrim + blur overlay, --card sheet) and the shop-add /
-     shop-stepper controls, kept in sync with the card via renderAction. */
+  /* ---------- product detail modal ---------- */
   var pOverlay = null, pPanel = null, pActionHolder = null, pSlug = null, pLastFocus = null;
 
   function pTrapKeydown(ev) {
@@ -563,8 +534,7 @@
     name.id = "pmodal-title";
     var sub = el("p", "pmodal-sub", p.sub[LANG]);
     var desc = el("p", "pmodal-desc", (p.desc && p.desc[LANG]) || "");
-    var price = el("p", "pmodal-price", fmtEgp(p.egp) + " ");
-    price.appendChild(el("small", null, "· " + fmtRub(p.rub)));
+    var price = el("p", "pmodal-price", fmtEgp(p.egp));
     pActionHolder = el("div", "pmodal-action");
     fillAction(pActionHolder, slug);
 
@@ -658,7 +628,7 @@
       var p = bySlug(s);
       lines.push("· " + p.name[LANG] + " (" + p.sub[LANG] + ") × " + cart[s] + " — " + fmtEgp(p.egp * cart[s]));
     }
-    lines.push(T.mailTotal + " " + fmtEgp(totals.egp) + " · " + fmtRub(totals.rub));
+    lines.push(T.mailTotal + " " + fmtEgp(totals.egp));
     var f = panel ? panel.querySelector("form") : null;
     if (f) {
       lines.push("");
@@ -783,9 +753,6 @@
         body: JSON.stringify(payload)
       }).then(function (res) {
         if (res.status === 400) {
-          /* Validation rejection — e.g. an item sold out after it was added
-             to the cart. Surface the server's (bilingual) message instead of
-             the generic network-failure mailto fallback. */
           return res.json().then(function (data) {
             var messages = [];
             if (data && data.fields) {
@@ -797,8 +764,6 @@
           }, function () { throw new Error("HTTP 400"); });
         }
         if (!res.ok) throw new Error("HTTP " + res.status);
-        /* Body parse failures must not turn a placed order into an error —
-           degrade to a success modal without the order number. */
         return res.json().catch(function () { return {}; });
       }).then(function (data) {
         showSuccess(data && typeof data.orderNumber === "string" ? data.orderNumber : "");
@@ -853,9 +818,7 @@
     var totals = cartTotals();
     total.textContent = "";
     total.appendChild(el("span", null, T.total));
-    var sum = el("span", "order-total-sum", fmtEgp(totals.egp) + " ");
-    sum.appendChild(el("small", null, "· " + fmtRub(totals.rub)));
-    total.appendChild(sum);
+    total.appendChild(el("span", "order-total-sum", fmtEgp(totals.egp)));
   }
 
   function showSuccess(orderNumber) {
@@ -874,7 +837,6 @@
     box.appendChild(mark);
     box.appendChild(title);
     if (orderNumber) {
-      /* Server-issued order number — omitted gracefully when absent. */
       var numLine = el("p", "order-success-line order-success-num");
       numLine.appendChild(el("strong", null, T.orderNumberLabel + orderNumber));
       box.appendChild(numLine);
@@ -901,7 +863,6 @@
     var last = focusables[focusables.length - 1];
     var active = document.activeElement;
     if (!panel.contains(active) || active === panel) {
-      /* focus is on the panel container or escaped it — pull it back in */
       ev.preventDefault();
       (ev.shiftKey ? last : first).focus();
       return;
@@ -935,13 +896,7 @@
     else if (!bar.hidden) bar.focus();
   }
 
-  /* ---------- init ----------
-     The live catalog comes from the booking host (Victoria edits it in her
-     admin panel) so price changes and sold-out flags appear without a site
-     deploy. If the fetch fails — host down, offline, ad-blocker — the page
-     renders the embedded copy above so the shop never goes blank. The cart
-     is loaded AFTER the catalog settles so stale/sold-out slugs get pruned
-     against the catalog actually being rendered. */
+  /* ---------- init ---------- */
   function init() {
     loadCart();
     renderGrid();
