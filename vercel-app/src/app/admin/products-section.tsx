@@ -187,9 +187,6 @@ function ProductForm({
       setError("Price (EGP) must be a whole number.");
       return;
     }
-      setError("Price must be a whole number.");
-      return;
-    }
     let quantity: number | null = null;
     if (form.quantity.trim() !== "") {
       quantity = Number(form.quantity);
@@ -248,7 +245,10 @@ function ProductForm({
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-3">
-          <div>set({ /* removed */ })} />
+          <div>
+            <label className={labelCls}>Price (EGP)</label>
+            <input className={inputCls} inputMode="numeric" value={form.priceEgp} onChange={(e) => set({ priceEgp: e.target.value })} />
+          </div>
         </div>
         <div>
           <label className={labelCls}>Quantity (empty = untracked)</label>

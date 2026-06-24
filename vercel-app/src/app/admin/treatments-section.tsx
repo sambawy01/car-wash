@@ -62,9 +62,9 @@ function statusChip(t: Treatment): { label: string; cls: string } {
 
 interface FormState {
   enName: string;
-  ruName: string;
+  arName: string;
   enDesc: string;
-  ruDesc: string;
+  arDesc: string;
   duration: string;
   priceEgp: string;
   active: boolean;
@@ -105,7 +105,7 @@ function TreatmentForm({
     const duration = Number(form.duration);
     const priceEgp = Number(form.priceEgp);
     if (!form.enName.trim() || !form.arName.trim()) {
-      setError("Both EN and RU names are required.");
+      setError("Both EN and AR names are required.");
       return;
     }
     if (!Number.isInteger(duration) || duration < 5 || form.duration === "") {
@@ -114,9 +114,6 @@ function TreatmentForm({
     }
     if (!Number.isInteger(priceEgp) || priceEgp < 0 || form.priceEgp === "") {
       setError("Price (EGP) must be a whole number.");
-      return;
-    }
-      setError("Price must be a whole number.");
       return;
     }
 
@@ -179,7 +176,32 @@ function TreatmentForm({
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-3">
-          <div>set({ /* removed */ })} />
+          <div>
+            <label className={labelCls}>Name (EN)</label>
+            <input className={inputCls} value={form.enName} onChange={(e) => set({ enName: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelCls}>Name (AR)</label>
+            <input className={inputCls} value={form.arName} onChange={(e) => set({ arName: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelCls}>Description (EN)</label>
+            <textarea className={inputCls} rows={3} value={form.enDesc} onChange={(e) => set({ enDesc: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelCls}>Description (AR)</label>
+            <textarea className={inputCls} rows={3} value={form.arDesc} onChange={(e) => set({ arDesc: e.target.value })} />
+          </div>
+        </div>
+        <div className="space-y-3">
+          <div>
+            <label className={labelCls}>Duration (minutes)</label>
+            <input className={inputCls} inputMode="numeric" value={form.duration} onChange={(e) => set({ duration: e.target.value })} />
+          </div>
+          <div>
+            <label className={labelCls}>Price (EGP)</label>
+            <input className={inputCls} inputMode="numeric" value={form.priceEgp} onChange={(e) => set({ priceEgp: e.target.value })} />
+          </div>
         </div>
       </div>
 
